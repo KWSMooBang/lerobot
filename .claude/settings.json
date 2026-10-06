@@ -1,0 +1,21 @@
+{
+  "crossSessionInbound": "accept",
+  "permissions": {
+    "additionalDirectories": ["/outputs", "/data", "/data-work", "/data0", "/data1", "/data2", "/harness"],
+    "allow": [
+      "Bash(/harness/launch.sh *)", "Bash(RUN_HOURS=* /harness/launch.sh *)", "Bash(/harness/qstat.sh)",
+      "Bash(uv sync)", "Bash(uv sync *)", "Bash(uv add *)", "Bash(uv lock *)",
+      "Bash(uv run pytest *)", "Bash(pytest *)", "Bash(pre-commit run *)", "Bash(uv run pre-commit *)",
+      "Bash(git *)", "Bash(codex exec *)"
+    ],
+    "ask": ["Bash(sudo *)", "Bash(sys-install *)"],
+    "deny": [
+      "Bash(torchrun *)", "Bash(accelerate launch *)", "Bash(deepspeed *)",
+      "Bash(lerobot-train *)", "Bash(uv run lerobot-train *)", "Bash(python -m lerobot.scripts.lerobot_train *)",
+      "Bash(uv run python -m lerobot.scripts.lerobot_train *)",
+      "Bash(lerobot-eval *)", "Bash(uv run lerobot-eval *)",
+      "Bash(kill *)", "Bash(pkill *)", "Bash(git push --force *)", "Bash(git push * main)", "Bash(git push * pid4vla)",
+      "Bash(ssh *)", "Bash(rm -rf /outputs *)"
+    ]
+  }
+}

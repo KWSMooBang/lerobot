@@ -176,3 +176,7 @@ outputs/
 *.urdf
 *.xml
 *.part
+
+# pid4vla research workflow
+.claude/worktrees/
+.claude/settings.local.json
