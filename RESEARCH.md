@@ -43,7 +43,7 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## GPU 예산
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
   (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
-- 미정 — 파일럿 실측 후 확정. T001 smoke 실측 (RTX 4090, GPU 0): ≈45 ms/step, 모델 로드 60–90 s/run.
+- P2 범위 결정 대기 (2026-10-26, 사람에게 질문). T001 smoke 실측 (RTX 4090, GPU 0): ≈45 ms/step, 모델 로드 60–90 s/run.
   ep 당: pi05lib C0 5.5 s (조기 종료), 300 step 조건 ≈14 s, pi05base 는 항상 max step (≈13–14 s, l10 은 ≈24 s).
   → P1 파일럿 (Spatial·Goal × C0/C1/C4/C5 × 10 task × 10 ep, 두 모델) ≈ 9–10 GPU-h.
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
@@ -55,7 +55,6 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
   같은 run 동시 제출 경합, --hours 검증 없음. **파일럿 중에는 .claude/worktrees/sc-pilot 의 submit.sh 를 고치거나 worktree 를 지우지 말 것**
   (driver bash 가 그 파일을 읽으며 실행 중).
 - T004 batched 경로: npz·mp4 교체가 서로 독립이라 이론상 두 시도의 파일이 섞일 수 있음 (commit 된 npz 가 깨져 있어야 생기므로 사실상 불가, codex 2차). attempt 별 경로로 바꿀 때 같이.
-- T004 GPU 확인 (single vs batched N=4 일치율, 처리량): 파일럿 종료 후 GPU 0 에서 ≤20분.
 - metrics.py C0 repeat 키에 base seed 가 없음 (codex 2차 리뷰). 지금은 seed 7 하나라 무해. 여러 seed 를 쓰기 전에 고칠 것.
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
@@ -69,3 +68,5 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-25 사람 지시: 파일럿이 끝나면 결과 문서에 영상 위주로 정리. T005(analysis) 가 영상·manifest 를 만들고 lead 가 문서에 올린다.
 - 2026-10-25 T002 병합 (exp/sc-instructions 4d97228c). swap 102개 중 101 feasible. codex 리뷰: goal t3 swap 의 Open 누락 지적은 원본 goal 도 In 만 쓰므로 유지.
 - 2026-10-25 T004 병합 (exp/sc-multigpu 1b7a67f1, CPU 테스트 25/25). P2 추정: 46,100 ep, 단일 경로 ≈162 GPU-h, 4×A100 ≈6 h (범위 3–11 h, 미측정 β 가정).
+- 2026-10-26 P1 완료 (16 run, 7.04 GPU-h). pi05lib: Spatial 은 지시를 바꿔도 원래 goal (C5 94.0% vs 새 0.5%, C4 61.1% vs 30.0%), Goal 은 언어 사용 (C1 13.0%, C4 새 40.0%). pi05base 전 조건 0% → 대조군 역할 못 함.
+- 2026-10-26 T005 결과 문서 반영 (개요·π0.5 LIBERO·π0.5 base 탭, 영상 18개, SR 차트). T006 GPU 확인 (4090): batched N=4 가 single 대비 3.4× (70 vs 20.8 step/s), β=0.27. single vs batched 일치: success_orig 24/24, grasp 24/24, C4 success_new 13/16 (bf16 배치로 step 0 부터 action 차이 ≈1e-3, C4 에서 궤적이 갈라짐) → batched 결과는 single 과 절대 짝짓지 않는다 (metrics 기본 차단). P2 추정: single ≈173 GPU-h, 4×A100 P=2 N=8–16 ≈5–6 h (3–7 h, A100 값 미측정).
