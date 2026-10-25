@@ -2,7 +2,7 @@
 
 설계 원문: "LIBERO Shortcut Learning 관측 실험 설계" (https://claude.ai/artifact/7jaV1qVgL53Dx2ZsjaSbr9, 2026-10-25).
 아래는 실행용 요약이며, 조건·지표의 세부 정의는 원문 1–9장을 따른다. 결과는 같은 문서의 모델별 탭에 정리한다
-(개요 · π0.5 · π0 · OpenVLA-OFT, rollout 영상 위주).
+(개요 · π0.5 LIBERO · π0.5 base · OpenVLA-OFT(보류), rollout 영상 위주).
 문서 id 3688b476-b3d8-4faa-9cbe-648f12a5d2a2 · 탭 body: 개요 148053fd-b595, π0.5 LIBERO a53f724e-8515,
 π0.5 base 7c071bcc-f214, OpenVLA-OFT(보류) 9f0d56b1-1013. 영상은 문서 artifact 에 asset 업로드 → blob → 탭에 삽입 (mp4 + 3MB 이하 gif).
 
