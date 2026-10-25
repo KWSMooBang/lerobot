@@ -41,6 +41,8 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - C9 (vision-only 학습) 는 선택, 보류
 
 ## GPU 예산
+- 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
+  (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
 - 미정 — 사람에게 확인 요청 중 (2026-10-25). 추정치: 모델당 P2 ≈ 50–70 GPU-h (17 조건 × 2000 ep, C4–C6 는 조기 종료 없음),
   파일럿 P1 ≈ 3–5 GPU-h. P1 실측 후 재추정.
 
