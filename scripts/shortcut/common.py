@@ -7,6 +7,7 @@ on `exp/pid-demo`.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import importlib.util
 import json
@@ -53,6 +54,8 @@ BASE_CKPT = {"pi05": "lerobot/pi05_base"}
 # available. Same fallback as exp/pid-demo: the public big_vision PaliGemma sentencepiece model that
 # OpenPI uses, loaded with BOS on / EOS off like the HF tokenizer config.
 TOKENIZER_DIR = os.environ.get("SC_TOKENIZER_DIR", "/cache/pid_demo_dl/paligemma_tok_hf")
+# where setup_server.sh puts gs://big_vision/paligemma_tokenizer.model on a new server
+USER_TOKENIZER_DIR = Path.home() / ".cache" / "shortcut_libero" / "paligemma_tok_hf"
 
 
 # ---------------------------------------------------------------- LIBERO config
@@ -224,6 +227,7 @@ def check_resume(identity: dict[str, Any], prev_meta: dict[str, Any] | None, ep_
             raise SystemExit(
                 f"{ep_path.parent}: run_meta.json has no identity (older harness); use a new --out"
             )
+        prev = legacy_exec_identity(prev, prev_meta, identity)
         diff = {k: (prev.get(k), v) for k, v in identity.items() if prev.get(k) != v}
         if diff:
             raise SystemExit(f"{ep_path.parent} was written with another configuration (old, new): {diff}")
@@ -240,6 +244,32 @@ def check_resume(identity: dict[str, Any], prev_meta: dict[str, Any] | None, ep_
             raise SystemExit(f"{ep_path}: episode {got} does not match this run {exp}")
 
 
+EXEC_KEYS = ("exec_mode", "gpu", "torch", "cuda")
+
+
+def exec_identity(exec_mode: str, gpu: str | None) -> dict[str, Any]:
+    """Execution fields of a run identity. bf16 batched kernels are not bit-identical to batch 1, so
+    episodes from different exec modes or GPU models are kept apart (resume guard, metrics pairing)."""
+    import torch
+
+    return {"exec_mode": exec_mode, "gpu": gpu, "torch": torch.__version__, "cuda": torch.version.cuda}
+
+
+def legacy_exec_identity(
+    prev: dict[str, Any], prev_meta: dict[str, Any], identity: dict[str, Any]
+) -> dict[str, Any]:
+    """Run dirs written before exec fields existed (T001) were single-env runs; their GPU and torch are
+    in the top level of run_meta.json. The CUDA build was not recorded, so it is taken as unchanged."""
+    if all(k in prev for k in EXEC_KEYS) or not any(k in identity for k in EXEC_KEYS):
+        return prev
+    filled = dict(prev)
+    filled.setdefault("exec_mode", "single")
+    filled.setdefault("gpu", prev_meta.get("gpu"))
+    filled.setdefault("torch", prev_meta.get("torch"))
+    filled.setdefault("cuda", identity.get("cuda"))
+    return filled
+
+
 def video_relpath(
     suite: str, task_id: int, condition: str, variant: str, init_idx: int, repeat_idx: int
 ) -> str:
@@ -253,8 +283,9 @@ def video_relpath(
 def load_tokenizer() -> Any:
     from transformers import AutoTokenizer, GemmaTokenizer
 
-    if Path(TOKENIZER_DIR).exists():
-        return GemmaTokenizer.from_pretrained(TOKENIZER_DIR, add_bos_token=True, add_eos_token=False)
+    for d in (Path(TOKENIZER_DIR), USER_TOKENIZER_DIR):
+        if (d / "tokenizer.model").exists():
+            return GemmaTokenizer.from_pretrained(str(d), add_bos_token=True, add_eos_token=False)
     return AutoTokenizer.from_pretrained("google/paligemma-3b-pt-224")
 
 
@@ -283,6 +314,7 @@ def load_policy(
     n_action_steps: int,
     device: str = "cuda",
     libero_adapter: str | None = None,
+    compile_model: bool = False,
 ) -> tuple:
     """Load like lerobot-eval (policy.path=ckpt) with a fixed n_action_steps. Returns
     (policy, pre, post, env_pre, env_post, tokenizer, inference_meta).
@@ -340,14 +372,14 @@ def load_policy(
         "tokenizer_max_length": getattr(cfg, "tokenizer_max_length", None),
         "dtype": getattr(cfg, "dtype", None),
         "temporal_ensembling": False,
-        "compile_model": False,
+        "compile_model": compile_model,
     }
     meta["libero_adapter"] = adapter_meta
     cfg.pretrained_path = Path(cfg_src)
     cfg.device = device
     cfg.n_action_steps = n_action_steps
     if hasattr(cfg, "compile_model"):
-        cfg.compile_model = False
+        cfg.compile_model = compile_model
     env_cfg = LiberoEnvConfig(task=suite)
     policy = make_policy(cfg=cfg, env_cfg=env_cfg, pretrained_path=ckpt)
     policy.eval()
@@ -367,6 +399,7 @@ def load_policy(
     return policy, pre, post, env_pre, env_post, tokenizer, meta
 
 
+@functools.cache  # hub calls once per checkpoint (run_multi plans many runs)
 def checkpoint_training_info(ckpt: str) -> dict[str, Any]:
     """Mixed vs per-suite training, read from the checkpoint's train_config.json and model card."""
     from huggingface_hub import HfApi, ModelCard, hf_hub_download

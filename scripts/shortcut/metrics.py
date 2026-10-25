@@ -3,6 +3,8 @@
     uv run python scripts/shortcut/metrics.py /outputs/VLA-shortcut-exps/runs/sc-* --out results/shortcut
 
 Each argument is a run dir (containing episodes.jsonl), an episodes.jsonl file, or a glob.
+Episodes pair only within one (exec_mode, GPU model) from run_meta.json (single vs batched-N runs are not
+bit-identical); --allow-mixed-exec pairs across them. Mixed inputs print a warning.
 
 Columns (design doc §5, §7):
   sr_orig        original goal reached. C0 → SR(C0); C1–C3 → SR under that instruction;
@@ -38,6 +40,9 @@ import numpy as np
 from scipy.stats import binomtest
 
 DTW_MAX_POINTS = 120
+# Episodes pair only within one (exec_mode, GPU model): bf16 batched kernels are not bit-identical to the
+# single-env path. --allow-mixed-exec turns this off.
+ALLOW_MIXED_EXEC = False
 
 
 def wilson(k: int, n: int, z: float = 1.959964) -> tuple[float, float]:
@@ -93,12 +98,38 @@ def load_episodes(inputs: Iterable[str]) -> list[dict[str, Any]]:
         if not f.exists():
             print(f"[skip] {f}")
             continue
+        sig = run_exec(f.parent)
         for line in f.read_text().splitlines():
             if line.strip():
                 r = json.loads(line)
                 r["_root"] = str(f.parent)
+                r["_exec"] = sig
                 eps.append(r)
     return eps
+
+
+def run_exec(run_dir: Path) -> tuple[str, str | None]:
+    """(exec_mode, GPU model) from run_meta.json; runs from before exec_mode existed were single-env."""
+    meta_path = run_dir / "run_meta.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    ident = meta.get("identity") or {}
+    return ident.get("exec_mode", "single"), ident.get("gpu", meta.get("gpu"))
+
+
+def exec_sig(r: dict[str, Any]) -> tuple:
+    """Pairing-key suffix; empty with --allow-mixed-exec or for records not read by load_episodes."""
+    return () if ALLOW_MIXED_EXEC or "_exec" not in r else tuple(r["_exec"])
+
+
+def warn_mixed_exec(eps: list[dict[str, Any]]) -> None:
+    sigs = sorted({tuple(r.get("_exec") or ("single", None)) for r in eps}, key=str)
+    if len(sigs) > 1:
+        how = (
+            "paired anyway (--allow-mixed-exec)"
+            if ALLOW_MIXED_EXEC
+            else "episodes pair only within the same (exec_mode, gpu); pass --allow-mixed-exec to pair across"
+        )
+        print(f"[warn] inputs mix exec modes / GPU models {sigs}: {how}. SR rows still pool all inputs.")
 
 
 def eef(r: dict[str, Any], cache: dict[str, np.ndarray]) -> np.ndarray:
@@ -123,7 +154,11 @@ def pair_key(r: dict[str, Any], repeat_idx: int | None = None) -> tuple:
     given repeat, so a C4 episode at repeat 0 pairs with the C0 episode of the same seed at repeat 0.
     """
     rep = r.get("repeat_idx", 0) if repeat_idx is None else repeat_idx
-    return (r["model"], r["ckpt"], r["suite"], r["task_id"], r["init_idx"], rep, r["seed"])
+    return (r["model"], r["ckpt"], r["suite"], r["task_id"], r["init_idx"], rep, r["seed"], *exec_sig(r))
+
+
+def c0_loc(r: dict[str, Any]) -> tuple:
+    return (r["model"], r["ckpt"], r["suite"], r["task_id"], r["init_idx"], *exec_sig(r))
 
 
 def index_c0(eps: list[dict[str, Any]]) -> tuple[dict[tuple, dict], dict[tuple, dict[int, dict]]]:
@@ -136,7 +171,7 @@ def index_c0(eps: list[dict[str, Any]]) -> tuple[dict[tuple, dict], dict[tuple, 
             continue
         k = pair_key(r)
         rep = r.get("repeat_idx", 0)
-        loc = (r["model"], r["ckpt"], r["suite"], r["task_id"], r["init_idx"])
+        loc = c0_loc(r)
         if rep in reps[loc]:
             raise ValueError(
                 f"duplicate C0 episode {loc} repeat {rep}: {r['_root']} and {reps[loc][rep]['_root']}"
@@ -228,8 +263,7 @@ def summarize(eps: list[dict[str, Any]], by_task: bool) -> list[dict[str, Any]]:
         if cond == "C0":
             d = []
             for r in main:
-                loc = (r["model"], r["ckpt"], r["suite"], r["task_id"], r["init_idx"])
-                for rep, other in c0_reps[loc].items():
+                for rep, other in c0_reps[c0_loc(r)].items():
                     if rep > 0:
                         a, b = eef(r, cache), eef(other, cache)
                         n_min = min(len(a), len(b))
@@ -291,12 +325,12 @@ def summarize_repeats(eps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """C0 repeat k vs repeat 0 at the same (task, init): agreement of success and first grasp, McNemar, DTW."""
     _, c0_reps = index_c0(eps)
     groups: dict[tuple, list[tuple[dict, dict]]] = defaultdict(list)
-    for (model, _ckpt, suite, _task, _init), reps in c0_reps.items():
+    for loc, reps in c0_reps.items():
         if 0 not in reps:
             continue
         for k, r in reps.items():
             if k > 0:
-                groups[(model, suite, k)].append((reps[0], r))
+                groups[(loc[0], loc[2], k)].append((reps[0], r))
     cache: dict[str, np.ndarray] = {}
     rows = []
     for (model, suite, k), pairs in sorted(groups.items(), key=lambda kv: tuple(map(str, kv[0]))):
@@ -436,10 +470,18 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--out", required=True)
+    ap.add_argument(
+        "--allow-mixed-exec",
+        action="store_true",
+        help="pair episodes across exec modes (single / batched-N) and GPU models",
+    )
     args = ap.parse_args()
+    global ALLOW_MIXED_EXEC
+    ALLOW_MIXED_EXEC = args.allow_mixed_exec
     eps = load_episodes(args.inputs)
     if not eps:
         raise SystemExit("no episodes found")
+    warn_mixed_exec(eps)
     check_unique(eps)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)

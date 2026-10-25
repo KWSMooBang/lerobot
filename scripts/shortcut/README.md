@@ -9,6 +9,9 @@ states stay original. Only the instruction string given to π0.5 changes.
 | `metrics.py`            | episodes.jsonl → `by_condition.csv`, `by_task.csv`, `by_variant.csv` (per-variant McNemar), `repeats.csv` (C0 repeat agreement), `summary.md`                                       |
 | `make_compare_video.py` | same (task, init), several conditions side by side → mp4 + GIF ≤ 3 MB                                                                                                               |
 | `submit.sh`             | one run per (ckpt, suite, cond, repeat). Default `--direct` runs sequentially on GPU 0; `--launch` (`/harness/launch.sh`, any GPU) is refused unless `--allow-any-gpu`; `--dry-run` |
+| `submit_multi.sh`       | multi-GPU: all runs of a call share one queue over G GPUs × P workers × N batched envs (`parallel/README.md`); same run_ids/layout                                                  |
+| `setup_server.sh`       | new server: venv, LIBERO assets, checkpoints, tokenizer, EGL check, per-GPU self-test (no sudo/apt)                                                                                 |
+| `parallel/`             | coordinator, work queue, batched runner, env subprocesses, mock backend (`parallel/README.md`)                                                                                      |
 | `common.py`             | LIBERO config, NVIDIA EGL, policy loading (+ LIBERO adapter for base ckpt), instruction variants                                                                                    |
 | `tests/fixtures/`       | 2-task libero_goal instruction set (tasks 1, 8) + swap goal BDDLs, used by the smoke test                                                                                           |
 
@@ -33,8 +36,9 @@ goal 300, libero_10 520).
 - C0–C3 stop at the original goal. C4–C6 run to max steps and check the original goal (`_check_success`)
   and the new goal (`goal_bddl` `:goal`, via the scene's `_eval_predicate`) every step → `t_orig`, `t_new`.
 - Seed per episode = `seed·1e6 + repeat·1e4 + task·100 + init`. It is the same in every condition, so episodes pair across conditions.
+- `run_eval.py --num-envs N` (N > 1) runs the same run batched (`exec_mode batched-N`); see `parallel/README.md` before mixing with single-env results.
 - Resume: an `--out` dir holds one configuration. `run_meta.json → identity` (checkpoint, adapter, suite,
-  condition, repeat, seed, instruction-set sha256, n_action_steps, max_steps) must match, and so must every
+  condition, repeat, seed, instruction-set sha256, n_action_steps, max_steps, exec_mode, GPU model, torch, CUDA) must match, and so must every
   existing episode's checkpoint/condition/seed; otherwise run_eval.py stops before loading the policy.
 - metrics: episodes pair on (model, ckpt, suite, task, init, repeat, seed) with C0 repeat 0 as the reference.
   Condition-level McNemar aggregates C3–C6 variants per (task, init) first (majority; `any` also reported);
