@@ -49,6 +49,7 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- metrics.py C0 repeat 키에 base seed 가 없음 (codex 2차 리뷰). 지금은 seed 7 하나라 무해. 여러 seed 를 쓰기 전에 고칠 것.
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
 - C9 vision-only 학습
@@ -56,3 +57,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## 결정 로그
 - 2026-10-25 설계 문서 채택, 통합 브랜치 `shortcut-learning-exps` 생성. 1차 모델은 lerobot 내장 π0.5·π0.
 - 2026-10-25 사람 지시: 1차 모델을 π0.5 base vs π0.5 LIBERO finetuned 로 변경. π0·OpenVLA-OFT 는 보류. GPU 예산은 파일럿 실측 후 확정.
+- 2026-10-25 T001 harness 병합 (exp/sc-harness 899e6a40). smoke: pi05lib goal C0 4/4, C4 새 지시 3/4·원래 goal 0/4, pi05base 전부 0/4.
