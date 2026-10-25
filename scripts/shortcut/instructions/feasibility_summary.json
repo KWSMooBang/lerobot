@@ -1,0 +1,36 @@
+{
+  "libero_spatial": {
+    "c0_tasks_solved": 10,
+    "c0_rollouts": "30/30",
+    "swaps": 39,
+    "swaps_feasible": 39,
+    "swaps_infeasible": [],
+    "paraphrases_for_review": 2
+  },
+  "libero_object": {
+    "c0_tasks_solved": 10,
+    "c0_rollouts": "30/30",
+    "swaps": 30,
+    "swaps_feasible": 30,
+    "swaps_infeasible": [],
+    "paraphrases_for_review": 0
+  },
+  "libero_goal": {
+    "c0_tasks_solved": 10,
+    "c0_rollouts": "30/30",
+    "swaps": 21,
+    "swaps_feasible": 21,
+    "swaps_infeasible": [],
+    "paraphrases_for_review": 2
+  },
+  "libero_10": {
+    "c0_tasks_solved": 9,
+    "c0_rollouts": "27/30",
+    "swaps": 12,
+    "swaps_feasible": 11,
+    "swaps_infeasible": [
+      "t9 C4-a"
+    ],
+    "paraphrases_for_review": 2
+  }
+}

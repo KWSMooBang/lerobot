@@ -1,0 +1,2798 @@
+{
+ "suite": "libero_spatial",
+ "rollouts": [
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 326,
+   "sec": 9.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 328,
+   "sec": 9.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 267,
+   "sec": 8.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 650,
+   "sec": 14.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 548,
+   "sec": 12.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 541,
+   "sec": 12.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 254,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 256,
+   "sec": 7.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 328,
+   "sec": 9.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 7.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 7.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 460,
+   "sec": 11.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 239,
+   "sec": 8.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 242,
+   "sec": 7.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 0,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 260,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 234,
+   "sec": 8.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 338,
+   "sec": 9.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 338,
+   "sec": 9.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1013,
+   "sec": 19.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 558,
+   "sec": 12.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1333,
+   "sec": 23.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 244,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 241,
+   "sec": 8.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 245,
+   "sec": 8.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 8.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 204,
+   "sec": 8.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 266,
+   "sec": 8.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 258,
+   "sec": 8.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 1,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 350,
+   "sec": 10.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 225,
+   "sec": 8.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 228,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 350,
+   "sec": 10.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 446,
+   "sec": 11.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 235,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 507,
+   "sec": 12.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 247,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 319,
+   "sec": 9.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 271,
+   "sec": 8.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 222,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 8.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 225,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 330,
+   "sec": 10.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 329,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 260,
+   "sec": 7.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 357,
+   "sec": 10.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 8.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 242,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 572,
+   "sec": 13.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 388,
+   "sec": 10.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 405,
+   "sec": 10.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 339,
+   "sec": 9.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 322,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 242,
+   "sec": 7.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1246,
+   "sec": 24.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 3496,
+   "sec": 56.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1103,
+   "sec": 22.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1278,
+   "sec": 22.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1146,
+   "sec": 21.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 3,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 910,
+   "sec": 18.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 461,
+   "sec": 11.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 646,
+   "sec": 15.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 499,
+   "sec": 12.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 272,
+   "sec": 8.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 279,
+   "sec": 9.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 482,
+   "sec": 12.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 245,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 244,
+   "sec": 9.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 254,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1291,
+   "sec": 25.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 655,
+   "sec": 15.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 504,
+   "sec": 12.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 471,
+   "sec": 12.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 2696,
+   "sec": 46.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 4,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 519,
+   "sec": 12.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 191,
+   "sec": 7.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 525,
+   "sec": 13.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 240,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 349,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 188,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 188,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 187,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 322,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 326,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 319,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1007,
+   "sec": 16.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 781,
+   "sec": 13.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 963,
+   "sec": 16.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 310,
+   "sec": 6.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 230,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 314,
+   "sec": 6.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 249,
+   "sec": 5.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 244,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 248,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1030,
+   "sec": 17.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1254,
+   "sec": 23.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 949,
+   "sec": 17.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1018,
+   "sec": 16.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 774,
+   "sec": 13.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 934,
+   "sec": 15.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 310,
+   "sec": 6.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 310,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1098,
+   "sec": 20.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 502,
+   "sec": 9.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 492,
+   "sec": 9.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 315,
+   "sec": 7.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 243,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 248,
+   "sec": 5.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 243,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 183,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 181,
+   "sec": 4.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 185,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 223,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 7,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 212,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 447,
+   "sec": 8.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 366,
+   "sec": 7.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 655,
+   "sec": 11.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 650,
+   "sec": 11.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 339,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1401,
+   "sec": 24.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 317,
+   "sec": 6.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 243,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 271,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1210,
+   "sec": 21.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 889,
+   "sec": 15.2
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 294,
+   "sec": 5.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 540,
+   "sec": 9.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 248,
+   "sec": 5.1
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 8,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 296,
+   "sec": 5.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 455,
+   "sec": 8.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 509,
+   "sec": 9.0
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 535,
+   "sec": 9.5
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 213,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_2",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 313,
+   "sec": 6.3
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 312,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 241,
+   "sec": 4.7
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "glazed_rim_porcelain_ramekin_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 246,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 415,
+   "sec": 7.8
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 486,
+   "sec": 8.9
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "glazed_rim_porcelain_ramekin_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 254,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 418,
+   "sec": 7.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 493,
+   "sec": 8.6
+  },
+  {
+   "suite": "libero_spatial",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "cookies_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 295,
+   "sec": 5.7
+  }
+ ]
+}

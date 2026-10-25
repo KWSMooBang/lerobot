@@ -1,0 +1,2285 @@
+{
+ "suite": "libero_object",
+ "rollouts": [
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 197,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 198,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 200,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 293,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 295,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 285,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 170,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 172,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 170,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 303,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 303,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 0,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 572,
+   "sec": 7.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 572,
+   "sec": 7.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 571,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 199,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 200,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 199,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 206,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 207,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 206,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 3.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 1,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 3.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 294,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 285,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 294,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 297,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 296,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 298,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 161,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 164,
+   "sec": 3.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 164,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 693,
+   "sec": 8.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 703,
+   "sec": 8.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 2,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 699,
+   "sec": 8.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 217,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 218,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 199,
+   "sec": 3.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 204,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 204,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 303,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 304,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 3,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 298,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 296,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 299,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 221,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 218,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "salad_dressing_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 207,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 238,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 236,
+   "sec": 3.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 4,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 235,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 195,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 195,
+   "sec": 3.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 196,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 224,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 223,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 225,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 171,
+   "sec": 2.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 169,
+   "sec": 3.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 170,
+   "sec": 3.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 5,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 206,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 196,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 197,
+   "sec": 3.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 197,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 874,
+   "sec": 11.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 875,
+   "sec": 11.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 6,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 864,
+   "sec": 10.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 226,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 225,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "milk_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 224,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 192,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 191,
+   "sec": 4.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 200,
+   "sec": 5.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 171,
+   "sec": 3.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 170,
+   "sec": 3.4
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 168,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 223,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 224,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 7,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 223,
+   "sec": 3.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 200,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 201,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 221,
+   "sec": 4.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 221,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 207,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 204,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 6.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 8,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "ketchup_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 305,
+   "sec": 6.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 4.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 220,
+   "sec": 3.9
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "orange_juice_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 4.1
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 201,
+   "sec": 5.2
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 205,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 169,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 168,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 168,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-c",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 234,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-c",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 236,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_object",
+   "task_id": 9,
+   "swap": "C4-c",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "bbq_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 234,
+   "sec": 5.7
+  }
+ ]
+}

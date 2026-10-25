@@ -1,0 +1,347 @@
+{
+  "suite": "libero_10",
+  "bddl_root": "libero/libero/bddl_files (hf-libero package)",
+  "vocab": "scripts/shortcut/instructions/vocab_libero_10.json",
+  "tasks": [
+    {
+      "task_id": 0,
+      "bddl": "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket.bddl",
+      "original": "put both the alphabet soup and the tomato sauce in the basket",
+      "paraphrases": [
+        "place the alphabet soup and the tomato sauce in the basket",
+        "move both the tomato sauce and the alphabet soup into the basket",
+        "drop the alphabet soup and the tomato sauce into the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 300,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put both the alphabet soup and the butter in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region) (In butter_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "tomato_sauce_1",
+          "new_target": "butter_1",
+          "feasible_trials": "2/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "put both the butter and the tomato sauce in the basket",
+          "goal": "(And (In butter_1 basket_1_contain_region) (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "alphabet_soup_1",
+          "new_target": "butter_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        1
+      ],
+      "cross_task_note": "Same scene (LIVING_ROOM_SCENE2) as the cross task.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 1,
+      "bddl": "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket.bddl",
+      "original": "put both the cream cheese box and the butter in the basket",
+      "paraphrases": [
+        "place the cream cheese box and the butter in the basket",
+        "move both the butter and the cream cheese box into the basket",
+        "drop the cream cheese box and the butter into the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 301,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put both the cream cheese box and the tomato sauce in the basket",
+          "goal": "(And (In cream_cheese_1 basket_1_contain_region) (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "butter_1",
+          "new_target": "tomato_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "put both the alphabet soup and the butter in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region) (In butter_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "cream_cheese_1",
+          "new_target": "alphabet_soup_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        0
+      ],
+      "cross_task_note": "Same scene (LIVING_ROOM_SCENE2) as the cross task.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 2,
+      "bddl": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it.bddl",
+      "original": "turn on the stove and put the moka pot on it",
+      "paraphrases": [
+        "switch on the stove and place the moka pot on it",
+        "turn the stove on, then put the moka pot on top of it",
+        "put the moka pot on the stove after turning the stove on"
+      ],
+      "review": {},
+      "nonsense_seed": 302,
+      "swaps": [],
+      "cross_task": [
+        3
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No swap: the only other object (frying pan) has no name in the libero_10 vocabulary, and the stove is the only place the vocabulary can refer to in this scene.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 3,
+      "bddl": "libero_10/KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it.bddl",
+      "original": "put the black bowl in the bottom drawer of the cabinet and close it",
+      "paraphrases": [
+        "place the black bowl in the cabinet's bottom drawer and then close the drawer",
+        "put the black bowl into the lowest drawer of the cabinet and shut it",
+        "move the black bowl into the bottom drawer of the cabinet, then close that drawer"
+      ],
+      "review": {},
+      "nonsense_seed": 303,
+      "swaps": [],
+      "cross_task": [
+        4
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No swap: the wine bottle ('wine' is not in the libero_10 vocabulary) is the only other object and the other drawers ('top'/'middle') are not in the vocabulary either.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 4,
+      "bddl": "libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl",
+      "original": "put the white mug on the left plate and put the yellow and white mug on the right plate",
+      "paraphrases": [
+        "place the white mug on the left plate and the yellow and white mug on the right plate",
+        "set the white mug on the plate on the left, and set the yellow and white mug on the plate on the right",
+        "put the yellow and white mug on the right plate and the white mug on the left plate"
+      ],
+      "review": {},
+      "nonsense_seed": 304,
+      "swaps": [
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the white mug on the right plate and put the yellow and white mug on the left plate",
+          "goal": "(And (On porcelain_mug_1 plate_2) (On white_yellow_mug_1 plate_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "plate_1,plate_2",
+          "new_target": "plate_2,plate_1",
+          "note": "Both steps change: moving only one mug onto the other plate would put both mugs on one plate. Plates are exchanged, objects and verbs are unchanged.",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        5
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 5,
+      "bddl": "libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy.bddl",
+      "original": "pick up the book and place it in the back compartment of the caddy",
+      "paraphrases": [
+        "grab the book and put it in the caddy's back compartment",
+        "take the book and place it into the rear compartment of the caddy",
+        "put the book in the back section of the caddy"
+      ],
+      "review": {},
+      "nonsense_seed": 305,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the yellow and white mug and place it in the back compartment of the caddy",
+          "goal": "(And (In white_yellow_mug_1 desk_caddy_1_back_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "black_book_1",
+          "new_target": "white_yellow_mug_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "pick up the book and place it in the left compartment of the caddy",
+          "goal": "(And (In black_book_1 desk_caddy_1_left_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "desk_caddy_1_back_contain_region",
+          "new_target": "desk_caddy_1_left_contain_region",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-b",
+          "type": "target",
+          "instruction": "pick up the book and place it in the right compartment of the caddy",
+          "goal": "(And (In black_book_1 desk_caddy_1_right_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/STUDY_SCENE1_pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy__C5-b.bddl",
+          "feasible": true,
+          "orig_target": "desk_caddy_1_back_contain_region",
+          "new_target": "desk_caddy_1_right_contain_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        6
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 6,
+      "bddl": "libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate.bddl",
+      "original": "put the white mug on the plate and put the chocolate pudding to the right of the plate",
+      "paraphrases": [
+        "place the white mug on the plate and set the chocolate pudding on the right side of the plate",
+        "put the white mug onto the plate, then place the chocolate pudding to the plate's right",
+        "set the chocolate pudding to the right of the plate and the white mug on the plate"
+      ],
+      "review": {
+        "1": "'to the plate's right' - right relative to the plate vs the viewer is as ambiguous as in the original; check it reads the same."
+      },
+      "nonsense_seed": 306,
+      "swaps": [
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the white mug on the plate and put the chocolate pudding to the left of the plate",
+          "goal": "(And (On porcelain_mug_1 plate_1) (On chocolate_pudding_1 living_room_table_plate_left_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "living_room_table_plate_right_region",
+          "new_target": "living_room_table_plate_left_region",
+          "note": "Only the second step changes (right -> left of the plate).",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        7
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 7,
+      "bddl": "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket.bddl",
+      "original": "put both the alphabet soup and the cream cheese box in the basket",
+      "paraphrases": [
+        "place the alphabet soup and the cream cheese box in the basket",
+        "move both the cream cheese box and the alphabet soup into the basket",
+        "drop the alphabet soup and the cream cheese box into the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 307,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put both the tomato sauce and the cream cheese box in the basket",
+          "goal": "(And (In tomato_sauce_1 basket_1_contain_region) (In cream_cheese_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "alphabet_soup_1",
+          "new_target": "tomato_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "put both the alphabet soup and the tomato sauce in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region) (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "cream_cheese_1",
+          "new_target": "tomato_sauce_1",
+          "note": "Sentence is verbatim the training instruction of task 0 (LIVING_ROOM_SCENE2); here it is asked in LIVING_ROOM_SCENE1, where both objects also exist.",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        8
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 8,
+      "bddl": "libero_10/KITCHEN_SCENE8_put_both_moka_pots_on_the_stove.bddl",
+      "original": "put both moka pots on the stove",
+      "paraphrases": [
+        "place both moka pots on the stove",
+        "put the two moka pots on the stove",
+        "set each of the moka pots on the stove"
+      ],
+      "review": {},
+      "nonsense_seed": 308,
+      "swaps": [],
+      "cross_task": [
+        9
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No swap: the scene only contains the two moka pots and the stove; nothing else is nameable in vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 9,
+      "bddl": "libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it.bddl",
+      "original": "put the yellow and white mug in the microwave and close it",
+      "paraphrases": [
+        "place the yellow and white mug in the microwave and close the microwave door",
+        "put the yellow and white mug inside the microwave, then shut it",
+        "move the yellow and white mug into the microwave and close the door"
+      ],
+      "review": {
+        "2": "'close the door' (no 'microwave') - only door in the scene is the microwave, but confirm."
+      },
+      "nonsense_seed": 309,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the white mug in the microwave and close it",
+          "goal": "(And (In porcelain_mug_1 microwave_1_heating_region) (Close microwave_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_10/KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it__C4-a.bddl",
+          "feasible": false,
+          "orig_target": "white_yellow_mug_1",
+          "new_target": "porcelain_mug_1",
+          "feasible_trials": "0/3",
+          "feasible_note": "scripted policy also fails the original task (C0) here, so this is a policy limitation, not evidence that the swap is physically infeasible; needs teleop or a better primitive"
+        }
+      ],
+      "cross_task": [
+        0
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "scripted_c0_success": 0,
+      "scripted_c0_trials": 3
+    }
+  ]
+}

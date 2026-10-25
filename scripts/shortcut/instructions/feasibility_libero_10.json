@@ -1,0 +1,1571 @@
+{
+ "suite": "libero_10",
+ "rollouts": [
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 365,
+   "sec": 7.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 355,
+   "sec": 6.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 4000,
+   "sec": 45.4
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 356,
+   "sec": 6.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 4000,
+   "sec": 47.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 348,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 341,
+   "sec": 6.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 343,
+   "sec": 6.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 0,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 336,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 375,
+   "sec": 7.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 359,
+   "sec": 6.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 347,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 384,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 375,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 361,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 348,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 343,
+   "sec": 6.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "butter_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 339,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 833,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 844,
+   "sec": 9.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 845,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "white_cabinet_1_bottom_region",
+     "in"
+    ],
+    [
+     "close",
+     "white_cabinet_1_bottom_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 2032,
+   "sec": 22.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "white_cabinet_1_bottom_region",
+     "in"
+    ],
+    [
+     "close",
+     "white_cabinet_1_bottom_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1985,
+   "sec": 21.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "white_cabinet_1_bottom_region",
+     "in"
+    ],
+    [
+     "close",
+     "white_cabinet_1_bottom_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1994,
+   "sec": 23.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_2",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 405,
+   "sec": 7.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_2",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 398,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_2",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 401,
+   "sec": 7.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_2",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 424,
+   "sec": 7.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_2",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 431,
+   "sec": 7.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_2",
+     "on"
+    ],
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 421,
+   "sec": 7.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 777,
+   "sec": 7.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2543,
+   "sec": 21.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2033,
+   "sec": 17.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2907,
+   "sec": 27.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2374,
+   "sec": 22.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "desk_caddy_1_back_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2937,
+   "sec": 27.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_left_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 192,
+   "sec": 3.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_left_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 192,
+   "sec": 3.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_left_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 191,
+   "sec": 3.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_right_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 184,
+   "sec": 3.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_right_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1408,
+   "sec": 12.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 5,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "pick",
+   "plan": [
+    [
+     "pickplace",
+     "black_book_1",
+     "desk_caddy_1_right_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 185,
+   "sec": 2.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_right_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 446,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_right_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 449,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_right_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 459,
+   "sec": 7.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_left_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 454,
+   "sec": 6.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_left_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 456,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "plate_1",
+     "on"
+    ],
+    [
+     "pickplace",
+     "chocolate_pudding_1",
+     "living_room_table_plate_left_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 465,
+   "sec": 6.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 366,
+   "sec": 6.0
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 371,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 368,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 380,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 389,
+   "sec": 5.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 389,
+   "sec": 6.1
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 387,
+   "sec": 6.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 389,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 7,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "alphabet_soup_1",
+     "basket_1_contain_region",
+     "in"
+    ],
+    [
+     "pickplace",
+     "tomato_sauce_1",
+     "basket_1_contain_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 393,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ],
+    [
+     "pickplace",
+     "moka_pot_2",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 875,
+   "sec": 9.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ],
+    [
+     "pickplace",
+     "moka_pot_2",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 883,
+   "sec": 9.6
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ],
+    [
+     "pickplace",
+     "moka_pot_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ],
+    [
+     "pickplace",
+     "moka_pot_2",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 1102,
+   "sec": 11.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2076,
+   "sec": 21.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2250,
+   "sec": 23.2
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "white_yellow_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2753,
+   "sec": 29.3
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2942,
+   "sec": 30.8
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2537,
+   "sec": 27.4
+  },
+  {
+   "suite": "libero_10",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "porcelain_mug_1",
+     "microwave_1_heating_region",
+     "in"
+    ],
+    [
+     "close",
+     "microwave_1"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 2461,
+   "sec": 26.3
+  }
+ ]
+}
