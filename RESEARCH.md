@@ -49,6 +49,8 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- paraphrase 6개 사람 검수 필요 (spatial 2, goal 2, l10 2; instructions/<suite>.json 의 review 필드). C3 실행 전에.
+- libero_10 t9 C4-a feasible=false 는 스크립트 정책 한계 (C0 도 실패). 포함하려면 teleop 확인 필요.
 - metrics.py C0 repeat 키에 base seed 가 없음 (codex 2차 리뷰). 지금은 seed 7 하나라 무해. 여러 seed 를 쓰기 전에 고칠 것.
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
@@ -60,3 +62,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-25 T001 harness 병합 (exp/sc-harness 899e6a40). smoke: pi05lib goal C0 4/4, C4 새 지시 3/4·원래 goal 0/4, pi05base 전부 0/4.
 - 2026-10-25 사람 지시: A100 80GB × 4 서버용 고속 실행 경로를 코드만 구현 (T004, 실행 안 함). 결과는 exec_mode·GPU 별로 구분해 단일 GPU 결과와 짝짓지 않는다.
 - 2026-10-25 사람 지시: 파일럿이 끝나면 결과 문서에 영상 위주로 정리. T005(analysis) 가 영상·manifest 를 만들고 lead 가 문서에 올린다.
+- 2026-10-25 T002 병합 (exp/sc-instructions 4d97228c). swap 102개 중 101 feasible. codex 리뷰: goal t3 swap 의 Open 누락 지적은 원본 goal 도 In 만 쓰므로 유지.
