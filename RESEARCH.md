@@ -3,8 +3,8 @@
 설계 원문: "LIBERO Shortcut Learning 관측 실험 설계" (https://claude.ai/artifact/7jaV1qVgL53Dx2ZsjaSbr9, 2026-10-25).
 아래는 실행용 요약이며, 조건·지표의 세부 정의는 원문 1–9장을 따른다. 결과는 같은 문서의 모델별 탭에 정리한다
 (개요 · π0.5 · π0 · OpenVLA-OFT, rollout 영상 위주).
-문서 id 3688b476-b3d8-4faa-9cbe-648f12a5d2a2 · 탭 body: 개요 148053fd-b595, π0.5 a53f724e-8515, π0 7c071bcc-f214,
-OpenVLA-OFT 9f0d56b1-1013. 영상은 문서 artifact 에 asset 업로드 → blob → 탭에 삽입 (mp4 + 3MB 이하 gif).
+문서 id 3688b476-b3d8-4faa-9cbe-648f12a5d2a2 · 탭 body: 개요 148053fd-b595, π0.5 LIBERO a53f724e-8515,
+π0.5 base 7c071bcc-f214, OpenVLA-OFT(보류) 9f0d56b1-1013. 영상은 문서 artifact 에 asset 업로드 → blob → 탭에 삽입 (mp4 + 3MB 이하 gif).
 
 ## 브랜치 구조
 - `main`: upstream lerobot fork 기준선. 연구 코드는 넣지 않는다.
@@ -27,15 +27,15 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## 모델
 | 모델 | 체크포인트 | 학습 방식 | 실행 환경 |
 |---|---|---|---|
-| π0.5 | lerobot 공식 LIBERO finetune | 4 suite 혼합 (L2 가 확인·기록) | 이 repo (lerobot) |
-| π0 | lerobot 공식 LIBERO finetune | 4 suite 혼합 (L2 가 확인·기록) | 이 repo (lerobot) |
-| OpenVLA-OFT | moojink/openvla-7b-oft-finetuned-libero-* | suite별 | 별도 환경 필요 — 결정 대기 |
+| π0.5 LIBERO | lerobot 공식 π0.5 LIBERO finetune | 4 suite 혼합 (L2 가 확인·기록) | 이 repo (lerobot) |
+| π0.5 base | lerobot/pi05_base | LIBERO 미학습 — shortcut 이 LIBERO 학습에서 생기는지 보는 대조 | 이 repo, LIBERO stats 로 전처리 |
+| (보류) π0, OpenVLA-OFT | — | — | π0.5 결과 후 결정 |
 
 ## 단계와 관문
 - P0 코드 (GPU 거의 없음): T001 평가 harness (override·이중 goal·로깅·영상), T002 instruction 세트·swap BDDL·feasibility
 - P1 파일럿: π0.5 × Spatial·Goal × {C0, C1, C4, C5}, 태스크당 10 ep → harness 검증, 시간 실측
   - 관문 1: C0 성공률이 보고값 ±3%p (π0.5 LeRobot 보고: Spatial 98.8, Object 98.2, Goal 98.0, 10 92.4 근방), ep 당 시간 실측
-- P2 본 평가: {π0.5, π0} × 4 suite × C0–C6, 태스크당 50 ep (C0 3회 반복)
+- P2 본 평가: {π0.5 LIBERO, π0.5 base} × 4 suite × C0–C6, 태스크당 50 ep (C0 3회 반복)
 - P3 시각 조건 C7–C8 (T003, P1 이후), OpenVLA-OFT 추가
 - P4 분석: 지표·Wilson CI·McNemar, 대표 rollout 영상 (C0 vs C4/C5 같은 초기 상태 나란히) → 문서 모델별 탭
 - C9 (vision-only 학습) 는 선택, 보류
@@ -45,9 +45,10 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
   파일럿 P1 ≈ 3–5 GPU-h. P1 실측 후 재추정.
 
 ## 백로그
-- OpenVLA-OFT 환경: 이 컨테이너에서 별도 venv 로 가능한지 / 새 컨테이너인지 (결정 대기)
+- π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
 - C9 vision-only 학습
 
 ## 결정 로그
 - 2026-10-25 설계 문서 채택, 통합 브랜치 `shortcut-learning-exps` 생성. 1차 모델은 lerobot 내장 π0.5·π0.
+- 2026-10-25 사람 지시: 1차 모델을 π0.5 base vs π0.5 LIBERO finetuned 로 변경. π0·OpenVLA-OFT 는 보류. GPU 예산은 파일럿 실측 후 확정.
