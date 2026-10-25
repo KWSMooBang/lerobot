@@ -59,3 +59,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-25 사람 지시: 1차 모델을 π0.5 base vs π0.5 LIBERO finetuned 로 변경. π0·OpenVLA-OFT 는 보류. GPU 예산은 파일럿 실측 후 확정.
 - 2026-10-25 T001 harness 병합 (exp/sc-harness 899e6a40). smoke: pi05lib goal C0 4/4, C4 새 지시 3/4·원래 goal 0/4, pi05base 전부 0/4.
 - 2026-10-25 사람 지시: A100 80GB × 4 서버용 고속 실행 경로를 코드만 구현 (T004, 실행 안 함). 결과는 exec_mode·GPU 별로 구분해 단일 GPU 결과와 짝짓지 않는다.
+- 2026-10-25 사람 지시: 파일럿이 끝나면 결과 문서에 영상 위주로 정리. T005(analysis) 가 영상·manifest 를 만들고 lead 가 문서에 올린다.
