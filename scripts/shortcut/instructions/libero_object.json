@@ -1,0 +1,547 @@
+{
+  "suite": "libero_object",
+  "bddl_root": "libero/libero/bddl_files (hf-libero package)",
+  "vocab": "scripts/shortcut/instructions/vocab_libero_object.json",
+  "tasks": [
+    {
+      "task_id": 0,
+      "bddl": "libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket.bddl",
+      "original": "pick up the alphabet soup and place it in the basket",
+      "paraphrases": [
+        "grab the alphabet soup and put it in the basket",
+        "take the alphabet soup and drop it into the basket",
+        "put the alphabet soup inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 100,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the salad dressing and place it in the basket",
+          "goal": "(And (In salad_dressing_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "alphabet_soup_1",
+          "new_target": "salad_dressing_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the cream cheese and place it in the basket",
+          "goal": "(And (In cream_cheese_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "alphabet_soup_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the milk and place it in the basket",
+          "goal": "(And (In milk_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_alphabet_soup_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "alphabet_soup_1",
+          "new_target": "milk_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        1
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 1,
+      "bddl": "libero_object/pick_up_the_cream_cheese_and_place_it_in_the_basket.bddl",
+      "original": "pick up the cream cheese and place it in the basket",
+      "paraphrases": [
+        "grab the cream cheese and put it in the basket",
+        "take the cream cheese and drop it into the basket",
+        "put the cream cheese inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 101,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the alphabet soup and place it in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_cream_cheese_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "cream_cheese_1",
+          "new_target": "alphabet_soup_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the milk and place it in the basket",
+          "goal": "(And (In milk_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_cream_cheese_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "cream_cheese_1",
+          "new_target": "milk_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the tomato sauce and place it in the basket",
+          "goal": "(And (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_cream_cheese_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "cream_cheese_1",
+          "new_target": "tomato_sauce_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        2
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 2,
+      "bddl": "libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket.bddl",
+      "original": "pick up the salad dressing and place it in the basket",
+      "paraphrases": [
+        "grab the salad dressing and put it in the basket",
+        "take the salad dressing and drop it into the basket",
+        "put the salad dressing inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 102,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the ketchup and place it in the basket",
+          "goal": "(And (In ketchup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "salad_dressing_1",
+          "new_target": "ketchup_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the alphabet soup and place it in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "salad_dressing_1",
+          "new_target": "alphabet_soup_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the cream cheese and place it in the basket",
+          "goal": "(And (In cream_cheese_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_salad_dressing_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "salad_dressing_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        3
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 3,
+      "bddl": "libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket.bddl",
+      "original": "pick up the bbq sauce and place it in the basket",
+      "paraphrases": [
+        "grab the bbq sauce and put it in the basket",
+        "take the bbq sauce and drop it into the basket",
+        "put the bbq sauce inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 103,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the chocolate pudding and place it in the basket",
+          "goal": "(And (In chocolate_pudding_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "bbq_sauce_1",
+          "new_target": "chocolate_pudding_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the ketchup and place it in the basket",
+          "goal": "(And (In ketchup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "bbq_sauce_1",
+          "new_target": "ketchup_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the salad dressing and place it in the basket",
+          "goal": "(And (In salad_dressing_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_bbq_sauce_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "bbq_sauce_1",
+          "new_target": "salad_dressing_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        4
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 4,
+      "bddl": "libero_object/pick_up_the_ketchup_and_place_it_in_the_basket.bddl",
+      "original": "pick up the ketchup and place it in the basket",
+      "paraphrases": [
+        "grab the ketchup and put it in the basket",
+        "take the ketchup and drop it into the basket",
+        "put the ketchup inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 104,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the bbq sauce and place it in the basket",
+          "goal": "(And (In bbq_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_ketchup_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "ketchup_1",
+          "new_target": "bbq_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the salad dressing and place it in the basket",
+          "goal": "(And (In salad_dressing_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_ketchup_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "ketchup_1",
+          "new_target": "salad_dressing_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the alphabet soup and place it in the basket",
+          "goal": "(And (In alphabet_soup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_ketchup_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "ketchup_1",
+          "new_target": "alphabet_soup_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        5
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 5,
+      "bddl": "libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket.bddl",
+      "original": "pick up the tomato sauce and place it in the basket",
+      "paraphrases": [
+        "grab the tomato sauce and put it in the basket",
+        "take the tomato sauce and drop it into the basket",
+        "put the tomato sauce inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 105,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the milk and place it in the basket",
+          "goal": "(And (In milk_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "tomato_sauce_1",
+          "new_target": "milk_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the butter and place it in the basket",
+          "goal": "(And (In butter_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "tomato_sauce_1",
+          "new_target": "butter_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the orange juice and place it in the basket",
+          "goal": "(And (In orange_juice_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "tomato_sauce_1",
+          "new_target": "orange_juice_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        6
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 6,
+      "bddl": "libero_object/pick_up_the_butter_and_place_it_in_the_basket.bddl",
+      "original": "pick up the butter and place it in the basket",
+      "paraphrases": [
+        "grab the butter and put it in the basket",
+        "take the butter and drop it into the basket",
+        "put the butter inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 106,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the tomato sauce and place it in the basket",
+          "goal": "(And (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_butter_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "butter_1",
+          "new_target": "tomato_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the orange juice and place it in the basket",
+          "goal": "(And (In orange_juice_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_butter_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "butter_1",
+          "new_target": "orange_juice_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the chocolate pudding and place it in the basket",
+          "goal": "(And (In chocolate_pudding_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_butter_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "butter_1",
+          "new_target": "chocolate_pudding_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        7
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 7,
+      "bddl": "libero_object/pick_up_the_milk_and_place_it_in_the_basket.bddl",
+      "original": "pick up the milk and place it in the basket",
+      "paraphrases": [
+        "grab the milk and put it in the basket",
+        "take the milk and drop it into the basket",
+        "put the milk inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 107,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the cream cheese and place it in the basket",
+          "goal": "(And (In cream_cheese_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_milk_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "milk_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the tomato sauce and place it in the basket",
+          "goal": "(And (In tomato_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_milk_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "milk_1",
+          "new_target": "tomato_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the butter and place it in the basket",
+          "goal": "(And (In butter_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_milk_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "milk_1",
+          "new_target": "butter_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        8
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 8,
+      "bddl": "libero_object/pick_up_the_chocolate_pudding_and_place_it_in_the_basket.bddl",
+      "original": "pick up the chocolate pudding and place it in the basket",
+      "paraphrases": [
+        "grab the chocolate pudding and put it in the basket",
+        "take the chocolate pudding and drop it into the basket",
+        "put the chocolate pudding inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 108,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the orange juice and place it in the basket",
+          "goal": "(And (In orange_juice_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_chocolate_pudding_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "chocolate_pudding_1",
+          "new_target": "orange_juice_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the bbq sauce and place it in the basket",
+          "goal": "(And (In bbq_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_chocolate_pudding_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "chocolate_pudding_1",
+          "new_target": "bbq_sauce_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the ketchup and place it in the basket",
+          "goal": "(And (In ketchup_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_chocolate_pudding_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "chocolate_pudding_1",
+          "new_target": "ketchup_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        9
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 9,
+      "bddl": "libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket.bddl",
+      "original": "pick up the orange juice and place it in the basket",
+      "paraphrases": [
+        "grab the orange juice and put it in the basket",
+        "take the orange juice and drop it into the basket",
+        "put the orange juice inside the basket"
+      ],
+      "review": {},
+      "nonsense_seed": 109,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "pick up the butter and place it in the basket",
+          "goal": "(And (In butter_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "orange_juice_1",
+          "new_target": "butter_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "pick up the chocolate pudding and place it in the basket",
+          "goal": "(And (In chocolate_pudding_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "orange_juice_1",
+          "new_target": "chocolate_pudding_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-c",
+          "type": "object",
+          "instruction": "pick up the bbq sauce and place it in the basket",
+          "goal": "(And (In bbq_sauce_1 basket_1_contain_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_object/pick_up_the_orange_juice_and_place_it_in_the_basket__C4-c.bddl",
+          "feasible": true,
+          "orig_target": "orange_juice_1",
+          "new_target": "bbq_sauce_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        0
+      ],
+      "cross_task_note": "Different scene: the cross-task sentence describes another layout.",
+      "note": "No C5: 'basket' is the only place word in the libero_object vocabulary.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    }
+  ]
+}

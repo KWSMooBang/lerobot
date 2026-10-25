@@ -1,0 +1,1754 @@
+{
+ "suite": "libero_goal",
+ "rollouts": [
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_middle_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 335,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_middle_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 337,
+   "sec": 6.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_middle_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 337,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_top_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 315,
+   "sec": 6.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_top_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 317,
+   "sec": 6.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 0,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "open",
+   "plan": [
+    [
+     "open",
+     "wooden_cabinet_1_top_region"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 317,
+   "sec": 5.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 233,
+   "sec": 6.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 232,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 231,
+   "sec": 6.0
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 221,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 219,
+   "sec": 5.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 193,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 194,
+   "sec": 4.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 193,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 224,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 222,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 1,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 224,
+   "sec": 6.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 527,
+   "sec": 9.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 528,
+   "sec": 9.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 528,
+   "sec": 10.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 206,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 4.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 210,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 192,
+   "sec": 4.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 194,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 194,
+   "sec": 5.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 200,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 5.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 2,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 806,
+   "sec": 11.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 796,
+   "sec": 11.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 789,
+   "sec": 11.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 602,
+   "sec": 9.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 4000,
+   "sec": 47.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_region",
+     "in"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 4000,
+   "sec": 43.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_middle_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 833,
+   "sec": 12.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_middle_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 830,
+   "sec": 11.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 3,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "open",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_middle_region",
+     "in"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 827,
+   "sec": 11.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 605,
+   "sec": 9.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 599,
+   "sec": 8.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 597,
+   "sec": 9.0
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 209,
+   "sec": 4.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 206,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wooden_cabinet_1_top_side",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 226,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 229,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 4,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 234,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "plate_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 168,
+   "sec": 4.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "plate_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 235,
+   "sec": 5.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "plate_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 215,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 183,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 339,
+   "sec": 8.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 180,
+   "sec": 5.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "cream_cheese_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 97,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "cream_cheese_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 100,
+   "sec": 3.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 5,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "push",
+   "plan": [
+    [
+     "push",
+     "cream_cheese_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 98,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "akita_black_bowl_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 193,
+   "sec": 5.0
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "akita_black_bowl_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 193,
+   "sec": 4.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "akita_black_bowl_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 191,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 208,
+   "sec": 4.0
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 213,
+   "sec": 5.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 211,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 226,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 222,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 6,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 222,
+   "sec": 4.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 528,
+   "sec": 7.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 531,
+   "sec": 9.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 7,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "turn",
+   "plan": [
+    [
+     "turnon",
+     "flat_stove_1"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 532,
+   "sec": 7.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2421,
+   "sec": 27.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2417,
+   "sec": 27.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 250,
+   "sec": 5.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 210,
+   "sec": 4.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": false,
+   "steps": 4000,
+   "sec": 48.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 207,
+   "sec": 5.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 203,
+   "sec": 5.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 202,
+   "sec": 5.2
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C4-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 199,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 228,
+   "sec": 4.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 226,
+   "sec": 3.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 8,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "akita_black_bowl_1",
+     "main_table_stove_front_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 238,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 971,
+   "sec": 12.8
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 2004,
+   "sec": 23.6
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C0",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 977,
+   "sec": 13.9
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 201,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 199,
+   "sec": 3.7
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C4-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "cream_cheese_1",
+     "wine_rack_1_top_region",
+     "on"
+    ]
+   ],
+   "success_at_end": false,
+   "success": true,
+   "steps": 200,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 193,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 195,
+   "sec": 4.3
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-a",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "flat_stove_1_cook_region",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 195,
+   "sec": 4.5
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 0,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 197,
+   "sec": 4.4
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 1,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 196,
+   "sec": 4.1
+  },
+  {
+   "suite": "libero_goal",
+   "task_id": 9,
+   "swap": "C5-b",
+   "init_idx": 2,
+   "verb": "put",
+   "plan": [
+    [
+     "pickplace",
+     "wine_bottle_1",
+     "plate_1",
+     "on"
+    ]
+   ],
+   "success_at_end": true,
+   "success": true,
+   "steps": 198,
+   "sec": 4.4
+  }
+ ]
+}
