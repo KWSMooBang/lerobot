@@ -70,3 +70,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-25 T004 병합 (exp/sc-multigpu 1b7a67f1, CPU 테스트 25/25). P2 추정: 46,100 ep, 단일 경로 ≈162 GPU-h, 4×A100 ≈6 h (범위 3–11 h, 미측정 β 가정).
 - 2026-10-26 P1 완료 (16 run, 7.04 GPU-h). pi05lib: Spatial 은 지시를 바꿔도 원래 goal (C5 94.0% vs 새 0.5%, C4 61.1% vs 30.0%), Goal 은 언어 사용 (C1 13.0%, C4 새 40.0%). pi05base 전 조건 0% → 대조군 역할 못 함.
 - 2026-10-26 T005 결과 문서 반영 (개요·π0.5 LIBERO·π0.5 base 탭, 영상 18개, SR 차트). T006 GPU 확인 (4090): batched N=4 가 single 대비 3.4× (70 vs 20.8 step/s), β=0.27. single vs batched 일치: success_orig 24/24, grasp 24/24, C4 success_new 13/16 (bf16 배치로 step 0 부터 action 차이 ≈1e-3, C4 에서 궤적이 갈라짐) → batched 결과는 single 과 절대 짝짓지 않는다 (metrics 기본 차단). P2 추정: single ≈173 GPU-h, 4×A100 P=2 N=8–16 ≈5–6 h (3–7 h, A100 값 미측정).
+- 2026-10-26 사람 지시: pi05lib 의 지시 미이행 케이스가 학습 instruction (완전·부분 일치, 같은/다른 장면) 과 관련 있는지 분석 → T007 (analysis, CPU).
