@@ -38,6 +38,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
 
+import imageio.v2 as imageio
+import numpy as np
+
 HERE = Path(__file__).resolve().parent
 SHORTCUT = HERE.parent
 REPO = SHORTCUT.parents[1]
@@ -90,6 +93,55 @@ def read_records(path: Path) -> list[dict[str, Any]]:
     return out
 
 
+def record_files_exist(out: Path, r: dict[str, Any]) -> bool:
+    return (out / r["steps_file"]).is_file() and (not r.get("video") or (out / r["video"]).is_file())
+
+
+def record_intact(out: Path, r: dict[str, Any]) -> bool:
+    """The record's npz loads completely and its mp4 (if any) decodes with at least one frame."""
+    try:
+        with np.load(out / r["steps_file"]) as z:
+            for k in z.files:
+                z[k]
+        if r.get("video"):
+            reader = imageio.get_reader(out / r["video"])
+            try:
+                n = reader.count_frames()
+            finally:
+                reader.close()
+            if n < 1:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def find_record(out: Path, unit: dict[str, Any]) -> dict[str, Any] | None:
+    """Latest record of this unit in episodes.jsonl / parts/*.jsonl, if any."""
+    key = (
+        unit["task_id"],
+        unit["condition"],
+        unit["variant"]["variant"],
+        unit["init_idx"],
+        unit["repeat_idx"],
+    )
+    found = None
+    for src in [out / "episodes.jsonl", *part_files(out)]:
+        for r in read_records(src):
+            if record_key(r) == key:
+                found = r
+    return found
+
+
+def fault_hook(name: str, uid: str, attempt: int) -> bool:
+    """Mock-only fault injection for tests: SC_TEST_HOOKS='name:uid:attempt;...'."""
+    for spec in filter(None, os.environ.get("SC_TEST_HOOKS", "").split(";")):
+        n, u, a = spec.rsplit(":", 2)
+        if (n, u, int(a)) == (name, uid, attempt):
+            return True
+    return False
+
+
 def part_files(out: Path) -> list[Path]:
     return sorted((out / "parts").glob("*.jsonl"), key=lambda p: (p.stat().st_mtime, p.name))
 
@@ -100,7 +152,8 @@ def plan_run(
     spec = run_eval.prepare_run(run_args, exec_mode, gpu)
     done = spec.done_keys()
     for p in part_files(spec.out):
-        done |= {record_key(r) for r in read_records(p)}
+        # files are renamed into place before the record is written; existence is enough here
+        done |= {record_key(r) for r in read_records(p) if record_files_exist(spec.out, r)}
     a = run_args
     if a.backend == "mock":
         n_init = dict.fromkeys(spec.instr_set["_suite_tasks"], 50)
@@ -219,6 +272,10 @@ def merge_run(p: PlannedRun, failed: set[str]) -> tuple[int, bool]:
     complete = want <= set(recs) and not any(u["uid"] in failed for u in p.units)
     if complete and (out / "parts").exists():
         shutil.rmtree(out / "parts")
+    if complete:  # temp files of writers that were killed before os.replace
+        for d in ("steps", "videos"):
+            for t in (out / d).rglob("*.tmp-*"):
+                t.unlink()
     return len(recs), complete
 
 
@@ -230,6 +287,7 @@ class EpisodeWriter:
 
     def __init__(self, session: dict[str, Any], queue: WorkQueue, wid: str, max_pending: int):
         self.session, self.queue, self.wid = session, queue, wid
+        self.mock = session["backend"] == "mock"
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="writer")
         self.sem = threading.BoundedSemaphore(max_pending)
         self.lock = threading.Lock()
@@ -272,6 +330,8 @@ class EpisodeWriter:
                 with open(out / "stdout.log", "a") as log:
                     log.write(f"[{self.wid}] {line}\n")
             print(f"[{self.wid}] {unit['run_id']} {line}", flush=True)
+            if self.mock and fault_hook("commit_exit", unit["uid"], self.queue.attempts[unit["uid"]]):
+                os._exit(9)  # test: record committed, unit not marked done
             self.queue.mark(unit["uid"], "done")
         except Exception:
             print(f"[{self.wid}] write failed for {unit['uid']}:\n{traceback.format_exc()}", flush=True)
@@ -318,7 +378,7 @@ def worker_main(args: argparse.Namespace) -> int:
         q.mark(unit["uid"], "fail")
 
     writer = EpisodeWriter(session, q, args.wid, max_pending=max(2, n))
-    crash_uid = os.environ.get("SC_TEST_CRASH_UID") if backend == "mock" else None
+    mock = backend == "mock"
     stats = Stats()
     bundle: Any = None
     current: str | None = None
@@ -350,10 +410,28 @@ def worker_main(args: argparse.Namespace) -> int:
                     inf.write_text(json.dumps(bundle.inf_meta, indent=2, default=str))
 
             def claim(loc: tuple | None, group: str = g) -> dict[str, Any] | None:
-                unit = q.claim(group, loc)
-                if unit is not None and unit["uid"] == crash_uid and q.attempts[unit["uid"]] == 1:
-                    os._exit(9)  # test hook: die holding a claim
-                return unit
+                while True:
+                    unit = q.claim(group, loc)
+                    if unit is None:
+                        return None
+                    uid, attempt = unit["uid"], q.attempts[unit["uid"]]
+                    if mock and fault_hook("claim_exit", uid, attempt):
+                        os._exit(9)  # test: die holding a claim
+                    if mock and fault_hook("claim_killgroup", uid, attempt):
+                        os.killpg(os.getpgid(0), signal.SIGKILL)  # test: whole session dies on the retry
+                    if attempt > 1:
+                        # a retry: the earlier attempt may have committed its record and died before
+                        # marking the unit done; keep that episode if its files are intact
+                        out = Path(session["runs"][unit["run_id"]]["out"])
+                        rec = find_record(out, unit)
+                        if rec is not None and record_intact(out, rec):
+                            print(
+                                f"[{args.wid}] {uid}: record from an earlier attempt is intact; done",
+                                flush=True,
+                            )
+                            q.mark(uid, "done")
+                            continue
+                    return unit
 
             runner = BatchedRunner(
                 bundle,

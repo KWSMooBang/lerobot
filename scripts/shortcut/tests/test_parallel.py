@@ -218,7 +218,7 @@ def test_run_eval_num_envs_and_n1_is_single(reference, tmp_path):
 
 
 def test_worker_crash_is_released_and_rerun(reference, tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("SC_TEST_CRASH_UID", "sc-pi05lib-goal-C3/t08/p1/i02")
+    monkeypatch.setenv("SC_TEST_HOOKS", "claim_exit:sc-pi05lib-goal-C3/t08/p1/i02:1")
     rc = run_multi.main(multi_argv(tmp_path, "--gpus", "7,9", "--procs-per-gpu", "1", "--num-envs", "2"))
     assert rc == 0
     assert "exited 9: released" in capsys.readouterr().out
@@ -322,3 +322,86 @@ def test_metrics_pairs_only_within_exec_mode(monkeypatch):
     monkeypatch.setattr(metrics, "ALLOW_MIXED_EXEC", True)
     ref, _ = metrics.index_c0(c0)
     assert len(metrics.aggregate_variants(c4, ref)) == 3
+
+
+# ---------------------------------------------------------------- record commit vs. done mark
+
+
+def _res(v: float) -> dict:
+    return {"arrays": {"x": np.full(50, v)}, "frames": [np.full((64, 128, 3), int(v), np.uint8)] * 5}
+
+
+def test_save_episode_is_atomic(tmp_path, monkeypatch):
+    steps, video = run_eval.save_episode(tmp_path, "s/t00/C0_orig_init00", _res(1.0), True)
+    rec = {"steps_file": steps, "video": video}
+    before = {f: (tmp_path / f).read_bytes() for f in (steps, video)}
+    assert run_multi.record_intact(tmp_path, rec)
+
+    def dying_write(path, frames):  # killed after part of the new mp4 is on disk
+        Path(path).write_bytes(b"\x00" * 100)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(run_eval, "write_video", dying_write)
+    with pytest.raises(KeyboardInterrupt):
+        run_eval.save_episode(tmp_path, "s/t00/C0_orig_init00", _res(2.0), True)
+    # the npz was replaced by a complete new copy, the mp4 still is the complete old one
+    assert (tmp_path / video).read_bytes() == before[video]
+    assert np.array_equal(np.load(tmp_path / steps)["x"], np.full(50, 2.0))
+    assert run_multi.record_intact(tmp_path, rec)
+    (tmp_path / steps).write_bytes(before[steps][:40])  # a truncated file (pre-fix writer)
+    assert not run_multi.record_intact(tmp_path, rec)
+
+
+X = "sc-pi05lib-goal-C3/t08/p1/i02"
+
+
+def _x_records(root: Path) -> list[dict]:
+    run = root / "runs" / "sc-pi05lib-goal-C3"
+    srcs = [run / "episodes.jsonl", *sorted((run / "parts").glob("*.jsonl"))]
+    out = []
+    for src in srcs:
+        for r in run_multi.read_records(src):
+            if (r["task_id"], r["variant"], r["init_idx"]) == (8, "p1", 2):
+                out.append(r)
+    return out
+
+
+def test_committed_record_is_kept_on_retry(reference, tmp_path, monkeypatch, capsys):
+    """Worker dies after committing X's record but before marking X done; the retry keeps the record."""
+    monkeypatch.setenv("SC_TEST_HOOKS", f"commit_exit:{X}:1")
+    rc = run_multi.main(multi_argv(tmp_path, "--gpus", "0", "--procs-per-gpu", "1", "--num-envs", "2"))
+    assert rc == 0
+    assert "exited 9: released" in capsys.readouterr().out
+    logs = "".join(p.read_text() for p in (tmp_path / "multi").glob("*/w*.log"))
+    assert f"{X}: record from an earlier attempt is intact; done" in logs
+    assert len(_x_records(tmp_path)) == 1
+    assert_same_runs(reference, tmp_path)
+
+
+def test_commit_kill_then_retry_kill_then_rerun(reference, tmp_path):
+    """Record of X committed → worker killed → the retry is killed with the whole session → rerun."""
+    argv = multi_argv(tmp_path, "--gpus", "0", "--procs-per-gpu", "1", "--num-envs", "2")
+    cmd = [sys.executable, str(SHORTCUT / "parallel" / "run_multi.py"), *argv]
+    env = {**os.environ, "SC_TEST_HOOKS": f"commit_exit:{X}:1;claim_killgroup:{X}:2"}
+    proc = subprocess.run(cmd, env=env, start_new_session=True, capture_output=True, text=True, timeout=300)
+    assert proc.returncode == -signal.SIGKILL, proc.stdout + proc.stderr
+    first = _x_records(tmp_path)
+    assert len(first) == 1
+    run = tmp_path / "runs" / "sc-pi05lib-goal-C3"
+    assert run_multi.record_intact(run, first[0])
+    n_done = 0  # finished runs were already merged into episodes.jsonl; the rest sit in parts/
+    for run_dir in (tmp_path / "runs").iterdir():
+        keys = {
+            run_multi.record_key(r)
+            for src in [run_dir / "episodes.jsonl", *(run_dir / "parts").glob("*.jsonl")]
+            for r in run_multi.read_records(src)
+            if run_multi.record_files_exist(run_dir, r)
+        }
+        n_done += len(keys)
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    assert out.returncode == 0, out.stdout + out.stderr
+    pending = int(out.stdout.split("[multi] ")[1].split(" pending")[0])
+    assert pending == 56 - n_done  # X is not run again
+    assert len(_x_records(tmp_path)) == 1
+    assert not list((tmp_path / "runs").rglob("*.tmp-*"))
+    assert_same_runs(reference, tmp_path)

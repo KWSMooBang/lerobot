@@ -30,10 +30,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import subprocess  # nosec B404
 import sys
 import textwrap
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -423,17 +425,35 @@ def write_video(path: Path, frames: list[np.ndarray]) -> None:
     imageio.mimwrite(path, frames, fps=VIDEO_FPS, codec="libx264", quality=7, macro_block_size=8)
 
 
+def tmp_path(path: Path) -> Path:
+    """Sibling temp name with the same suffix (imageio picks the format from it)."""
+    return path.with_name(f"{path.stem}.tmp-{os.getpid()}-{threading.get_ident()}{path.suffix}")
+
+
+def save_npz(path: Path, arrays: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_path(path)
+    with open(tmp, "wb") as f:
+        np.savez_compressed(f, **arrays)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def save_episode(out: Path, rel: str, res: dict[str, Any], record_video: bool) -> tuple[str, str | None]:
     """Write steps/<rel>.npz (+ videos/<rel>.mp4); pops arrays and frames from res. Returns both paths
-    relative to out."""
+    relative to out. Each file is written to a temp name and os.replace'd, so a writer killed mid-way
+    never leaves a truncated file at the final path (an earlier complete copy stays intact)."""
     steps_file = out / "steps" / f"{rel}.npz"
-    steps_file.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(steps_file, **res.pop("arrays"))
+    save_npz(steps_file, res.pop("arrays"))
     frames = res.pop("frames")
     video_file = None
     if record_video:
         video_file = f"videos/{rel}.mp4"
-        write_video(out / video_file, frames)
+        final = out / video_file
+        tmp = tmp_path(final)
+        write_video(tmp, frames)
+        os.replace(tmp, final)
     return str(steps_file.relative_to(out)), video_file
 
 
