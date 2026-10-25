@@ -43,8 +43,10 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## GPU 예산
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
   (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
-- 미정 — 사람에게 확인 요청 중 (2026-10-25). 추정치: 모델당 P2 ≈ 50–70 GPU-h (17 조건 × 2000 ep, C4–C6 는 조기 종료 없음),
-  파일럿 P1 ≈ 3–5 GPU-h. P1 실측 후 재추정.
+- 미정 — 파일럿 실측 후 확정. T001 smoke 실측 (RTX 4090, GPU 0): ≈45 ms/step, 모델 로드 60–90 s/run.
+  ep 당: pi05lib C0 5.5 s (조기 종료), 300 step 조건 ≈14 s, pi05base 는 항상 max step (≈13–14 s, l10 은 ≈24 s).
+  → P1 파일럿 (Spatial·Goal × C0/C1/C4/C5 × 10 task × 10 ep, 두 모델) ≈ 9–10 GPU-h.
+  → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
