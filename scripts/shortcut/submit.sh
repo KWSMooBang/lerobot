@@ -13,17 +13,19 @@
 #                       layout as /harness/launch.sh: /outputs/<project>/runs/<run_id>/{git_sha,git_dirty,
 #                       patch.diff,cmd.txt,meta.txt,STATUS,stdout.log,...} and one results.tsv line per run.
 #                       An existing run dir is resumed (run_eval.py skips finished episodes).
-#   --launch            hand each run to /harness/launch.sh (FIFO queue, picks any free GPU, returns at once).
+#   --launch            hand each run to /harness/launch.sh (FIFO queue, picks ANY free GPU, returns at once).
+#                       Refused under the current GPU-0-only rule unless --allow-any-gpu is also given.
 #   --dry-run           print the run_ids and commands only.
 set -euo pipefail
 
-MODE=direct; DRY=0; CKPTS=pi05lib; SUITES=goal; CONDS=C0; REPEATS=0; EPISODES=50; TASKS=0-9; HOURS=12
+MODE=direct; DRY=0; ANY_GPU=0; CKPTS=pi05lib; SUITES=goal; CONDS=C0; REPEATS=0; EPISODES=50; TASKS=0-9; HOURS=12
 EXTRA=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --direct) MODE=direct ;;
     --launch) MODE=launch ;;
     --dry-run) DRY=1 ;;
+    --allow-any-gpu) ANY_GPU=1 ;;
     --ckpt) CKPTS=$2; shift ;;
     --suites) SUITES=$2; shift ;;
     --conds) CONDS=$2; shift ;;
@@ -36,6 +38,12 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+if [ "$MODE" = launch ] && [ "$ANY_GPU" != 1 ]; then
+  echo "WARNING: --launch lets /harness/launch.sh pick any free GPU; GPU 0 cannot be pinned there." >&2
+  echo "Current rule is GPU 0 only -> refusing. Use --direct (default), or add --allow-any-gpu once GPUs 1-3 are allowed." >&2
+  exit 2
+fi
 
 REPO=$(git rev-parse --show-toplevel)
 GCD=$(git rev-parse --git-common-dir)

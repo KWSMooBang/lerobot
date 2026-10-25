@@ -22,6 +22,7 @@ Outputs under --out:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import subprocess  # nosec B404
@@ -40,6 +41,7 @@ from common import (  # noqa: E402
     DUAL_GOAL_CONDITIONS,
     POLICY_CKPT,
     Variant,
+    check_resume,
     checkpoint_training_info,
     ensure_libero_config,
     episode_seed,
@@ -421,12 +423,32 @@ def main() -> None:
     }
     k_by_task = scene_groups(suite)
 
+    # Resume guard: an out dir holds exactly one configuration. Checked before loading the policy.
+    identity = {
+        "policy": args.policy,
+        "checkpoint": ckpt,
+        "libero_adapter": adapter,
+        "suite": args.suite,
+        "condition": args.condition,
+        "repeat_idx": args.repeat_idx,
+        "seed": args.seed,
+        "instr_set_sha256": hashlib.sha256(Path(args.instr_set).read_bytes()).hexdigest(),
+        "n_action_steps": args.n_action_steps,
+        "max_steps": max_steps,
+    }
+    meta_path = out / "run_meta.json"
+    ep_path = out / "episodes.jsonl"
+    prev_meta = json.loads(meta_path.read_text()) if meta_path.exists() else None
+    check_resume(identity, prev_meta, ep_path)
+
     policy, pre, post, env_pre, env_post, tokenizer, inf_meta = load_policy(
         args.policy, ckpt, args.suite, args.n_action_steps, args.device, libero_adapter=adapter
     )
-    meta_path = out / "run_meta.json"
+    now = datetime.now(UTC).isoformat()
     meta = {
-        "created": datetime.now(UTC).isoformat(),
+        "identity": identity,
+        "created": prev_meta["created"] if prev_meta else now,
+        "resumed": [*(prev_meta or {}).get("resumed", []), now] if prev_meta else [],
         "args": vars(args),
         "checkpoint": ckpt,
         "model_tag": tag,
@@ -444,7 +466,6 @@ def main() -> None:
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2, default=str)
 
-    ep_path = out / "episodes.jsonl"
     done: set[tuple] = set()
     if ep_path.exists():
         for line in ep_path.read_text().splitlines():

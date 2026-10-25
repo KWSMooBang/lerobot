@@ -215,6 +215,31 @@ def episode_seed(base: int, repeat_idx: int, task_id: int, init_idx: int) -> int
     return base * 1_000_000 + repeat_idx * 10_000 + task_id * 100 + init_idx
 
 
+def check_resume(identity: dict[str, Any], prev_meta: dict[str, Any] | None, ep_path: Path) -> None:
+    """Refuse to append to an out dir written with another configuration (checkpoint, seed, condition,
+    suite, repeat, instruction-set hash, ...). Existing episodes must also match it one by one."""
+    if prev_meta is not None:
+        prev = prev_meta.get("identity")
+        if prev is None:
+            raise SystemExit(
+                f"{ep_path.parent}: run_meta.json has no identity (older harness); use a new --out"
+            )
+        diff = {k: (prev.get(k), v) for k, v in identity.items() if prev.get(k) != v}
+        if diff:
+            raise SystemExit(f"{ep_path.parent} was written with another configuration (old, new): {diff}")
+    elif ep_path.exists() and ep_path.stat().st_size > 0:
+        raise SystemExit(f"{ep_path} exists without run_meta.json; cannot verify its configuration")
+    if not ep_path.exists():
+        return
+    for line in ep_path.read_text().splitlines():
+        r = json.loads(line)
+        want = episode_seed(identity["seed"], identity["repeat_idx"], r["task_id"], r["init_idx"])
+        got = (r["ckpt"], r["suite"], r["condition"], r["repeat_idx"], r["seed"])
+        exp = (identity["checkpoint"], identity["suite"], identity["condition"], identity["repeat_idx"], want)
+        if got != exp:
+            raise SystemExit(f"{ep_path}: episode {got} does not match this run {exp}")
+
+
 def video_relpath(
     suite: str, task_id: int, condition: str, variant: str, init_idx: int, repeat_idx: int
 ) -> str:

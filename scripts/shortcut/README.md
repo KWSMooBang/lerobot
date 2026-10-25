@@ -3,14 +3,14 @@
 Design: "LIBERO Shortcut Learning 관측 실험 설계" §4–6 (summary in `RESEARCH.md`). The env, BDDL and init
 states stay original. Only the instruction string given to π0.5 changes.
 
-| file                    | what                                                                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `run_eval.py`           | one (checkpoint, suite, condition, repeat) run → `run_meta.json`, `episodes.jsonl`, `steps/**.npz`, `videos/**.mp4`                       |
-| `metrics.py`            | episodes.jsonl → `by_condition.csv`, `by_task.csv`, `summary.md`                                                                          |
-| `make_compare_video.py` | same (task, init), several conditions side by side → mp4 + GIF ≤ 3 MB                                                                     |
-| `submit.sh`             | one run per (ckpt, suite, cond, repeat). Default `--direct` runs sequentially on GPU 0; `--launch` uses `/harness/launch.sh`; `--dry-run` |
-| `common.py`             | LIBERO config, NVIDIA EGL, policy loading (+ LIBERO adapter for base ckpt), instruction variants                                          |
-| `tests/fixtures/`       | 2-task libero_goal instruction set (tasks 1, 8) + swap goal BDDLs, used by the smoke test                                                 |
+| file                    | what                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_eval.py`           | one (checkpoint, suite, condition, repeat) run → `run_meta.json`, `episodes.jsonl`, `steps/**.npz`, `videos/**.mp4`                                                                 |
+| `metrics.py`            | episodes.jsonl → `by_condition.csv`, `by_task.csv`, `by_variant.csv` (per-variant McNemar), `repeats.csv` (C0 repeat agreement), `summary.md`                                       |
+| `make_compare_video.py` | same (task, init), several conditions side by side → mp4 + GIF ≤ 3 MB                                                                                                               |
+| `submit.sh`             | one run per (ckpt, suite, cond, repeat). Default `--direct` runs sequentially on GPU 0; `--launch` (`/harness/launch.sh`, any GPU) is refused unless `--allow-any-gpu`; `--dry-run` |
+| `common.py`             | LIBERO config, NVIDIA EGL, policy loading (+ LIBERO adapter for base ckpt), instruction variants                                                                                    |
+| `tests/fixtures/`       | 2-task libero_goal instruction set (tasks 1, 8) + swap goal BDDLs, used by the smoke test                                                                                           |
 
 ## Checkpoints (`--policy pi05 --checkpoint ...`)
 
@@ -33,6 +33,12 @@ goal 300, libero_10 520).
 - C0–C3 stop at the original goal. C4–C6 run to max steps and check the original goal (`_check_success`)
   and the new goal (`goal_bddl` `:goal`, via the scene's `_eval_predicate`) every step → `t_orig`, `t_new`.
 - Seed per episode = `seed·1e6 + repeat·1e4 + task·100 + init`. It is the same in every condition, so episodes pair across conditions.
+- Resume: an `--out` dir holds one configuration. `run_meta.json → identity` (checkpoint, adapter, suite,
+  condition, repeat, seed, instruction-set sha256, n_action_steps, max_steps) must match, and so must every
+  existing episode's checkpoint/condition/seed; otherwise run_eval.py stops before loading the policy.
+- metrics: episodes pair on (model, ckpt, suite, task, init, repeat, seed) with C0 repeat 0 as the reference.
+  Condition-level McNemar aggregates C3–C6 variants per (task, init) first (majority; `any` also reported);
+  per-variant McNemar is in `by_variant.csv`. Duplicate episodes across inputs are an error.
 - `first_grasp_object` = first step where the gripper is commanded closed and both fingers touch the same
   object/fixture. `first_descent_xy` = eef xy where z has dropped 5 cm below its start and stops descending (or the gripper closes).
 - `scene_k` = tasks in the suite sharing the scene (same objects, fixtures, regions, init): goal 10,
