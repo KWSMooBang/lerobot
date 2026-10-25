@@ -54,6 +54,8 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - submit.sh (T003) codex 리뷰 3건, 파일럿 후 수정: driver 가 죽으면 run 이 running 으로 남음(check-runs 에선 stale 로 보임),
   같은 run 동시 제출 경합, --hours 검증 없음. **파일럿 중에는 .claude/worktrees/sc-pilot 의 submit.sh 를 고치거나 worktree 를 지우지 말 것**
   (driver bash 가 그 파일을 읽으며 실행 중).
+- T004 batched 경로: npz·mp4 교체가 서로 독립이라 이론상 두 시도의 파일이 섞일 수 있음 (commit 된 npz 가 깨져 있어야 생기므로 사실상 불가, codex 2차). attempt 별 경로로 바꿀 때 같이.
+- T004 GPU 확인 (single vs batched N=4 일치율, 처리량): 파일럿 종료 후 GPU 0 에서 ≤20분.
 - metrics.py C0 repeat 키에 base seed 가 없음 (codex 2차 리뷰). 지금은 seed 7 하나라 무해. 여러 seed 를 쓰기 전에 고칠 것.
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
@@ -66,3 +68,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-25 사람 지시: A100 80GB × 4 서버용 고속 실행 경로를 코드만 구현 (T004, 실행 안 함). 결과는 exec_mode·GPU 별로 구분해 단일 GPU 결과와 짝짓지 않는다.
 - 2026-10-25 사람 지시: 파일럿이 끝나면 결과 문서에 영상 위주로 정리. T005(analysis) 가 영상·manifest 를 만들고 lead 가 문서에 올린다.
 - 2026-10-25 T002 병합 (exp/sc-instructions 4d97228c). swap 102개 중 101 feasible. codex 리뷰: goal t3 swap 의 Open 누락 지적은 원본 goal 도 In 만 쓰므로 유지.
+- 2026-10-25 T004 병합 (exp/sc-multigpu 1b7a67f1, CPU 테스트 25/25). P2 추정: 46,100 ep, 단일 경로 ≈162 GPU-h, 4×A100 ≈6 h (범위 3–11 h, 미측정 β 가정).
