@@ -1,0 +1,377 @@
+"""Shared helpers for the LIBERO shortcut-observation harness.
+
+LIBERO setup (non-interactive config), policy loading (same path as lerobot-eval), instruction-set
+handling and per-condition instruction strings. Adapted from `scripts/pid_demo/{common,setup_libero}.py`
+on `exp/pid-demo`.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import os
+import random
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+os.environ.setdefault("MUJOCO_GL", "egl")
+
+
+def _use_nvidia_egl() -> None:
+    """This container ships libEGL_nvidia but glvnd only lists mesa, so MuJoCo renders on llvmpipe
+    (~100 ms per 360px frame vs <1 ms). Point glvnd at the NVIDIA vendor library via a user-level
+    vendor JSON; no system change. Must run before EGL is first loaded."""
+    if "__EGL_VENDOR_LIBRARY_FILENAMES" in os.environ:
+        return
+    vendor_dirs = ("/usr/share/glvnd/egl_vendor.d", "/etc/glvnd/egl_vendor.d")
+    if any(Path(d, "10_nvidia.json").exists() for d in vendor_dirs):
+        return
+    if not any(
+        Path(d, "libEGL_nvidia.so.0").exists() for d in ("/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu")
+    ):
+        return
+    vendor = Path.home() / ".cache" / "shortcut_libero" / "10_nvidia.json"
+    if not vendor.exists():
+        vendor.parent.mkdir(parents=True, exist_ok=True)
+        vendor.write_text('{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}\n')
+    os.environ["__EGL_VENDOR_LIBRARY_FILENAMES"] = str(vendor)
+
+
+_use_nvidia_egl()
+
+SUITE_SHORT = {"libero_spatial": "spat", "libero_object": "obj", "libero_goal": "goal", "libero_10": "l10"}
+CONDITIONS = ("C0", "C1", "C2", "C3", "C4", "C5", "C6")
+DUAL_GOAL_CONDITIONS = ("C4", "C5", "C6")  # no early termination, original + new goal tracked every step
+# --policy picks the architecture; --checkpoint picks the weights (pi05lib = LIBERO finetune,
+# pi05base = lerobot/pi05_base, not trained on LIBERO).
+POLICY_CKPT = {"pi05": "lerobot/pi05_libero_finetuned"}
+BASE_CKPT = {"pi05": "lerobot/pi05_base"}
+# google/paligemma-3b-pt-224 (the tokenizer named in both checkpoints) is gated and no HF token is
+# available. Same fallback as exp/pid-demo: the public big_vision PaliGemma sentencepiece model that
+# OpenPI uses, loaded with BOS on / EOS off like the HF tokenizer config.
+TOKENIZER_DIR = os.environ.get("SC_TOKENIZER_DIR", "/cache/pid_demo_dl/paligemma_tok_hf")
+
+
+# ---------------------------------------------------------------- LIBERO config
+
+
+def ensure_libero_config() -> str:
+    """Point LIBERO at a config.yaml for *this* interpreter's libero install (no input() prompt).
+
+    Must run before the first `import libero`. Keyed by the libero install path so worktrees with
+    different venvs do not clobber each other.
+    """
+    if (
+        os.environ.get("LIBERO_CONFIG_PATH")
+        and Path(os.environ["LIBERO_CONFIG_PATH"], "config.yaml").exists()
+    ):
+        return os.environ["LIBERO_CONFIG_PATH"]
+    spec = importlib.util.find_spec("libero")
+    assert spec is not None and spec.submodule_search_locations is not None
+    libero_dir = os.path.join(list(spec.submodule_search_locations)[0], "libero")
+    key = hashlib.sha1(libero_dir.encode(), usedforsecurity=False).hexdigest()[:10]
+    cfg_dir = Path.home() / ".cache" / "shortcut_libero" / key
+    cfg = cfg_dir / "config.yaml"
+    if not cfg.exists():
+        from huggingface_hub import snapshot_download
+
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        assets = snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset")
+        tmp = cfg.with_suffix(f".tmp{os.getpid()}")
+        tmp.write_text(
+            f"assets: {assets}\n"
+            f"bddl_files: {libero_dir}/bddl_files\n"
+            f"benchmark_root: {libero_dir}\n"
+            f"datasets: {libero_dir}/../datasets\n"
+            f"init_states: {libero_dir}/init_files\n"
+        )
+        tmp.replace(cfg)
+    os.environ["LIBERO_CONFIG_PATH"] = str(cfg_dir)
+    return str(cfg_dir)
+
+
+# ---------------------------------------------------------------- instruction set
+
+
+@dataclass
+class Variant:
+    """One instruction given to the policy for a (task, condition)."""
+
+    condition: str
+    variant: str  # file-name-safe id, e.g. "orig", "blank", "p0", "C4-a", "t3"
+    instruction: str
+    goal_bddl: str | None = None  # new-goal BDDL (C4–C6); None for C0–C3
+    meta: dict[str, Any] = field(default_factory=dict)
+
+
+def load_instruction_set(path: str | Path) -> dict[str, Any]:
+    with open(path) as f:
+        data = json.load(f)
+    data["_by_task"] = {int(t["task_id"]): t for t in data["tasks"]}
+    data["_path"] = str(path)
+    return data
+
+
+def resolve_path(p: str, instr_set_path: str | Path) -> str:
+    """Resolve a BDDL path from the JSON: absolute, repo-relative, or relative to the JSON file."""
+    cand = [Path(p), Path.cwd() / p, Path(instr_set_path).parent / p]
+    repo_root = Path(__file__).resolve().parents[2]
+    cand.append(repo_root / p)
+    try:  # original LIBERO BDDLs may be given relative to libero's bddl_files dir
+        from libero.libero import get_libero_path
+
+        cand.append(Path(get_libero_path("bddl_files")) / p)
+    except ImportError:
+        pass
+    for c in cand:
+        if c.exists():
+            return str(c.resolve())
+    raise FileNotFoundError(f"BDDL not found: {p} (tried {[str(c) for c in cand]})")
+
+
+def nonsense_instruction(original: str, tokenizer: Any, seed: int) -> str:
+    """Random whole-word vocab pieces, as many as the original has tokens (no BOS).
+
+    Restricting to `▁[a-z]{2,8}` pieces keeps re-tokenized length close to the original.
+    """
+    n = len(tokenizer.encode(original, add_special_tokens=False))
+    vocab = sorted(t for t in tokenizer.get_vocab() if re.fullmatch(r"▁[a-z]{2,8}", t))
+    rng = random.Random(seed)
+    return " ".join(rng.choice(vocab)[1:] for _ in range(n))
+
+
+def variants_for(
+    condition: str,
+    task_entry: dict[str, Any],
+    instr_set: dict[str, Any],
+    tokenizer: Any,
+    include_infeasible: bool = False,
+) -> list[Variant]:
+    original = task_entry["original"]
+    if condition == "C0":
+        return [Variant("C0", "orig", original)]
+    if condition == "C1":
+        return [Variant("C1", "blank", "")]
+    if condition == "C2":
+        seed = int(task_entry.get("nonsense_seed", 0)) * 1000 + int(task_entry["task_id"])
+        return [
+            Variant("C2", "nonsense", nonsense_instruction(original, tokenizer, seed), meta={"seed": seed})
+        ]
+    if condition == "C3":
+        return [Variant("C3", f"p{i}", s) for i, s in enumerate(task_entry.get("paraphrases", []))]
+    if condition in ("C4", "C5"):
+        want = "object" if condition == "C4" else "target"
+        out = []
+        for sw in task_entry.get("swaps", []):
+            if sw.get("type") != want:
+                continue
+            if sw.get("feasible") is False and not include_infeasible:
+                continue
+            out.append(
+                Variant(
+                    condition,
+                    sw["id"],
+                    sw["instruction"],
+                    goal_bddl=resolve_path(sw["goal_bddl"], instr_set["_path"]),
+                    meta={k: sw.get(k) for k in ("type", "feasible", "orig_target", "new_target")},
+                )
+            )
+        return out
+    if condition == "C6":
+        out = []
+        for j in task_entry.get("cross_task", []):
+            other = instr_set["_by_task"].get(int(j)) or instr_set["_suite_tasks"][int(j)]
+            out.append(
+                Variant(
+                    "C6",
+                    f"t{int(j)}",
+                    other["original"],
+                    goal_bddl=resolve_path(other["bddl"], instr_set["_path"]),
+                    meta={"cross_task_id": int(j)},
+                )
+            )
+        return out
+    raise ValueError(f"unknown condition {condition}")
+
+
+def parse_range(spec: str) -> list[int]:
+    """'0-9' / '0,3,5' / '2' -> list of ints."""
+    out: list[int] = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = part.split("-")
+            out.extend(range(int(a), int(b) + 1))
+        elif part:
+            out.append(int(part))
+    return out
+
+
+def episode_seed(base: int, repeat_idx: int, task_id: int, init_idx: int) -> int:
+    """Same seed for every condition at a given (task, init, repeat) → paired comparisons."""
+    return base * 1_000_000 + repeat_idx * 10_000 + task_id * 100 + init_idx
+
+
+def video_relpath(
+    suite: str, task_id: int, condition: str, variant: str, init_idx: int, repeat_idx: int
+) -> str:
+    rep = f"_r{repeat_idx}" if repeat_idx else ""
+    return f"{suite}/task{task_id:02d}/{condition}_{variant}{rep}_init{init_idx:02d}"
+
+
+# ---------------------------------------------------------------- policy
+
+
+def load_tokenizer() -> Any:
+    from transformers import AutoTokenizer, GemmaTokenizer
+
+    if Path(TOKENIZER_DIR).exists():
+        return GemmaTokenizer.from_pretrained(TOKENIZER_DIR, add_bos_token=True, add_eos_token=False)
+    return AutoTokenizer.from_pretrained("google/paligemma-3b-pt-224")
+
+
+LIBERO_IMAGE_KEYS = ("observation.images.image", "observation.images.image2")
+
+
+def needs_libero_adapter(ckpt: str) -> bool:
+    """True when the checkpoint was not trained on LIBERO keys (e.g. lerobot/pi05_base:
+    base_0_rgb/left_wrist_0_rgb/right_wrist_0_rgb, 32-d state, no normalization stats)."""
+    import lerobot.policies  # noqa: F401  (registers policy config types)
+    from lerobot.configs.policies import PreTrainedConfig
+
+    cfg = PreTrainedConfig.from_pretrained(ckpt)
+    return not all(k in (cfg.input_features or {}) for k in LIBERO_IMAGE_KEYS)
+
+
+def model_tag(ckpt: str) -> str:
+    known = {"lerobot/pi05_libero_finetuned": "pi05lib", "lerobot/pi05_base": "pi05base"}
+    return known.get(ckpt, re.sub(r"[^A-Za-z0-9]+", "-", ckpt.split("/")[-1]))
+
+
+def load_policy(
+    policy_type: str,
+    ckpt: str,
+    suite: str,
+    n_action_steps: int,
+    device: str = "cuda",
+    libero_adapter: str | None = None,
+) -> tuple:
+    """Load like lerobot-eval (policy.path=ckpt) with a fixed n_action_steps. Returns
+    (policy, pre, post, env_pre, env_post, tokenizer, inference_meta).
+
+    With `libero_adapter` (a LIBERO-finetuned checkpoint of the same architecture), the weights come
+    from `ckpt` but the config (input/output features: agentview→image, wrist→image2, empty third
+    camera, 8-d state, 7-d action; MEAN_STD normalization; dtype) and the pre/post processors
+    (HuggingFaceVLA/libero normalization stats, tokenizer settings) come from the adapter, so a
+    non-LIBERO checkpoint sees exactly the inputs the LIBERO finetune sees.
+    """
+    from lerobot.configs.policies import PreTrainedConfig
+    from lerobot.envs.configs import LiberoEnv as LiberoEnvConfig
+    from lerobot.envs.factory import make_env_pre_post_processors
+    from lerobot.policies import make_policy, make_pre_post_processors
+
+    cfg_src = libero_adapter or ckpt
+    cfg = PreTrainedConfig.from_pretrained(cfg_src)
+    if cfg.type != policy_type:
+        raise ValueError(f"--policy {policy_type} but checkpoint {cfg_src} is type {cfg.type}")
+    adapter_meta = None
+    if libero_adapter:
+        own = PreTrainedConfig.from_pretrained(ckpt)
+        if own.type != cfg.type:
+            raise ValueError(f"adapter {libero_adapter} ({cfg.type}) != checkpoint {ckpt} ({own.type})")
+        adapter_meta = {
+            "weights_from": ckpt,
+            "config_and_processors_from": libero_adapter,
+            "matched": [
+                "input features: observation.images.image (agentview), observation.images.image2 (wrist), "
+                "observation.images.empty_camera_0 (padding), observation.state 8-d; replaces "
+                "base_0_rgb / left_wrist_0_rgb / right_wrist_0_rgb (same slot order) and 32-d state",
+                "output feature: action 7-d (model still predicts max_action_dim=32, first 7 used)",
+                "normalization: MEAN_STD with HuggingFaceVLA/libero stats from the adapter's "
+                "normalizer/unnormalizer (checkpoint ships none)",
+                "pre/post processor pipeline and tokenizer settings of the adapter "
+                "(no relative_actions/absolute_actions steps)",
+                f"dtype {getattr(cfg, 'dtype', None)} (checkpoint stored {getattr(own, 'dtype', None)})",
+            ],
+            "checkpoint_own_input_features": {
+                k: list(v.shape) for k, v in (own.input_features or {}).items()
+            },
+            "checkpoint_own_normalization_mapping": (
+                {k: str(v) for k, v in own.normalization_mapping.items()}
+                if own.normalization_mapping
+                else None
+            ),
+        }
+    meta = {
+        "policy_type": cfg.type,
+        "chunk_size": cfg.chunk_size,
+        "n_action_steps_stored": cfg.n_action_steps,
+        "n_action_steps": n_action_steps,
+        "num_inference_steps": getattr(cfg, "num_inference_steps", None),
+        "image_resolution": list(getattr(cfg, "image_resolution", []) or []),
+        "tokenizer_max_length": getattr(cfg, "tokenizer_max_length", None),
+        "dtype": getattr(cfg, "dtype", None),
+        "temporal_ensembling": False,
+        "compile_model": False,
+    }
+    meta["libero_adapter"] = adapter_meta
+    cfg.pretrained_path = Path(cfg_src)
+    cfg.device = device
+    cfg.n_action_steps = n_action_steps
+    if hasattr(cfg, "compile_model"):
+        cfg.compile_model = False
+    env_cfg = LiberoEnvConfig(task=suite)
+    policy = make_policy(cfg=cfg, env_cfg=env_cfg, pretrained_path=ckpt)
+    policy.eval()
+    tokenizer = load_tokenizer()
+    pre, post = make_pre_post_processors(
+        policy_cfg=cfg,
+        pretrained_path=cfg_src,
+        preprocessor_overrides={
+            "device_processor": {"device": device},
+            "rename_observations_processor": {"rename_map": {}},
+            "tokenizer_processor": {"tokenizer": tokenizer},
+        },
+    )
+    env_pre, env_post = make_env_pre_post_processors(env_cfg=env_cfg, policy_cfg=cfg)
+    meta["env_observation_hw"] = [env_cfg.observation_height, env_cfg.observation_width]
+    meta["control_mode"] = env_cfg.control_mode
+    return policy, pre, post, env_pre, env_post, tokenizer, meta
+
+
+def checkpoint_training_info(ckpt: str) -> dict[str, Any]:
+    """Mixed vs per-suite training, read from the checkpoint's train_config.json and model card."""
+    from huggingface_hub import HfApi, ModelCard, hf_hub_download
+
+    info: dict[str, Any] = {"checkpoint": ckpt}
+    try:
+        info["revision"] = HfApi().model_info(ckpt).sha
+    except Exception as e:
+        info["revision_error"] = repr(e)
+    try:
+        with open(hf_hub_download(ckpt, "train_config.json")) as f:
+            tc = json.load(f)
+        ds = tc.get("dataset") or {}
+        info.update(
+            dataset_repo_id=ds.get("repo_id"),
+            dataset_episodes=ds.get("episodes"),
+            steps=tc.get("steps"),
+            batch_size=tc.get("batch_size"),
+            init_from=(tc.get("policy") or {}).get("pretrained_path"),
+        )
+        # HuggingFaceVLA/libero holds all four suites (spatial/object/goal/10) in one dataset.
+        mixed = ds.get("repo_id") == "HuggingFaceVLA/libero" and ds.get("episodes") is None
+        info["training_mix"] = "mixed-4-suites" if mixed else "unknown"
+    except Exception as e:
+        info["train_config_error"] = repr(e)
+        if ckpt in BASE_CKPT.values():
+            info["training_mix"] = "not-libero-trained (pi05 base, no train_config.json on hub)"
+    try:
+        text = ModelCard.load(ckpt).text
+        info["model_card_excerpt"] = " ".join(text.split()[:60])
+    except Exception as e:
+        info["model_card_error"] = repr(e)
+    return info
