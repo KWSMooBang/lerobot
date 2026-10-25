@@ -51,6 +51,9 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## 백로그
 - paraphrase 6개 사람 검수 필요 (spatial 2, goal 2, l10 2; instructions/<suite>.json 의 review 필드). C3 실행 전에.
 - libero_10 t9 C4-a feasible=false 는 스크립트 정책 한계 (C0 도 실패). 포함하려면 teleop 확인 필요.
+- submit.sh (T003) codex 리뷰 3건, 파일럿 후 수정: driver 가 죽으면 run 이 running 으로 남음(check-runs 에선 stale 로 보임),
+  같은 run 동시 제출 경합, --hours 검증 없음. **파일럿 중에는 .claude/worktrees/sc-pilot 의 submit.sh 를 고치거나 worktree 를 지우지 말 것**
+  (driver bash 가 그 파일을 읽으며 실행 중).
 - metrics.py C0 repeat 키에 base seed 가 없음 (codex 2차 리뷰). 지금은 seed 7 하나라 무해. 여러 seed 를 쓰기 전에 고칠 것.
 - π0, OpenVLA-OFT: π0.5 결과 후 결정 (OFT 는 별도 환경 필요)
 - 자체 학습 모델(suite별 학습) 포함 여부 (설계 3장 열린 질문)
