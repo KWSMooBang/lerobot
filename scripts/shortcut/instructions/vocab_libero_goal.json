@@ -1,0 +1,42 @@
+{
+  "suite": "libero_goal",
+  "source": "task.language of the 10 training tasks",
+  "instructions": [
+    "open the middle drawer of the cabinet",
+    "put the bowl on the stove",
+    "put the wine bottle on top of the cabinet",
+    "open the top drawer and put the bowl inside",
+    "put the bowl on top of the cabinet",
+    "push the plate to the front of the stove",
+    "put the cream cheese in the bowl",
+    "turn on the stove",
+    "put the bowl on the plate",
+    "put the wine bottle on the rack"
+  ],
+  "tokens": [
+    "and",
+    "bottle",
+    "bowl",
+    "cabinet",
+    "cheese",
+    "cream",
+    "drawer",
+    "front",
+    "in",
+    "inside",
+    "middle",
+    "of",
+    "on",
+    "open",
+    "plate",
+    "push",
+    "put",
+    "rack",
+    "stove",
+    "the",
+    "to",
+    "top",
+    "turn",
+    "wine"
+  ]
+}

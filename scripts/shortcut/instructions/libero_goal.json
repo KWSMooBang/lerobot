@@ -1,0 +1,433 @@
+{
+  "suite": "libero_goal",
+  "bddl_root": "libero/libero/bddl_files (hf-libero package)",
+  "vocab": "scripts/shortcut/instructions/vocab_libero_goal.json",
+  "tasks": [
+    {
+      "task_id": 0,
+      "bddl": "libero_goal/open_the_middle_drawer_of_the_cabinet.bddl",
+      "original": "open the middle drawer of the cabinet",
+      "paraphrases": [
+        "pull open the middle drawer of the cabinet",
+        "open the cabinet's middle drawer",
+        "slide the middle drawer of the cabinet open"
+      ],
+      "review": {},
+      "nonsense_seed": 200,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "open the top drawer of the cabinet",
+          "goal": "(And (Open wooden_cabinet_1_top_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/open_the_middle_drawer_of_the_cabinet__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "wooden_cabinet_1_middle_region",
+          "new_target": "wooden_cabinet_1_top_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        1
+      ],
+      "note": "Only one in-vocab swap: the other drawer reachable with 'open' that appears in training is the top one ('bottom' is not in the libero_goal vocabulary).",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 1,
+      "bddl": "libero_goal/put_the_bowl_on_the_stove.bddl",
+      "original": "put the bowl on the stove",
+      "paraphrases": [
+        "place the bowl on the stove",
+        "set the bowl on top of the stove",
+        "move the bowl onto the stove"
+      ],
+      "review": {},
+      "nonsense_seed": 201,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on the stove",
+          "goal": "(And (On cream_cheese_1 flat_stove_1_cook_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_stove__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "put the wine bottle on the stove",
+          "goal": "(And (On wine_bottle_1 flat_stove_1_cook_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_stove__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "wine_bottle_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the bowl in front of the stove",
+          "goal": "(And (On akita_black_bowl_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_stove__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "flat_stove_1_cook_region",
+          "new_target": "main_table_stove_front_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        2
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 2,
+      "bddl": "libero_goal/put_the_wine_bottle_on_top_of_the_cabinet.bddl",
+      "original": "put the wine bottle on top of the cabinet",
+      "paraphrases": [
+        "place the wine bottle on the top of the cabinet",
+        "set the wine bottle on the cabinet's top",
+        "move the wine bottle onto the top of the cabinet"
+      ],
+      "review": {},
+      "nonsense_seed": 202,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on top of the cabinet",
+          "goal": "(And (On cream_cheese_1 wooden_cabinet_1_top_side))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_top_of_the_cabinet__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "wine_bottle_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the wine bottle on the stove",
+          "goal": "(And (On wine_bottle_1 flat_stove_1_cook_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_top_of_the_cabinet__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "wooden_cabinet_1_top_side",
+          "new_target": "flat_stove_1_cook_region",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-b",
+          "type": "target",
+          "instruction": "put the wine bottle in front of the stove",
+          "goal": "(And (On wine_bottle_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_top_of_the_cabinet__C5-b.bddl",
+          "feasible": true,
+          "orig_target": "wooden_cabinet_1_top_side",
+          "new_target": "main_table_stove_front_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        3
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 3,
+      "bddl": "libero_goal/open_the_top_drawer_and_put_the_bowl_inside.bddl",
+      "original": "open the top drawer and put the bowl inside",
+      "paraphrases": [
+        "pull open the top drawer and place the bowl in it",
+        "open the cabinet's top drawer, then put the bowl inside it",
+        "open the uppermost drawer and set the bowl inside"
+      ],
+      "review": {},
+      "nonsense_seed": 203,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "open the top drawer and put the cream cheese inside",
+          "goal": "(And (In cream_cheese_1 wooden_cabinet_1_top_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/open_the_top_drawer_and_put_the_bowl_inside__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "1/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "open the middle drawer and put the bowl inside",
+          "goal": "(And (In akita_black_bowl_1 wooden_cabinet_1_middle_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/open_the_top_drawer_and_put_the_bowl_inside__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "wooden_cabinet_1_top_region",
+          "new_target": "wooden_cabinet_1_middle_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        4
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 4,
+      "bddl": "libero_goal/put_the_bowl_on_top_of_the_cabinet.bddl",
+      "original": "put the bowl on top of the cabinet",
+      "paraphrases": [
+        "place the bowl on the top of the cabinet",
+        "set the bowl on the cabinet's top",
+        "move the bowl onto the top of the cabinet"
+      ],
+      "review": {},
+      "nonsense_seed": 204,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on top of the cabinet",
+          "goal": "(And (On cream_cheese_1 wooden_cabinet_1_top_side))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_top_of_the_cabinet__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the bowl in front of the stove",
+          "goal": "(And (On akita_black_bowl_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_top_of_the_cabinet__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "wooden_cabinet_1_top_side",
+          "new_target": "main_table_stove_front_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        5
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 5,
+      "bddl": "libero_goal/push_the_plate_to_the_front_of_the_stove.bddl",
+      "original": "push the plate to the front of the stove",
+      "paraphrases": [
+        "slide the plate to the front of the stove",
+        "push the plate so that it is in front of the stove",
+        "move the plate in front of the stove by pushing it"
+      ],
+      "review": {},
+      "nonsense_seed": 205,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "push the bowl to the front of the stove",
+          "goal": "(And (On akita_black_bowl_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/push_the_plate_to_the_front_of_the_stove__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "plate_1",
+          "new_target": "akita_black_bowl_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "push the cream cheese to the front of the stove",
+          "goal": "(And (On cream_cheese_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/push_the_plate_to_the_front_of_the_stove__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "plate_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        6
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 6,
+      "bddl": "libero_goal/put_the_cream_cheese_in_the_bowl.bddl",
+      "original": "put the cream cheese in the bowl",
+      "paraphrases": [
+        "place the cream cheese in the bowl",
+        "drop the cream cheese into the bowl",
+        "move the cream cheese into the bowl"
+      ],
+      "review": {
+        "1": "'drop ... into' may suggest releasing from height; goal (cream cheese On bowl) is unchanged."
+      },
+      "nonsense_seed": 206,
+      "swaps": [
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the cream cheese on the plate",
+          "goal": "(And (On cream_cheese_1 plate_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_cream_cheese_in_the_bowl__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "plate_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-b",
+          "type": "target",
+          "instruction": "put the cream cheese on the stove",
+          "goal": "(And (On cream_cheese_1 flat_stove_1_cook_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_cream_cheese_in_the_bowl__C5-b.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "flat_stove_1_cook_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        7
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 7,
+      "bddl": "libero_goal/turn_on_the_stove.bddl",
+      "original": "turn on the stove",
+      "paraphrases": [
+        "switch on the stove",
+        "turn the stove on",
+        "power on the stove"
+      ],
+      "review": {},
+      "nonsense_seed": 207,
+      "swaps": [],
+      "cross_task": [
+        8
+      ],
+      "note": "No swap: 'turn on' only ever applies to the stove in the libero_goal vocabulary, so there is no in-vocab object or target to swap to.",
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 8,
+      "bddl": "libero_goal/put_the_bowl_on_the_plate.bddl",
+      "original": "put the bowl on the plate",
+      "paraphrases": [
+        "place the bowl on the plate",
+        "set the bowl on top of the plate",
+        "move the bowl onto the plate"
+      ],
+      "review": {},
+      "nonsense_seed": 208,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on the plate",
+          "goal": "(And (On cream_cheese_1 plate_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_plate__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "2/3"
+        },
+        {
+          "id": "C4-b",
+          "type": "object",
+          "instruction": "put the wine bottle on the plate",
+          "goal": "(And (On wine_bottle_1 plate_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_plate__C4-b.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "wine_bottle_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the bowl in front of the stove",
+          "goal": "(And (On akita_black_bowl_1 main_table_stove_front_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_bowl_on_the_plate__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "plate_1",
+          "new_target": "main_table_stove_front_region",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        9
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    },
+    {
+      "task_id": 9,
+      "bddl": "libero_goal/put_the_wine_bottle_on_the_rack.bddl",
+      "original": "put the wine bottle on the rack",
+      "paraphrases": [
+        "place the wine bottle on the rack",
+        "set the wine bottle in the wine rack",
+        "move the wine bottle onto the rack"
+      ],
+      "review": {
+        "1": "'in the wine rack' vs original 'on the rack': the goal predicate is On(wine_bottle, rack top_region); check the preposition change is acceptable."
+      },
+      "nonsense_seed": 209,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on the rack",
+          "goal": "(And (On cream_cheese_1 wine_rack_1_top_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_the_rack__C4-a.bddl",
+          "feasible": true,
+          "orig_target": "wine_bottle_1",
+          "new_target": "cream_cheese_1",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the wine bottle on the stove",
+          "goal": "(And (On wine_bottle_1 flat_stove_1_cook_region))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_the_rack__C5-a.bddl",
+          "feasible": true,
+          "orig_target": "wine_rack_1_top_region",
+          "new_target": "flat_stove_1_cook_region",
+          "feasible_trials": "3/3"
+        },
+        {
+          "id": "C5-b",
+          "type": "target",
+          "instruction": "put the wine bottle on the plate",
+          "goal": "(And (On wine_bottle_1 plate_1))",
+          "goal_bddl": "scripts/shortcut/bddl/libero_goal/put_the_wine_bottle_on_the_rack__C5-b.bddl",
+          "feasible": true,
+          "orig_target": "wine_rack_1_top_region",
+          "new_target": "plate_1",
+          "feasible_trials": "3/3"
+        }
+      ],
+      "cross_task": [
+        0
+      ],
+      "scripted_c0_success": 3,
+      "scripted_c0_trials": 3
+    }
+  ]
+}
