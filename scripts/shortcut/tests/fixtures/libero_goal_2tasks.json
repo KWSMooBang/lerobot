@@ -1,0 +1,73 @@
+{
+  "suite": "libero_goal",
+  "tasks": [
+    {
+      "task_id": 1,
+      "bddl": "libero_goal/put_the_bowl_on_the_stove.bddl",
+      "original": "put the bowl on the stove",
+      "paraphrases": [
+        "place the bowl on the stove",
+        "put the black bowl on top of the stove",
+        "move the bowl onto the stove"
+      ],
+      "nonsense_seed": 0,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the wine bottle on the stove",
+          "goal_bddl": "scripts/shortcut/tests/fixtures/bddl/libero_goal/task01_C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "wine_bottle_1"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the bowl on the plate",
+          "goal_bddl": "scripts/shortcut/tests/fixtures/bddl/libero_goal/task01_C5-a.bddl",
+          "feasible": true,
+          "orig_target": "flat_stove_1_cook_region",
+          "new_target": "plate_1"
+        }
+      ],
+      "cross_task": [
+        8
+      ]
+    },
+    {
+      "task_id": 8,
+      "bddl": "libero_goal/put_the_bowl_on_the_plate.bddl",
+      "original": "put the bowl on the plate",
+      "paraphrases": [
+        "place the bowl on the plate",
+        "put the black bowl on top of the plate",
+        "move the bowl onto the plate"
+      ],
+      "nonsense_seed": 0,
+      "swaps": [
+        {
+          "id": "C4-a",
+          "type": "object",
+          "instruction": "put the cream cheese on the plate",
+          "goal_bddl": "scripts/shortcut/tests/fixtures/bddl/libero_goal/task08_C4-a.bddl",
+          "feasible": true,
+          "orig_target": "akita_black_bowl_1",
+          "new_target": "cream_cheese_1"
+        },
+        {
+          "id": "C5-a",
+          "type": "target",
+          "instruction": "put the bowl on the stove",
+          "goal_bddl": "scripts/shortcut/tests/fixtures/bddl/libero_goal/task08_C5-a.bddl",
+          "feasible": true,
+          "orig_target": "plate_1",
+          "new_target": "flat_stove_1_cook_region"
+        }
+      ],
+      "cross_task": [
+        1
+      ]
+    }
+  ]
+}
