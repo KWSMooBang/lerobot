@@ -49,6 +49,7 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- **평가 환경 ≠ 학습 데이터 (T008, P2 전 필수)**: LIBERO-10 t0·t1·t7 (LIVING_ROOM_SCENE1/2) 은 평가 렌더에서 milk·orange juice·ketchup 이 테이블 위에 없음 (sim z≈0.9–1.05 m), Object 는 바닥 텍스처·조명이 다름. Spatial·Goal 은 일치. 원인(자산·BDDL 버전) 조사 후 Object·LIBERO-10 평가.
 - paraphrase 6개 사람 검수 필요 (spatial 2, goal 2, l10 2; instructions/<suite>.json 의 review 필드). C3 실행 전에.
 - libero_10 t9 C4-a feasible=false 는 스크립트 정책 한계 (C0 도 실패). 포함하려면 teleop 확인 필요.
 - submit.sh (T003) codex 리뷰 3건, 파일럿 후 수정: driver 가 죽으면 run 이 running 으로 남음(check-runs 에선 stale 로 보임),
@@ -73,3 +74,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-26 사람 지시: pi05lib 의 지시 미이행 케이스가 학습 instruction (완전·부분 일치, 같은/다른 장면) 과 관련 있는지 분석 → T007 (analysis, CPU).
 - 2026-10-26 T007 결과: 학습 데이터 = HuggingFaceVLA/libero 40 문장/1,693 ep (LIBERO-90 없음). swap 60개 중 완전 일치 10 (전부 Spatial C4-a, 다른 장면), 같은 장면 0. SR_new: Spatial L2 56.0% / L4 3.3% / L5 0.4%, Goal L4 34.7%. 처음 보는 구성요소(특히 목적지)는 거의 항상 실패, 그러나 학습 문장 그대로도 Spatial 4/10 은 원래 bowl ("next to …" 3개 모두 실패) → 미이행은 학습 노출 부족만으로 설명 안 됨. 문서 π0.5 LIBERO 탭에 섹션·차트(widget 4e7b2319-b42d) 추가.
 - 2026-10-26 사람 지시: LIBERO 학습 데이터(HuggingFaceVLA/libero) 를 빠짐없이 시각화 → T008 (analysis). 문서에 "학습 데이터" 탭 + suite 별 하위 탭으로 정리 예정.
+- 2026-10-26 T008 학습 데이터 시각화 완료 (HuggingFaceVLA/libero rev 86958911, 34.9 GB → /outputs/VLA-shortcut-exps/data/hf_libero/). 첫 프레임 → task 정확도 (DINOv2+logreg): Spatial 90.0 / Object 100 / Goal 8.9 / LIBERO-10 89.7% (배치 상한 91.9/100/11.7/91.3). Goal 도 진행 10% 에 71%. Spatial t7·t9 는 같은 물리 배치. 문서 '학습 데이터' 탭 + suite 하위 탭 4개에 197 그림 반영.
