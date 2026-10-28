@@ -33,7 +33,7 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 
 ## Testbed (2026-10-28 사람 지시)
 임의 모델(lerobot 내장·직접 만든 플러그인)을 LIBERO 학습 데이터로 학습하고, 우리 instruction 변환 + LIBERO-Plus + LIBERO-PRO 로
-shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4×A100 서버, 검증 = GPU 0. 설계: /outputs/VLA-shortcut-exps/tasks/TESTBED_DESIGN.md.
+shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4×A100 서버, 검증 = GPU 0. 설계: /outputs/VLA-shortcut-exps/tasks/TESTBED_DESIGN.md, 문서 "Shortcut Testbed 설계" https://claude.ai/artifact/N5RnamMWSYwxoQ54RsEfXF.
 작업: T009 평가 env 수정 · T010 policy server + battery + report · T011 학습 harness + 플러그인 템플릿 → T012 LIBERO-Plus · T013 LIBERO-PRO adapter.
 
 ## 단계와 관문
