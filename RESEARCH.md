@@ -83,3 +83,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 사람 결정: testbed 구축. 학습 GPU = 4×A100 서버 + GPU 0, 벤치마크 1차 = LIBERO-Plus·PRO (X·MAX 보류), 모델 = lerobot 내장 + 플러그인 템플릿 (외부 모델 보류). T009–T011 동시 시작.
 - 2026-10-28 T011 병합 (exp/sc-train ce58993e). preset: sc_template·smolvla·pi05·pi0, effective batch 고정 (pi05 256, 6k update), 변형 instr=blank|paraphrase (frame 별 결정적)·suites=, --variant-eval same|none. ckpt_registry.tsv = /outputs/VLA-shortcut-exps/ckpt_registry.tsv. W&B 키 거부 → offline.
 - 2026-10-28 T010 관찰: 기존 in-process 경로도 긴 C4 에피소드에서 action 이 bit 단위로 재현되지 않음 (같은 설정 반복 8/12 bit 동일, 결과 수준은 일치). 짝 비교는 결과 수준(성공·파지)으로만 해석.
+- 2026-10-28 T010 병합 (exp/sc-bench-core 458606fd). 프로토콜 sc-policy/1, server↔in-process 결과 24/24 일치. T012 LIBERO-Plus·T013 LIBERO-PRO 시작.
