@@ -47,6 +47,14 @@ file-name suffix (`"put the bowl on the plate view 0 0 100 0 0 initstate 19"`, `
 is what upstream evaluation and lerobot's `libero_plus` env feed the policy. Default `instruction: clean` gives the
 original instruction instead, so each axis is measured alone; `instruction: registry` in a job reproduces upstream.
 
+**Lighting variants that collapse.** Each light variant loads its own scene XML (`assets/scenes/lights/*.xml`), and
+all of them change the image (`render_check.py`: no lighting / texture / camera variant renders like the original).
+But about half of them render the same unlit scene: both spotlights aim away from the table (`dir` with z ≥ 0, e.g.
+`0 0 1`, `0 -1 0`) or have zero diffuse, so only ambient light remains. These variants differ only in specular /
+castshadow, which cannot show. Spatial t0: 23 of 42 variants (labelled L2–L5); Goal t8: 11 of 26 (L1–L3 and
+unlabelled). Results per lighting level therefore partly measure one "lights off" image. Details:
+`/outputs/VLA-shortcut-exps/smoke/T012/render_check/render_check.csv`.
+
 ## Batteries
 
 | battery | Plus jobs                                                                                            | episodes | est. env steps |

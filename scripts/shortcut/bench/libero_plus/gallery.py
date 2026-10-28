@@ -49,15 +49,24 @@ AXIS_TITLE = {
 SIDE = 256
 
 
-def picks(vs: list[reg.PlusVariant], task_id: int, dim: str, wand: bool) -> list[reg.PlusVariant]:
+def picks(vs: list[reg.PlusVariant], task_id: int, dim: str, wand: bool) -> list[list[reg.PlusVariant]]:
+    """Candidates for the lowest- and the highest-difficulty example, nearest level first, registry order inside
+    a level; main() takes the first candidate whose frame differs from the axis' earlier picks (half of the
+    light variants render the same unlit scene: both spotlights aim away from the table)."""
     pool = [v for v in vs if v.task_id == task_id and v.dimension == dim and (wand or not reg.motion_blur(v))]
     levels = sorted({v.level for v in pool if v.level is not None})
     if not levels:
-        return sorted(pool, key=lambda v: v.index)[:1]
-    out = []
-    for lv in dict.fromkeys((levels[0], levels[-1])):
-        out.append(min((v for v in pool if v.level == lv), key=lambda v: v.index))
-    return out
+        return [sorted(pool, key=lambda v: v.index)]
+    ends = [levels, levels[::-1]] if len(levels) > 1 else [levels]
+    return [
+        sorted((v for v in pool if v.level is not None), key=lambda v: (order.index(v.level), v.index))
+        for order in ends
+    ]
+
+
+def same_image(a: np.ndarray, b: np.ndarray, tol: float = 2.0) -> bool:
+    """Visually the same frame: mean |Δ| below `tol` (unlit light variants differ only by a specular glint)."""
+    return float(np.abs(a.astype(np.int16) - b.astype(np.int16)).mean()) < tol
 
 
 def text_band(width: int, lines: list[str]) -> np.ndarray:
@@ -105,13 +114,29 @@ def main(argv: list[str] | None = None) -> int:
         ]
         q0: np.ndarray | None = None
         for dim in reg.AXES:
-            chosen = (
-                [reg.original_variant(suite, task_id)]
+            cands = (
+                [[reg.original_variant(suite, task_id)]]
                 if dim == "none"
                 else picks(vs, task_id, dim, b["wand"])
             )
-            for v in chosen:
-                img, qpos = first_frame(v, args.hw)
+            seen: list[np.ndarray] = []
+            chosen = []
+            for cs in cands:
+                for v in cs[:12]:
+                    img, qpos = first_frame(v, args.hw)
+                    if dim == "language" or not any(same_image(img, x) for x in seen):
+                        break
+                    print(
+                        f"[gallery] {v.name}: renders (almost) like an earlier pick, next candidate",
+                        flush=True,
+                    )
+                if dim == "language" and chosen and v.name == chosen[-1][0].name:
+                    continue
+                if any(same_image(img, x) for x in seen) and dim != "language":
+                    continue
+                seen.append(img)
+                chosen.append((v, img, qpos))
+            for v, img, qpos in chosen:
                 if dim == "none":
                     q0 = qpos
                 registry_instr = lp_env.instruction(v)
