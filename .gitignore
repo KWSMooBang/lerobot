@@ -176,3 +176,6 @@ outputs/
 *.urdf
 *.xml
 *.part
+
+# benchmark client venvs (scripts/shortcut/bench/*/setup_*.sh)
+.venvs/

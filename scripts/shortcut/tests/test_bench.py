@@ -134,9 +134,9 @@ def test_battery_expand_and_shipped_files():
     assert jobs[0]["episodes"] == 5 and jobs[-1]["episodes"] == 2 and jobs[-1]["repeat"] == 1
     for name in ("quick", "full", "smoke"):
         jobs = battery.expand_jobs(battery.load_battery(name))
-        assert all(j["benchmark"] == "ours" for j in jobs)
+        assert {j["benchmark"] for j in jobs} <= set(records.BENCHMARKS)
     quick = battery.expand_jobs(battery.load_battery("quick"))
-    assert {j["condition"] for j in quick} == {"C0", "C1", "C4", "C5"}
+    assert {j["condition"] for j in quick if j["benchmark"] == "ours"} == {"C0", "C1", "C4", "C5"}
     tm = battery.TimeModel()
     assert tm.steps_per_s(4) > tm.steps_per_s(1)
 
