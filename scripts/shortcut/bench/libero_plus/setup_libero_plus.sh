@@ -77,6 +77,7 @@ if [ "$ASSETS" = 1 ] && [ ! -d "$LIB/assets/new_objects" ]; then
   rm -rf "$LIB/assets"
   mv "$A" "$LIB/assets"
   rm -rf "$DL/extract"
+  [ "$ZIP" = "$DL/assets.zip" ] && rm -rf "$DL"  # our own download (6 GB): no longer needed
 fi
 [ -d "$LIB/assets" ] && note "assets: $(du -sh "$LIB/assets" | cut -f1)"
 
