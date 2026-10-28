@@ -31,6 +31,11 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 | π0.5 base | lerobot/pi05_base | LIBERO 미학습 — shortcut 이 LIBERO 학습에서 생기는지 보는 대조 | 이 repo, LIBERO stats 로 전처리 |
 | (보류) π0, OpenVLA-OFT | — | — | π0.5 결과 후 결정 |
 
+## Testbed (2026-10-28 사람 지시)
+임의 모델(lerobot 내장·직접 만든 플러그인)을 LIBERO 학습 데이터로 학습하고, 우리 instruction 변환 + LIBERO-Plus + LIBERO-PRO 로
+shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4×A100 서버, 검증 = GPU 0. 설계: /outputs/VLA-shortcut-exps/tasks/TESTBED_DESIGN.md.
+작업: T009 평가 env 수정 · T010 policy server + battery + report · T011 학습 harness + 플러그인 템플릿 → T012 LIBERO-Plus · T013 LIBERO-PRO adapter.
+
 ## 단계와 관문
 - P0 코드 (GPU 거의 없음): T001 평가 harness (override·이중 goal·로깅·영상), T002 instruction 세트·swap BDDL·feasibility
 - P1 파일럿: π0.5 × Spatial·Goal × {C0, C1, C4, C5}, 태스크당 10 ep → harness 검증, 시간 실측
@@ -75,3 +80,4 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 - 2026-10-26 T007 결과: 학습 데이터 = HuggingFaceVLA/libero 40 문장/1,693 ep (LIBERO-90 없음). swap 60개 중 완전 일치 10 (전부 Spatial C4-a, 다른 장면), 같은 장면 0. SR_new: Spatial L2 56.0% / L4 3.3% / L5 0.4%, Goal L4 34.7%. 처음 보는 구성요소(특히 목적지)는 거의 항상 실패, 그러나 학습 문장 그대로도 Spatial 4/10 은 원래 bowl ("next to …" 3개 모두 실패) → 미이행은 학습 노출 부족만으로 설명 안 됨. 문서 π0.5 LIBERO 탭에 섹션·차트(widget 4e7b2319-b42d) 추가.
 - 2026-10-26 사람 지시: LIBERO 학습 데이터(HuggingFaceVLA/libero) 를 빠짐없이 시각화 → T008 (analysis). 문서에 "학습 데이터" 탭 + suite 별 하위 탭으로 정리 예정.
 - 2026-10-26 T008 학습 데이터 시각화 완료 (HuggingFaceVLA/libero rev 86958911, 34.9 GB → /outputs/VLA-shortcut-exps/data/hf_libero/). 첫 프레임 → task 정확도 (DINOv2+logreg): Spatial 90.0 / Object 100 / Goal 8.9 / LIBERO-10 89.7% (배치 상한 91.9/100/11.7/91.3). Goal 도 진행 10% 에 71%. Spatial t7·t9 는 같은 물리 배치. 문서 '학습 데이터' 탭 + suite 하위 탭 4개에 197 그림 반영.
+- 2026-10-28 사람 결정: testbed 구축. 학습 GPU = 4×A100 서버 + GPU 0, 벤치마크 1차 = LIBERO-Plus·PRO (X·MAX 보류), 모델 = lerobot 내장 + 플러그인 템플릿 (외부 모델 보류). T009–T011 동시 시작.
