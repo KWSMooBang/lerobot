@@ -240,3 +240,60 @@ def test_shipped_batteries_plan_plus_jobs(tmp_path, monkeypatch):
     plan = ad.plan(job, ctx)
     assert plan.job_id == "plus-goal-language" and plan.n_episodes == 2 * 10  # fake fork: tasks 1, 8 only
     assert {u["task_id"] for u in plan.units} == {1, 8}
+
+
+def test_resume_refuses_another_selection(tmp_path, monkeypatch):
+    """levels [1] then levels [5] in the same run/job must not append level-5 episodes to the level-1 job."""
+    monkeypatch.setenv("LIBERO_PLUS_VENV", str(fake_fork(tmp_path)))
+    root = tmp_path / "out"
+
+    def bat(name: str, extra: str) -> Path:
+        p = tmp_path / f"{name}.yaml"
+        p.write_text(
+            f"name: sel\njobs:\n  - {{benchmark: libero_plus, suite: {SUITE}, perturbation: layout, tasks: '1,8', "
+            f"variants: 2, video: none{extra}}}\n"
+        )
+        return p
+
+    jdir = root / "runs" / "sel" / "jobs" / "plus-goal-layout"
+    assert sc_bench.main(argv(bat("l1", ", levels: [1]"), root, "--run-id", "sel")) == 0
+    before = (jdir / "episodes.jsonl").read_text()
+    meta = json.loads((jdir / "run_meta.json").read_text())
+    assert meta["selection"]["levels"] == [1] and meta["identity"]["selection_sha"]
+    assert {r["perturbation"]["level"] for r in records.read_jsonl(jdir / "episodes.jsonl")} == {1}
+    # same command again = resume, nothing new
+    assert sc_bench.main(argv(bat("l1", ", levels: [1]"), root, "--run-id", "sel")) == 0
+    assert (jdir / "episodes.jsonl").read_text() == before
+    # sc-bench: an edited battery in the same run is already refused by the run identity (battery sha256) ...
+    with pytest.raises(SystemExit, match="another configuration"):
+        sc_bench.main(argv(bat("l1", ", levels: [5]"), root, "--run-id", "sel"))
+    # ... and the job dir itself refuses another selection at plan time (before any server starts), whatever
+    # the battery: levels, inits, tasks, instruction mode
+    ad = lp_adapter.LiberoPlusAdapter()
+    ctx = Context(
+        root / "runs" / "sel",
+        {"ckpt_id": "pi05lib", "path_or_hub": "mock/pi05lib"},
+        "mock",
+        SHORTCUT.parents[1],
+    )
+    base = {
+        "benchmark": "libero_plus",
+        "suite": SUITE,
+        "perturbation": "layout",
+        "tasks": "1,8",
+        "variants": 2,
+    }
+    assert ad.plan({**base, "levels": [1]}, ctx).n_pending == 0  # same selection: resume
+    for change in ({"levels": [5]}, {"levels": [1], "episodes": 2}, {"levels": [1], "tasks": "8"},
+                   {"levels": [1], "instruction": "registry"}, {"levels": [1], "variants": 1}):  # fmt: skip
+        with pytest.raises(SystemExit, match="another variant selection"):
+            ad.plan({**base, **change}, ctx)
+    assert (jdir / "episodes.jsonl").read_text() == before
+    assert json.loads((jdir / "run_meta.json").read_text())["selection"]["levels"] == [1]
+    # under another job name (tag) it plans as a separate job dir; in a new run it simply runs
+    p5 = ad.plan({**base, "levels": [5], "tag": "L5"}, ctx)
+    assert p5.job_id == "plus-goal-layout-L5" and p5.n_pending == 4
+    assert {v["level"] for u in p5.units for v in u["variants"]} == {5}
+    assert sc_bench.main(argv(bat("l5", ", levels: [5]"), root, "--run-id", "sel5")) == 0
+    l5 = records.read_jsonl(root / "runs" / "sel5" / "jobs" / "plus-goal-layout" / "episodes.jsonl")
+    assert {r["perturbation"]["level"] for r in l5} == {5}

@@ -86,6 +86,27 @@ def video_cap(spec: Any) -> int | None:
     raise ValueError(f"video: {spec!r} (all | none | first:N)")
 
 
+def check_selection(jdir: Path, sel_sha: str, selection: dict[str, Any]) -> None:
+    """Resume guard for the variant selection, at plan time (before servers start; also in --dry-run): a job dir
+    holds episodes of exactly one selection, else its success rate would depend on the run history."""
+    meta_path = jdir / "run_meta.json"
+    if not meta_path.exists():
+        return
+    meta = json.loads(meta_path.read_text())
+    prev = (meta.get("identity") or {}).get("selection_sha")
+    if prev != sel_sha:
+        old = meta.get("selection") or {}
+        diff: dict[str, Any] = {
+            k: (old.get(k), v) for k, v in selection.items() if k != "picked" and old.get(k) != v
+        }
+        if not diff:
+            diff = {"picked": "registered variants differ (registry / fork revision changed?)"}
+        raise SystemExit(
+            f"{jdir}: holds episodes of another variant selection {diff}; run this job under another "
+            "`tag:` (job name) or --run-id"
+        )
+
+
 class LiberoPlusAdapter(BenchmarkAdapter):
     name = "libero_plus"
 
@@ -171,6 +192,19 @@ class LiberoPlusAdapter(BenchmarkAdapter):
                     "est_steps": pending * per_ep,
                 }
             )
+        selection = {
+            "axis": st["axis"],
+            "tasks": st["tasks"],
+            "variants": st["variants"],
+            "levels": st["levels"],
+            "details": st["details"],
+            "episodes": st["episodes"],
+            "instruction": st["instruction"],
+            "motion_blur": motion_blur,
+            "picked": {str(t): [v.name for v in vs] for t, vs in picked.items() if vs},
+        }
+        sel_sha = hashlib.sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()[:16]
+        check_selection(jdir, sel_sha, selection)
         return JobPlan(
             job_id=jid,
             units=units,
@@ -182,6 +216,8 @@ class LiberoPlusAdapter(BenchmarkAdapter):
                 "src": str(src),
                 "sha": env.get("sha", "unknown"),
                 "motion_blur": motion_blur,
+                "selection": selection,
+                "selection_sha": sel_sha,
             },
         )
 
@@ -195,7 +231,6 @@ class LiberoPlusAdapter(BenchmarkAdapter):
         jdir.mkdir(parents=True, exist_ok=True)
         ex = hello["exec"]
         bv = self.bench_version(plan, ctx)
-        selection = {t["unit_id"]: [v["name"] for v in t["variants"]] for t in plan.units}
         identity = {
             "benchmark": "libero_plus",
             "bench_version": bv,
@@ -203,6 +238,7 @@ class LiberoPlusAdapter(BenchmarkAdapter):
             "axis": st["axis"],
             "instruction": st["instruction"],
             "motion_blur": plan.info["motion_blur"],  # selection differs without libMagickWand
+            "selection_sha": plan.info["selection_sha"],  # axis, levels, details, tasks, variant names, inits
             "seed": st["seed"],
             "max_steps": st["max_steps"],
             "ckpt": ctx.ckpt["path_or_hub"],
@@ -224,15 +260,13 @@ class LiberoPlusAdapter(BenchmarkAdapter):
                 if prev["identity"].get(k) != identity.get(k)
             }
             raise SystemExit(f"{jdir}: written with another configuration {diff}; use a new --run-id")
-        sel_sha = hashlib.sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()[:12]
         meta = {
             "identity": identity,
             "benchmark": "libero_plus",
             "bench_version": bv,
             "bench_run": ctx.run_dir.name,
             "settings": st,
-            "selection_sha": sel_sha,
-            "selection": selection,
+            "selection": plan.info["selection"],
             "libero_plus_src": plan.info["src"],
             "policy_server": {k: v for k, v in hello.items() if k not in ("inference", "ok")},
             "inference": hello.get("inference"),
