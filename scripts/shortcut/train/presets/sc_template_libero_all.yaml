@@ -4,9 +4,11 @@
 # HF arrow cache on SSD or in page cache (a cold cache on a spinning disk ran at <1 step/s here).
 # T011 smoke (GPU 0, 3k steps, bs 64): L1 loss 0.643 -> 0.318.
 #
-# GPUs     batch/GPU  steps   effective batch  expected time
-# 1 (GPU0)  64        30000   64               ~0.45 h (measured on RTX 4090: 25 steps/s = 1,550 samples/s, 12 workers, + ~5 min startup)
-# 4 A100    64         7500   256              ~0.2 h (estimate; data-loading bound, give each GPU >= 12 CPU workers)
+# effective batch and optimizer updates are fixed; sc-train derives batch/GPU x GPUs x grad accum for any
+# GPU count (error if it does not divide). save_freq / log_freq below are in optimizer updates.
+# GPUs      batch/GPU x GPUs x accum  lerobot --steps  expected time
+# 1 (GPU0)  64 x 1 x 4                30000            ~0.45 h (measured on RTX 4090: 25 micro-batches/s = 1,550 samples/s, 12 workers, + ~5 min startup)
+# 4 A100    64 x 4 x 1                 7500            ~0.2 h (estimate; data-loading bound, give each GPU >= 12 CPU workers)
 description: small conv + hashed-instruction FiLM + MLP action-chunk head, from scratch
 policy_type: sc_template
 train_data: HuggingFaceVLA/libero
@@ -14,11 +16,11 @@ lerobot:
   policy.type: sc_template
   policy.device: cuda
   num_workers: 12
-  save_freq: 5000
-  log_freq: 100
-scale:
-  1: {batch: 64, steps: 30000}
-  4: {batch: 64, steps: 7500}
+  save_freq: 1250
+  log_freq: 25
+effective_batch: 256
+optimizer_updates: 7500
+micro_batch: 64
 estimate:
   mem_gb_per_gpu: 3
   hours_gpu0: 0.45

@@ -12,10 +12,11 @@ scripts/shortcut/train/sc-train --preset sc_template_libero_all --run-id tb-tmpl
 scripts/shortcut/train/sc-train --preset smolvla_libero_all --run-id tb-smolvla-a --gpus 0,1,2,3   # A100 server
 ```
 
-Options: `--steps N`, `--batch B` (per GPU), `--grad-accum K`, `--data-variant ...`, `--out-root DIR`
-(default `$SC_OUT_ROOT` or `/outputs/VLA-shortcut-exps`), `--resume`, `--dry-run`, `--wandb auto|online|offline|off`,
-`--ckpt-id`, `--no-register`, `--notes`. Anything after `--` goes to `lerobot-train` unchanged,
-e.g. `-- --policy.lang_cond=none --save_freq=1000`.
+Options: `--steps N` (optimizer updates), `--batch B` (max per-GPU micro-batch), `--effective-batch E`,
+`--data-variant ...`, `--variant-eval same|none`, `--out-root DIR` (default `$SC_OUT_ROOT` or
+`/outputs/VLA-shortcut-exps`), `--resume`, `--dry-run`, `--wandb auto|online|offline|off`, `--ckpt-id`,
+`--no-register`, `--notes`. Anything after `--` goes to `lerobot-train` unchanged (lerobot units: micro-batches),
+e.g. `-- --policy.lang_cond=none`.
 
 | file                      | what                                                                                                  |
 | ------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -42,23 +43,28 @@ At the end one line goes to `<out-root>/results.tsv` (same columns as the eval r
   `<out-root>/data/hf_libero`) when it exists, else the Hub at the pinned revision `86958911`.
 - GPUs: `CUDA_VISIBLE_DEVICES=--gpus`. One GPU = plain python; several = `accelerate launch --num_processes N`
   (DDP; every setting stays in lerobot's own config, as `docs/source/multi_gpu_training.mdx` asks).
-  `--steps` counts micro-batches per GPU (lerobot convention), so effective batch = batch × GPUs × grad-accum.
+- Batch: each preset fixes `effective_batch` and `optimizer_updates`; for N GPUs sc-train sets
+  batch/GPU = min(`micro_batch`, effective / N) and grad accum = effective / (batch/GPU × N), and stops with an
+  error if that does not divide (e.g. pi05 on 3 GPUs). So 1, 2, 4 or 8 GPUs train the same recipe. lerobot's
+  `--steps` counts micro-batches, so sc-train passes updates × accum (and scales `save_freq`/`log_freq`,
+  which presets give in updates, and the LR schedule the same way).
 - In this container (`/queue/locks` exists) the GPU's `<uuid>.lock` is flock'ed for the whole run and only GPU 0
   is accepted (`--allow-any-gpu` to override). No `/harness` queue. Without `/queue` nothing is locked.
 - W&B: `auto` uses the online project `VLA-shortcut-exps` (`$SC_WANDB_PROJECT`, entity `$SC_WANDB_ENTITY`) when the
   login works, otherwise logs offline under `train/wandb/`; `wandb_url.txt` says which, and how to `wandb sync`.
-- `--resume` continues `checkpoints/last` with the run's own config and data variant (`--steps` may raise the total).
+- `--resume` continues `checkpoints/last` with the run's own config and data variant on the same number of GPUs
+  (`--steps` may raise the total number of updates).
 - `--dry-run` prints GPUs, effective batch, optimizer updates, epochs, memory/time estimates and the exact command,
   then lets lerobot parse and validate the config on CPU (no weights, no data).
 
 ## Presets
 
-| preset                   | policy      | start from                | 1 GPU (GPU 0, RTX 4090)    | 4×A100-80GB                                                                 |
-| ------------------------ | ----------- | ------------------------- | -------------------------- | --------------------------------------------------------------------------- |
-| `sc_template_libero_all` | sc_template | scratch (~4 M params)     | bs 64, 30k steps, see yaml | bs 64×4, 7.5k steps                                                         |
-| `smolvla_libero_all`     | smolvla     | SmolVLM2-500M VLM weights | bs 64, 100k steps          | bs 64×4, 25k steps                                                          |
-| `pi05_libero_all`        | pi05        | `lerobot/pi05_libero`     | does not fit 24 GB         | bs 32×4×accum 2 = 256, 6k updates (official `pi05_libero_finetuned` recipe) |
-| `pi0_libero_all`         | pi0         | `lerobot/pi0_base`        | does not fit 24 GB         | bs 8×4 = 32, 30k steps (openpi pi0_libero)                                  |
+| preset                   | policy      | start from                | 1 GPU (GPU 0, RTX 4090)              | 4×A100-80GB                                                        |
+| ------------------------ | ----------- | ------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| `sc_template_libero_all` | sc_template | scratch (~4 M params)     | 256 × 7.5k updates = 64×1×4, ~0.45 h | 64×4×1, ~0.2 h                                                     |
+| `smolvla_libero_all`     | smolvla     | SmolVLM2-500M VLM weights | 256 × 25k = 64×1×4, ~16 h            | 64×4×1, ~3 h                                                       |
+| `pi05_libero_all`        | pi05        | `lerobot/pi05_libero`     | does not fit 24 GB                   | 256 × 6k = 32×4×2 (official `pi05_libero_finetuned` recipe), ~12 h |
+| `pi0_libero_all`         | pi0         | `lerobot/pi0_base`        | does not fit 24 GB                   | 32 × 30k = 8×4×1 (openpi pi0_libero), ~7 h                         |
 
 Measured / estimated hours are in each yaml header and in `sc-train presets`.
 
@@ -68,18 +74,23 @@ Measured / estimated hours are in each yaml header and in `sc-train presets`.
 sc-train --preset sc_template_libero_all --run-id tb-tmpl-goal-blank --data-variant suites=goal --data-variant instr=blank
 ```
 
-| item                            | effect                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------- |
-| `suites=spatial,object,goal,10` | only episodes of these suites (sets lerobot `dataset.episodes`; goal = 428 episodes)        |
-| `instr=blank`                   | every task string is `""` (design C9: vision-only training)                                 |
-| `instr=paraphrase`              | each sample's task is a random paraphrase from `scripts/shortcut/instructions/<suite>.json` |
-| `para_review=include`           | also use the 6 paraphrases still flagged for human review (excluded by default)             |
-| `para_keep=0.3`                 | with `instr=paraphrase`, keep the original sentence 30 % of the time                        |
+| item                            | effect                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `suites=spatial,object,goal,10` | only episodes of these suites (sets lerobot `dataset.episodes`; goal = 428 episodes)                                                                                                                                |
+| `instr=blank`                   | every task string is `""` (design C9: vision-only training)                                                                                                                                                         |
+| `instr=paraphrase`              | each frame's task is a paraphrase from `scripts/shortcut/instructions/<suite>.json`, picked by hash(seed, frame index): the same frame always gets the same sentence (any worker count, process, epoch, `--resume`) |
+| `para_review=include`           | also use the 6 paraphrases still flagged for human review (excluded by default)                                                                                                                                     |
+| `para_keep=0.3`                 | with `instr=paraphrase`, keep the original sentence 30 % of the time                                                                                                                                                |
 
 Nothing is copied: `data_variants.install` patches lerobot-train's dataset factory in the training process and
 switches the dataset object to `VariantLeRobotDataset`, which only rewrites `item["task"]` (in every dataloader
 worker). Normalization stats stay those of the full dataset. The variant id (e.g. `suites=goal;instr=blank`) is
 recorded in `run_meta.json` and in the registry column `train_variant`.
+
+`--variant-eval same|none` (default `same`, recorded in `run_meta.json` as `variant_eval`) concerns lerobot-train's
+held-out split only (`-- --dataset.eval_split=0.05 --eval_steps=...`: offline validation loss on held-out
+episodes). `same` = validation on the training distribution, `none` = original instructions. Env-rollout evaluation
+never sees the variant (that is sc-bench's job).
 
 ## Checkpoint registry
 

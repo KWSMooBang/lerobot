@@ -2,7 +2,7 @@
 
 Before handing argv to `lerobot.scripts.lerobot_train.main()`:
   1. imports the local policy plugins in scripts/shortcut/policies/lerobot_policy_*/src (no pip install needed);
-  2. installs the data variant from $SC_DATA_VARIANT (data_variants.install);
+  2. installs the data variant from $SC_DATA_VARIANT (+ $SC_VARIANT_EVAL for the held-out split);
   3. if the gated `google/paligemma-3b-pt-224` tokenizer cannot be loaded, falls back to the local
      sentencepiece copy that common.py uses (pi0 / pi05 processors).
 """
@@ -102,7 +102,9 @@ def main() -> None:
     if os.environ.get("SC_CHECK_CONFIG") == "1":
         check_config()
         return
-    install(DataVariant.from_json(os.environ.get("SC_DATA_VARIANT")))
+    install(
+        DataVariant.from_json(os.environ.get("SC_DATA_VARIANT")), os.environ.get("SC_VARIANT_EVAL", "same")
+    )
     patch_paligemma_tokenizer()
     from lerobot.scripts.lerobot_train import main as lerobot_train_main
 

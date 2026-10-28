@@ -3,7 +3,8 @@
 Spec: one or more `key=value` items, separated by `;` or given as repeated `--data-variant` flags.
   suites=spatial,object,goal,10   train on a subset of the 4 suites (lerobot `dataset.episodes`)
   instr=orig|blank|paraphrase     task string given to the policy: unchanged / "" (design C9,
-                                  vision-only) / a random paraphrase from scripts/shortcut/instructions
+                                  vision-only) / a paraphrase from scripts/shortcut/instructions, picked per frame
+                                  by hash(seed, frame index): reproducible across workers and --resume
   para_review=exclude|include     paraphrases still flagged for human review (6) are left out by default
   para_keep=<p>                   with instr=paraphrase, keep the original sentence with probability p (0)
 
@@ -15,9 +16,8 @@ dataset (the metadata is shared).
 
 from __future__ import annotations
 
+import hashlib
 import json
-import os
-import random
 from dataclasses import asdict, dataclass
 from functools import cache
 from pathlib import Path
@@ -156,38 +156,35 @@ def episodes_for_suites(episodes_tasks: list[list[str]], suites: tuple[str, ...]
     return [i for i, tasks in enumerate(episodes_tasks) if all(suite_of(t) in keep for t in tasks)]
 
 
+def _unit_hashes(seed: int, key: int) -> tuple[float, int]:
+    """Two independent values from (seed, key): a float in [0, 1) and a 64-bit int."""
+    h = hashlib.blake2b(f"{seed}:{key}".encode(), digest_size=16).digest()
+    return int.from_bytes(h[:8], "little") / 2**64, int.from_bytes(h[8:], "little")
+
+
 class TaskRemap:
-    """Picklable task-string rewriter (runs inside dataloader workers)."""
+    """Picklable, stateless task-string rewriter (runs inside dataloader workers).
+
+    The paraphrase of a sample is a pure function of (seed, key), key = the frame's global `index`, so the
+    same frame gets the same sentence in every process, worker count, epoch and after --resume.
+    """
 
     def __init__(self, variant: DataVariant, seed: int = 0):
         self.variant = variant
         self.seed = seed
         self.pool = paraphrase_pool(variant.para_review == "include") if variant.instr == "paraphrase" else {}
-        self._rng: random.Random | None = None
 
-    def _get_rng(self) -> random.Random:
-        if self._rng is None:
-            import torch.utils.data
-
-            info = torch.utils.data.get_worker_info()
-            wid = info.id if info is not None else -1
-            self._rng = random.Random(f"{self.seed}:{wid}:{os.getpid()}")
-        return self._rng
-
-    def __getstate__(self) -> dict[str, Any]:
-        return {**self.__dict__, "_rng": None}
-
-    def __call__(self, task: str) -> str:
+    def __call__(self, task: str, key: int) -> str:
         if self.variant.instr == "blank":
             return ""
         if self.variant.instr == "paraphrase":
             ps = self.pool.get(task)
             if not ps:
                 return task
-            rng = self._get_rng()
-            if self.variant.para_keep and rng.random() < self.variant.para_keep:
+            u, n = _unit_hashes(self.seed, key)
+            if u < self.variant.para_keep:
                 return task
-            return rng.choice(ps)
+            return ps[n % len(ps)]
         return task
 
 
@@ -199,7 +196,7 @@ class VariantLeRobotDataset(LeRobotDataset):
 
     def _sc_apply(self, item: dict) -> dict:
         if "task" in item:
-            item["task"] = self._sc_remap(item["task"])
+            item["task"] = self._sc_remap(item["task"], int(item["index"]))
         return item
 
     def __getitem__(self, idx):
@@ -222,8 +219,16 @@ def wrap_dataset(dataset: Any, variant: DataVariant, seed: int = 0) -> Any:
     return dataset
 
 
-def install(variant: DataVariant) -> None:
-    """Patch lerobot-train's dataset factory in this process (call before `lerobot_train.main()`)."""
+def install(variant: DataVariant, eval_variant: str = "same") -> None:
+    """Patch lerobot-train's dataset factory in this process (call before `lerobot_train.main()`).
+
+    `eval_variant` applies to lerobot-train's held-out split (`dataset.eval_split` > 0, offline validation
+    loss every `eval_steps`; env-rollout eval does not use it): "same" = the training variant's task strings
+    (validation loss on the training distribution), "none" = original instructions. The held-out episodes
+    are the same either way (they come from the suite-filtered episode list).
+    """
+    if eval_variant not in ("same", "none"):
+        raise ValueError(f"eval_variant must be same|none, got {eval_variant!r}")
     if variant.is_identity:
         return
     import lerobot.scripts.lerobot_train as lt
@@ -244,11 +249,13 @@ def install(variant: DataVariant) -> None:
         train_ds, eval_ds = orig(cfg)
         seed = cfg.seed or 0
         train_ds = wrap_dataset(train_ds, variant, seed)
-        eval_ds = wrap_dataset(eval_ds, variant, seed + 1)
+        if eval_variant == "same":
+            eval_ds = wrap_dataset(eval_ds, variant, seed)
         sample = [train_ds[i]["task"] for i in (0, len(train_ds) // 2, len(train_ds) - 1)]
         print(
             f"[sc-train] data variant {variant.id}: {train_ds.num_episodes} episodes, "
-            f"{len(train_ds)} frames, sample tasks {sample}",
+            f"{len(train_ds)} frames, sample tasks {sample}; held-out split: "
+            f"{'none' if eval_ds is None else f'{eval_ds.num_episodes} episodes, variant {eval_variant}'}",
             flush=True,
         )
         return train_ds, eval_ds

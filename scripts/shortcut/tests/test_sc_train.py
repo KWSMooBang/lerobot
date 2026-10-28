@@ -25,7 +25,7 @@ from data_variants import (  # noqa: E402
 )
 from registry import COLUMNS, add_entries, ensure_seed_rows, lookup, read_registry  # noqa: E402
 from sc_plugins import register_local_plugins  # noqa: E402
-from sc_train import build_plan, load_preset, main, scale_for  # noqa: E402
+from sc_train import build_plan, load_preset, main, print_plan, scale_for  # noqa: E402
 
 DATA_ROOT = Path("/outputs/VLA-shortcut-exps/data/hf_libero")
 needs_data = pytest.mark.skipif(
@@ -63,15 +63,22 @@ def test_instruction_table_and_review_exclusion():
 
 def test_task_remap():
     orig = "put the bowl on the plate"
-    assert TaskRemap(parse_variant("instr=blank"))(orig) == ""
-    assert TaskRemap(parse_variant("instr=orig"))(orig) == orig
+    assert TaskRemap(parse_variant("instr=blank"))(orig, 0) == ""
+    assert TaskRemap(parse_variant("instr=orig"))(orig, 0) == orig
     para = TaskRemap(parse_variant("instr=paraphrase"), seed=3)
-    outs = {para(orig) for _ in range(50)}
-    assert orig not in outs and outs <= set(paraphrase_pool(False)[orig]) and len(outs) > 1
+    outs = [para(orig, k) for k in range(200)]
+    assert orig not in outs and set(outs) == set(paraphrase_pool(False)[orig])
+    # deterministic in (seed, key): same object, a fresh object and a pickled copy agree
+    assert outs == [TaskRemap(parse_variant("instr=paraphrase"), seed=3)(orig, k) for k in range(200)]
+    assert outs == [pickle.loads(pickle.dumps(para))(orig, k) for k in range(200)]
+    other = [TaskRemap(parse_variant("instr=paraphrase"), seed=4)(orig, k) for k in range(200)]
+    assert other != outs
     keep = TaskRemap(parse_variant("instr=paraphrase;para_keep=1"))
-    assert keep(orig) == orig
-    assert para("an instruction not in the tables") == "an instruction not in the tables"
-    assert pickle.loads(pickle.dumps(para))(orig) in paraphrase_pool(False)[orig]
+    assert keep(orig, 5) == orig
+    half = TaskRemap(parse_variant("instr=paraphrase;para_keep=0.5"))
+    kept = sum(half(orig, k) == orig for k in range(2000))
+    assert 900 < kept < 1100
+    assert para("an instruction not in the tables", 1) == "an instruction not in the tables"
 
 
 def test_episodes_for_suites():
@@ -121,6 +128,72 @@ def test_variant_changes_batch_tasks(spec):
         assert {instruction_table()[t]["suite"] for t in tasks} == {"libero_goal"}
 
 
+def _paraphrase_batches(seed: int, num_workers: int, n_batches: int = 3) -> list[list[str]]:
+    from lerobot.datasets import LeRobotDataset, LeRobotDatasetMetadata
+
+    meta = LeRobotDatasetMetadata("HuggingFaceVLA/libero", root=DATA_ROOT)
+    eps = episodes_for_suites(list(meta.episodes["tasks"]), ("libero_goal",))[:4]
+    ds = LeRobotDataset("HuggingFaceVLA/libero", root=DATA_ROOT, episodes=eps, return_uint8=True)
+    ds = wrap_dataset(ds, parse_variant("instr=paraphrase"), seed=seed)
+    loader = torch.utils.data.DataLoader(
+        ds,
+        batch_size=16,
+        shuffle=True,
+        generator=torch.Generator().manual_seed(0),  # same sample order; only the variant seed varies
+        num_workers=num_workers,
+        multiprocessing_context="spawn" if num_workers else None,
+    )
+    out = []
+    for i, batch in enumerate(loader):
+        if i == n_batches:
+            break
+        out.append(list(batch["task"]))
+    return out
+
+
+@needs_data
+def test_paraphrase_reproducible_across_runs_and_workers():
+    """Same seed -> same task strings in the first batches, whatever the worker count; other seed -> different."""
+    a = _paraphrase_batches(seed=0, num_workers=2)
+    assert a == _paraphrase_batches(seed=0, num_workers=2)
+    assert a == _paraphrase_batches(seed=0, num_workers=0)
+    assert a == _paraphrase_batches(seed=0, num_workers=3)
+    assert a != _paraphrase_batches(seed=1, num_workers=2)
+
+
+@needs_data
+@pytest.mark.parametrize("eval_variant", ["same", "none"])
+def test_install_eval_variant(monkeypatch, eval_variant):
+    """lerobot-train's held-out split (offline val loss) gets the variant only with eval_variant=same."""
+    import types
+
+    from data_variants import install
+
+    import lerobot.datasets
+    import lerobot.scripts.lerobot_train as lt
+    from lerobot.datasets import LeRobotDataset
+
+    def fake_split(cfg):
+        mk = lambda eps: LeRobotDataset(cfg.dataset.repo_id, root=cfg.dataset.root, episodes=eps)  # noqa: E731
+        return mk(cfg.dataset.episodes[:2]), mk(cfg.dataset.episodes[-1:])
+
+    monkeypatch.setattr(lerobot.datasets, "make_train_eval_datasets", fake_split)
+    monkeypatch.setattr(
+        lt, "make_train_eval_datasets", lt.make_train_eval_datasets
+    )  # restored after the test
+    install(parse_variant(["suites=goal", "instr=blank"]), eval_variant)
+    cfg = types.SimpleNamespace(
+        dataset=types.SimpleNamespace(
+            repo_id="HuggingFaceVLA/libero", root=DATA_ROOT, revision=None, episodes=None
+        ),
+        seed=0,
+    )
+    train_ds, eval_ds = lt.make_train_eval_datasets(cfg)
+    assert len(cfg.dataset.episodes) == 428
+    assert train_ds[0]["task"] == ""
+    assert (eval_ds[0]["task"] == "") == (eval_variant == "same")
+
+
 # ---------------------------------------------------------------------------- registry
 def test_registry(tmp_path):
     reg = tmp_path / "ckpt_registry.tsv"
@@ -138,13 +211,36 @@ def test_registry(tmp_path):
 
 
 # ---------------------------------------------------------------------------- presets / plan
-@pytest.mark.parametrize(
-    "name", ["sc_template_libero_all", "smolvla_libero_all", "pi05_libero_all", "pi0_libero_all"]
-)
-def test_presets_load(name):
+PRESETS = ["sc_template_libero_all", "smolvla_libero_all", "pi05_libero_all", "pi0_libero_all"]
+
+
+@pytest.mark.parametrize("name", PRESETS)
+def test_presets_effective_batch_fixed(name):
+    """For every GPU count that divides, batch/GPU x GPUs x accum = the preset's effective batch."""
     p = load_preset(name)
-    assert p["policy_type"] and p["lerobot"] and p["scale"]
-    assert scale_for(p, 4)["batch"] > 0
+    assert p["policy_type"] and p["lerobot"]
+    eff, upd = p["effective_batch"], p["optimizer_updates"]
+    for n in (1, 2, 4, 8):
+        sc = scale_for(p, n)
+        assert sc["batch"] * n * sc["grad_accum"] == eff == sc["effective_batch"]
+        assert sc["batch"] <= p["micro_batch"]
+        assert sc["updates"] == upd and sc["steps"] == upd * sc["grad_accum"]
+
+
+def test_scale_for_pi05_and_errors():
+    p = load_preset("pi05_libero_all")
+    got = {
+        n: (scale_for(p, n)["batch"], scale_for(p, n)["grad_accum"], scale_for(p, n)["steps"])
+        for n in (1, 2, 4, 8)
+    }
+    assert got == {1: (32, 8, 48000), 2: (32, 4, 24000), 4: (32, 2, 12000), 8: (32, 1, 6000)}
+    with pytest.raises(ValueError):
+        scale_for(p, 3)  # 256 / 3
+    with pytest.raises(ValueError):
+        scale_for(p, 1, micro_batch=48)  # 256 not a multiple of 48
+    pi0 = scale_for(load_preset("pi0_libero_all"), 4)
+    assert (pi0["batch"], pi0["grad_accum"]) == (8, 1)
+    assert scale_for(p, 2, effective_batch=128, updates=10)["steps"] == 20
 
 
 def _args(tmp_path, **kw):
@@ -156,7 +252,8 @@ def _args(tmp_path, **kw):
         "gpus": "0,1,2,3",
         "steps": None,
         "batch": None,
-        "grad_accum": None,
+        "effective_batch": None,
+        "variant_eval": None,
         "out_root": str(tmp_path),
         "data_variant": None,
         "resume": False,
@@ -174,8 +271,27 @@ def test_plan_pi05_4gpu(tmp_path):
     assert plan["launcher"] == "accelerate" and "--num_processes=4" in plan["cmd"]
     assert plan["effective_batch"] == 256 and plan["optimizer_updates"] == 6000
     assert "--policy.pretrained_path=lerobot/pi05_libero" in plan["cmd"]
+    assert "--steps=12000" in plan["cmd"] and "--accelerator.gradient_accumulation.steps=2" in plan["cmd"]
     assert "--policy.scheduler_decay_steps=12000" in plan["cmd"]
+    assert "--policy.scheduler_warmup_steps=2000" in plan["cmd"]  # 1000 updates x accum 2
+    assert "--save_freq=4000" in plan["cmd"]  # 2000 updates x accum 2
     assert plan["env"]["CUDA_VISIBLE_DEVICES"] == "0,1,2,3"
+
+
+def test_plan_pi05_2gpu_keeps_effective_batch(tmp_path, capsys):
+    plan = build_plan(_args(tmp_path, gpus="0,1"))
+    assert plan["effective_batch"] == 256 and plan["optimizer_updates"] == 6000
+    assert "--batch_size=32" in plan["cmd"] and "--accelerator.gradient_accumulation.steps=4" in plan["cmd"]
+    assert "--steps=24000" in plan["cmd"]
+    print_plan(plan, {})
+    out = capsys.readouterr().out
+    assert "effective batch 256 = batch/GPU 32 x 2 GPU x grad accum 4" in out
+    assert "optimizer updates 6000 (lerobot --steps 24000" in out
+
+
+def test_plan_bad_gpu_count(tmp_path):
+    with pytest.raises(SystemExit, match="not divisible by 3"):
+        build_plan(_args(tmp_path, gpus="0,1,2"))
 
 
 def test_plan_variant_and_overrides(tmp_path):
@@ -185,16 +301,21 @@ def test_plan_variant_and_overrides(tmp_path):
             preset="sc_template_libero_all",
             gpus="0",
             steps=123,
-            batch=7,
+            batch=32,
             data_variant=["suites=goal", "instr=blank"],
+            variant_eval="none",
             extra=["--policy.lang_cond=none"],
         )
     )
     assert plan["launcher"] == "python"
-    assert "--steps=123" in plan["cmd"] and "--batch_size=7" in plan["cmd"]
+    # 256 = 32 x 1 x 8; 123 updates -> 984 micro-batches
+    assert "--steps=984" in plan["cmd"] and "--batch_size=32" in plan["cmd"]
+    assert "--accelerator.gradient_accumulation.steps=8" in plan["cmd"]
     assert plan["cmd"][-1] == "--policy.lang_cond=none"
     assert json.loads(plan["env"]["SC_DATA_VARIANT"])["instr"] == "blank"
+    assert plan["env"]["SC_VARIANT_EVAL"] == "none" and plan["variant_eval"] == "none"
     assert plan["data_variant_id"] == "suites=goal;instr=blank"
+    assert build_plan(_args(tmp_path, preset="sc_template_libero_all", gpus="0"))["variant_eval"] == "same"
 
 
 def test_cli_register_external(tmp_path):

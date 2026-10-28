@@ -1,7 +1,8 @@
 """sc-train: LIBERO training harness around `lerobot-train` (TESTBED_DESIGN.md, T011).
 
   sc-train --preset sc_template_libero_all --run-id tb-tmpl-a [--gpus 0] [--steps N] [--batch B]
-           [--grad-accum K] [--data-variant instr=blank] [--out-root DIR] [--resume] [--dry-run]
+           [--effective-batch E] [--data-variant instr=blank] [--variant-eval same|none] [--out-root DIR]
+           [--resume] [--dry-run]
            [-- <extra lerobot-train args>]
   sc-train register --run-id tb-tmpl-a [--ckpt-id X]          # (re-)register a finished run
   sc-train register --ckpt-id X --path P --policy-type T ...  # register an external checkpoint
@@ -62,11 +63,34 @@ def load_preset(name: str) -> dict[str, Any]:
     return preset
 
 
-def scale_for(preset: dict[str, Any], n_gpus: int) -> dict[str, Any]:
-    """Per-GPU batch / loop steps / grad accum for the largest preset GPU count <= n_gpus."""
-    table = {int(k): v for k, v in preset["scale"].items()}
-    keys = [k for k in sorted(table) if k <= n_gpus] or [min(table)]
-    return {"grad_accum": 1, **table[keys[-1]], "_from_gpus": keys[-1]}
+def scale_for(
+    preset: dict[str, Any],
+    n_gpus: int,
+    micro_batch: int | None = None,
+    effective_batch: int | None = None,
+    updates: int | None = None,
+) -> dict[str, Any]:
+    """Batch layout with the preset's effective batch fixed for any GPU count.
+
+    effective_batch = batch/GPU x n_gpus x grad_accum, where batch/GPU = min(micro_batch, effective / n_gpus).
+    `steps` is lerobot's loop count (micro-batches per GPU) = optimizer updates x grad_accum.
+    Raises ValueError when the effective batch does not split evenly.
+    """
+    eff = effective_batch or preset["effective_batch"]
+    upd = updates or preset["optimizer_updates"]
+    micro = micro_batch or preset["micro_batch"]
+    if n_gpus < 1:
+        raise ValueError("need at least one GPU")
+    if eff % n_gpus:
+        raise ValueError(f"effective batch {eff} is not divisible by {n_gpus} GPUs")
+    per_gpu = eff // n_gpus
+    micro = min(micro, per_gpu)
+    if per_gpu % micro:
+        raise ValueError(
+            f"effective batch {eff} / {n_gpus} GPUs = {per_gpu} per GPU is not a multiple of batch/GPU {micro}"
+        )
+    accum = per_gpu // micro
+    return {"batch": micro, "grad_accum": accum, "effective_batch": eff, "updates": upd, "steps": upd * accum}
 
 
 def cli_value(v: Any) -> str:
@@ -168,21 +192,36 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         last = train_dir / "checkpoints" / "last" / "pretrained_model" / "train_config.json"
         if not last.exists():
             raise SystemExit(f"--resume: no checkpoint at {last}")
+        if n != len(prev["gpus"]):
+            raise SystemExit(
+                f"--resume: run used {len(prev['gpus'])} GPU(s); resuming on {n} would change the effective batch"
+            )
+        eval_variant = prev.get("variant_eval", "same")
+        if args.variant_eval and args.variant_eval != eval_variant:
+            raise SystemExit(f"--resume: --variant-eval differs from the run's ({eval_variant})")
         lerobot_args = [f"--config_path={last}", "--resume=true", f"--output_dir={train_dir}"]
+        sc = dict(prev["scale"])
+        sc.setdefault("grad_accum", 1)  # run_meta written before the effective-batch rule
+        sc.setdefault("updates", sc["steps"] // sc["grad_accum"])
+        sc.setdefault("effective_batch", sc["batch"] * n * sc["grad_accum"])
         if args.steps:
-            lerobot_args.append(f"--steps={args.steps}")
-        sc = {**prev["scale"], **({"steps": args.steps} if args.steps else {})}
+            sc["updates"], sc["steps"] = args.steps, args.steps * sc["grad_accum"]
+            lerobot_args.append(f"--steps={sc['steps']}")
     else:
         preset = load_preset(args.preset)
         variant = parse_variant(args.data_variant)
-        sc = scale_for(preset, n)
-        if args.batch:
-            sc["batch"] = args.batch
-        if args.steps:
-            sc["steps"] = args.steps
-        if args.grad_accum:
-            sc["grad_accum"] = args.grad_accum
+        eval_variant = args.variant_eval or "same"
+        try:
+            sc = scale_for(preset, n, args.batch, args.effective_batch, args.steps)
+        except ValueError as e:
+            raise SystemExit(
+                f"[sc-train] {e}; pick --gpus / --batch / --effective-batch that divide evenly"
+            ) from e
         lerobot: dict[str, Any] = dict(preset["lerobot"])
+        # preset save/log frequencies are in optimizer updates; lerobot counts micro-batches
+        for k in ("save_freq", "log_freq"):
+            if k in lerobot:
+                lerobot[k] = int(lerobot[k]) * sc["grad_accum"]
         lerobot["dataset.repo_id"] = DATASET_REPO
         root = local_dataset_root(out_root)
         if root is not None:
@@ -196,7 +235,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         sched = preset.get("schedule")
         if sched:
             lerobot["policy.scheduler_decay_steps"] = sc["steps"]
-            lerobot["policy.scheduler_warmup_steps"] = max(1, round(sc["steps"] * sched["warmup_frac"]))
+            warmup_updates = max(1, round(sc["updates"] * sched["warmup_frac"]))
+            lerobot["policy.scheduler_warmup_steps"] = warmup_updates * sc["grad_accum"]
         lerobot["output_dir"] = str(train_dir)
         lerobot["job_name"] = args.run_id
         lerobot["policy.push_to_hub"] = False
@@ -231,10 +271,12 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
         "CUDA_VISIBLE_DEVICES": ",".join(map(str, gpus)),
         "SC_DATA_VARIANT": variant.to_json(),
+        "SC_VARIANT_EVAL": eval_variant,
         "TOKENIZERS_PARALLELISM": "false",
         "PYTHONUNBUFFERED": "1",
     }
-    eff_batch = sc["batch"] * n * sc.get("grad_accum", 1)
+    eff_batch = sc["batch"] * n * sc["grad_accum"]
+    assert eff_batch == sc["effective_batch"], (eff_batch, sc)
     return {
         "run_id": args.run_id,
         "preset": preset["name"],
@@ -245,12 +287,12 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "train_dir": str(train_dir),
         "gpus": gpus,
         "launcher": launcher,
-        "scale": {k: v for k, v in sc.items() if not k.startswith("_")},
-        "scale_from_gpus": sc.get("_from_gpus"),
+        "scale": sc,
         "effective_batch": eff_batch,
-        "optimizer_updates": sc["steps"] // max(1, sc.get("grad_accum", 1)),
+        "optimizer_updates": sc["updates"],
         "data_variant": json.loads(variant.to_json()),
         "data_variant_id": variant.id,
+        "variant_eval": eval_variant,
         "dataset": {
             "repo_id": DATASET_REPO,
             "revision": DATASET_REV,
@@ -272,10 +314,12 @@ def print_plan(plan: dict[str, Any], inv: dict[int, dict[str, Any]]) -> None:
         f"root={plan['dataset']['root'] or '(Hub)'}  variant={plan['data_variant_id']}"
     )
     print(
-        f"[sc-train] GPUs {plan['gpus']} ({plan['launcher']}; preset row for {plan['scale_from_gpus']} GPU)  "
-        f"batch/GPU {sc['batch']} x {len(plan['gpus'])} GPU x accum {sc.get('grad_accum', 1)} = "
-        f"effective {plan['effective_batch']}; loop steps {sc['steps']} = {plan['optimizer_updates']} optimizer updates"
+        f"[sc-train] GPUs {plan['gpus']} ({plan['launcher']})  effective batch {plan['effective_batch']} = "
+        f"batch/GPU {sc['batch']} x {len(plan['gpus'])} GPU x grad accum {sc['grad_accum']}; "
+        f"optimizer updates {plan['optimizer_updates']} (lerobot --steps {sc['steps']} micro-batches)"
     )
+    if plan["data_variant_id"] != "none":
+        print(f"[sc-train] held-out split (if dataset.eval_split > 0) uses variant: {plan['variant_eval']}")
     samples = plan["effective_batch"] * plan["optimizer_updates"]
     print(f"[sc-train] samples seen {samples:,} (~{samples / 273465:.1f} epochs of 273,465 frames)")
     if est:
@@ -548,12 +592,16 @@ def cmd_presets(_: argparse.Namespace) -> int:
     for p in sorted(PRESET_DIR.glob("*.yaml")):
         pr = load_preset(p.stem)
         est = pr.get("estimate", {})
-        rows = ", ".join(
-            f"{g} GPU: bs {v['batch']}x{v.get('grad_accum', 1)} {v['steps']} steps"
-            for g, v in sorted(pr["scale"].items())
-        )
+        rows = []
+        for g in (1, 4):
+            try:
+                v = scale_for(pr, g)
+                rows.append(f"{g} GPU: {v['batch']}x{g}x{v['grad_accum']}")
+            except ValueError:
+                rows.append(f"{g} GPU: n/a")
         print(
-            f"{p.stem:24s} {pr['policy_type']:12s} {rows} | ~{est.get('hours_a100x4')} h 4xA100, "
+            f"{p.stem:24s} {pr['policy_type']:12s} batch {pr['effective_batch']} x {pr['optimizer_updates']} "
+            f"updates ({', '.join(rows)}) | ~{est.get('hours_a100x4')} h 4xA100, "
             f"~{est.get('hours_gpu0')} h GPU0 | {pr.get('description', '')}"
         )
     return 0
@@ -576,9 +624,16 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--preset")
     r.add_argument("--run-id")
     r.add_argument("--gpus", default=os.environ.get("SC_GPUS", "0"))
-    r.add_argument("--steps", type=int)
-    r.add_argument("--batch", type=int, help="per-GPU micro-batch")
-    r.add_argument("--grad-accum", type=int)
+    r.add_argument("--steps", type=int, help="optimizer updates (lerobot --steps = this x grad accum)")
+    r.add_argument(
+        "--batch", type=int, help="max per-GPU micro-batch (grad accum fills up the effective batch)"
+    )
+    r.add_argument("--effective-batch", type=int, help="override the preset's effective batch")
+    r.add_argument(
+        "--variant-eval",
+        choices=("same", "none"),
+        help="data variant on lerobot's held-out split (dataset.eval_split, offline val loss); default same",
+    )
     r.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     r.add_argument("--data-variant", action="append", help="e.g. suites=goal  instr=blank  instr=paraphrase")
     r.add_argument("--resume", action="store_true")

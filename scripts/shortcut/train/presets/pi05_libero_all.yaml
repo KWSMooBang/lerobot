@@ -5,10 +5,13 @@
 # decay 6000 to 2.5e-6, 32/GPU x 8 GPUs = effective batch 256, 6000 optimizer steps, seed 1000.
 # lerobot-train `--steps` counts micro-batches, so with grad accumulation steps and the schedule scale by it.
 #
-# GPUs       batch/GPU  accum  loop steps  effective batch  expected time
-# 8 H100      32        1       6000       256              (official run)
-# 4 A100-80G  32        2      12000       256              ~10-14 h (estimate, not measured here)
-# 1 (GPU0)    -         -          -         -              does not fit a 24 GB RTX 4090 (full fine-tune of ~3.6 B params)
+# effective batch and optimizer updates are fixed; sc-train derives batch/GPU x GPUs x grad accum for any
+# GPU count (error if it does not divide). save_freq / log_freq below are in optimizer updates.
+# GPUs        batch/GPU x GPUs x accum  lerobot --steps  expected time
+# 8 H100      32 x 8 x 1                6000             (official run)
+# 4 A100-80G  32 x 4 x 2                12000            ~10-14 h (estimate, not measured here)
+# 2 GPUs      32 x 2 x 4                24000
+# 1 (GPU0)    32 x 1 x 8                48000            does not fit a 24 GB RTX 4090 (full fine-tune of ~3.6 B params)
 description: pi05 LIBERO fine-tune from lerobot/pi05_libero (official recipe of pi05_libero_finetuned)
 policy_type: pi05
 train_data: HuggingFaceVLA/libero
@@ -27,11 +30,10 @@ lerobot:
   seed: 1000
   num_workers: 8
   save_freq: 2000
-  log_freq: 200
-scale:
-  1: {batch: 32, grad_accum: 8, steps: 48000}
-  4: {batch: 32, grad_accum: 2, steps: 12000}
-  8: {batch: 32, grad_accum: 1, steps: 6000}
+  log_freq: 100
+effective_batch: 256
+optimizer_updates: 6000
+micro_batch: 32
 schedule: {warmup_frac: 0.1667}   # 1000 / 6000 optimizer steps, scaled to loop steps
 estimate:
   params_b: 3.6
