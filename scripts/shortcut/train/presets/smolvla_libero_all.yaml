@@ -1,0 +1,25 @@
+# SmolVLA (450 M; SmolVLM2-500M backbone + action expert) on all 4 LIBERO suites.
+# Same recipe as docs/source/libero.mdx (policy.type=smolvla, load_vlm_weights=true, bs 64, 100k steps),
+# on HuggingFaceVLA/libero (PNG frames, the data pi05lib was trained on) instead of lerobot/libero.
+#
+# GPUs     batch/GPU  steps    effective batch  expected time
+# 1 (GPU0)  64        100000   64               ~TBD_GPU0 (measured s/step: TBD)
+# 4 A100    64         25000   256              ~TBD_A100 (estimate)
+description: SmolVLA from the SmolVLM2 VLM weights (lerobot LIBERO recipe)
+policy_type: smolvla
+train_data: HuggingFaceVLA/libero
+lerobot:
+  policy.type: smolvla
+  policy.load_vlm_weights: true
+  policy.device: cuda
+  num_workers: 12
+  save_freq: 10000
+  log_freq: 200
+scale:
+  1: {batch: 64, steps: 100000}
+  4: {batch: 64, steps: 25000}
+schedule: {warmup_frac: 0.01}   # policy.scheduler_decay_steps = steps, warmup = 1 % of steps
+estimate:
+  mem_gb_per_gpu: TBD
+  hours_gpu0: TBD
+  hours_a100x4: TBD
