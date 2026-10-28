@@ -360,3 +360,106 @@ def test_dry_run_prints_estimate(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "ours-goal-C4" in out and "4×A100" in out and "GPU 0 (4090), single" in out
     assert not (tmp_path / "o" / "runs").exists()
+
+
+# ---------------------------------------------------------------- sc-report: pairing, ids, de-duplication
+
+
+def fake_run(root: Path, name: str, model: str, eps: list[dict], exec_mode: str = "single") -> Path:
+    """A bench run dir with one ours job; each episode gets a tiny 2-frame video."""
+    import imageio.v2 as imageio
+
+    jd = root / "runs" / name / "jobs" / "ours-goal-C0"
+    jd.mkdir(parents=True, exist_ok=True)
+    (jd / "run_meta.json").write_text(json.dumps({"identity": {"exec_mode": exec_mode, "gpu": "cpu"}}))
+    with open(jd / "episodes.jsonl", "w") as f:
+        for e in eps:
+            rel = f"videos/{e['task_id']}_{e['init_idx']}_{e.get('repeat_idx', 0)}_{e['seed']}.mp4"
+            (jd / rel).parent.mkdir(parents=True, exist_ok=True)
+            frames: list[np.ndarray] = [np.full((64, 128, 3), 40 * i, np.uint8) for i in range(2)]
+            imageio.mimwrite(jd / rel, frames, fps=10, codec="libx264", macro_block_size=8)
+            rec = records.standard_fields(
+                benchmark="ours", bench_version="v1", model=model, ckpt=f"ck/{model}", suite="libero_goal",
+                task_id=e["task_id"], variant_id="orig", init_idx=e["init_idx"],
+                pert=records.perturbation("none", "original", "C0"), instruction_original="a",
+                instruction_given="a", success=e.get("success", True), success_orig=e.get("success", True),
+                success_new=None, video=rel, seed=e["seed"],
+            )  # fmt: skip
+            extra = {"condition": "C0", "variant": "orig", "repeat_idx": e.get("repeat_idx", 0)}
+            f.write(json.dumps({**rec, **extra}) + "\n")
+    return root / "runs" / name
+
+
+def test_report_video_pairs_need_same_seed(tmp_path):
+    fake_run(
+        tmp_path,
+        "ra",
+        "A",
+        [{"task_id": 1, "init_idx": 0, "seed": 7}, {"task_id": 1, "init_idx": 1, "seed": 7}],
+    )
+    fake_run(
+        tmp_path,
+        "rb",
+        "B",
+        [{"task_id": 1, "init_idx": 0, "seed": 8}, {"task_id": 1, "init_idx": 1, "seed": 7}],
+    )
+    eps, _, _ = sc_report.load(sc_report.resolve_runs(["ra", "rb"], tmp_path))
+    cases, warns = sc_report.video_cases(eps, ["A", "B"], 10)
+    assert [[r["init_idx"] for r in c] for c in cases] == [[1, 1]]  # init 0: seeds 7 vs 8 → not paired
+    assert len(warns) == 1 and "seeds differ" in warns[0] and "init 0" in warns[0]
+
+
+def test_report_video_ids_keep_repeats_apart(tmp_path):
+    eps_a = [{"task_id": 1, "init_idx": 0, "seed": 7 + k, "repeat_idx": k} for k in range(3)]
+    fake_run(tmp_path, "ra", "A", eps_a)
+    fake_run(tmp_path, "rb", "B", eps_a)
+    out = tmp_path / "rep"
+    assert (
+        sc_report.main(["--runs", "ra,rb", "--out-root", str(tmp_path), "--out", str(out), "--videos", "5"])
+        == 0
+    )
+    man = json.loads((out / "manifest.json").read_text())
+    assert len(man) == 3 and len({m["id"] for m in man}) == 3 and len({m["gif"] for m in man}) == 3
+    assert sorted(m["repeat_idx"] for m in man) == [0, 1, 2]
+    assert all(Path(m["mp4"]).exists() and Path(m["thumb"]).exists() for m in man)
+
+
+def test_report_deduplicates_runs_and_episodes(tmp_path):
+    base = [{"task_id": t, "init_idx": i, "seed": 7} for t in (1, 8) for i in range(2)]
+    quick = fake_run(tmp_path, "bench-A-quick", "A", base[:2])
+    fake_run(tmp_path, "bench-A-full", "A", base)  # full ⊃ quick
+    # the same run as a path and again through the ckpt id (which also brings full)
+    runs = sc_report.resolve_runs([str(quick), "A"], tmp_path)
+    assert len(runs) == 2
+    eps, dups, warns = sc_report.load(runs)
+    assert len(eps) == 4 and len(dups) == 2 and not any(d["conflict"] for d in dups)
+    assert {d["used"].split("/")[0] for d in dups} == {"bench-A-quick"}
+    assert warns and "duplicate" in warns[0]
+    # another exec mode is another sample, not a duplicate
+    fake_run(tmp_path, "bench-A-K4", "A", base[:1], exec_mode="batched-4")
+    eps, dups, _ = sc_report.load(sc_report.resolve_runs(["bench-A-quick", "bench-A-K4"], tmp_path))
+    assert len(eps) == 3 and not dups
+    # same key, different outcome → warning naming the run that was used
+    fake_run(tmp_path, "bench-A-redo", "A", [{**base[0], "success": False}])
+    eps, dups, warns = sc_report.load(sc_report.resolve_runs(["bench-A-quick", "bench-A-redo"], tmp_path))
+    assert len(eps) == 2 and [d["conflict"] for d in dups] == [True]
+    assert any("conflicting" in w and "used bench-A-quick" in w for w in warns)
+    out = tmp_path / "rep"
+    argv = [
+        "--runs",
+        "bench-A-quick,bench-A-redo",
+        "--out-root",
+        str(tmp_path),
+        "--out",
+        str(out),
+        "--videos",
+        "0",
+    ]
+    assert sc_report.main(argv) == 0
+    assert "True" in (out / "duplicates.csv").read_text()
+    assert "conflicting" in (out / "report.md").read_text()
+
+
+def test_setup_server_syncs_shortcut_bench_extra():
+    lines = (SHORTCUT / "setup_server.sh").read_text().splitlines()
+    assert any(x.startswith("uv sync") and "--extra shortcut-bench" in x for x in lines)

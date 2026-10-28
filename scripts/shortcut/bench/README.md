@@ -20,7 +20,7 @@ scripts/shortcut/bench/sc-report --runs tb-smolvla-a,pi05lib                    
 - Same commands on the 4×A100 server and here (GPU 0: `--gpus 0`, the default from `CUDA_VISIBLE_DEVICES`).
   `/queue/locks/<uuid>.lock` is flock'ed per GPU when it exists (`--no-gpu-lock` to skip).
 - venv: the main one plus `--extra shortcut-bench` (websockets, msgpack; the wrappers pass it).
-  On a new server after `setup_server.sh`: `uv sync --locked --python 3.12 --extra libero --extra pi --extra shortcut-bench`.
+  `setup_server.sh` already syncs this extra; elsewhere add `--extra shortcut-bench` to your `uv sync`.
 - `--tasks 1,8 --episodes 2 --suites libero_goal --only C0,C4` shrink a battery (smoke runs; use a new `--run-id`).
 
 ### Exec modes (T004 rule: never pair across them)

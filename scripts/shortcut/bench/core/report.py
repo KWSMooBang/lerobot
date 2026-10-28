@@ -68,7 +68,10 @@ def resolve_runs(items: list[str], root: Path) -> list[Path]:
                     f"--runs {it!r}: not a dir, not {root}/runs/{it}, no {root}/runs/bench-{it}-*"
                 )
             out += hits
-    return out
+    uniq: dict[Path, Path] = {}
+    for p in out:  # the same run given as a path and as a ckpt id / run id counts once
+        uniq.setdefault(p.resolve(), p)
+    return list(uniq.values())
 
 
 def job_dirs(run: Path) -> list[Path]:
@@ -99,13 +102,55 @@ def normalize(r: dict[str, Any], meta: dict[str, Any], jdir: Path, run: Path) ->
     return r
 
 
-def load(runs: list[Path]) -> list[dict[str, Any]]:
-    eps = []
+OUTCOME_FIELDS = ("success", "success_orig", "success_new", "t_orig", "t_new")
+
+
+def episode_key(r: dict[str, Any]) -> tuple:
+    """One episode, wherever it was written: overlapping batteries (quick ⊂ full) or the same run given twice."""
+    return (
+        r["ckpt"], r["benchmark"], str(r["bench_version"]), r["suite"], r["task_id"], str(r["perturbation"]["detail"]),
+        r["variant_id"], r["init_idx"], r.get("repeat_idx", 0), r["seed"], r["_exec"],
+    )  # fmt: skip
+
+
+def load(runs: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """Episodes of all runs, one per episode_key (the first in --runs order is used).
+    Returns (episodes, duplicates [key, used run, dropped run, conflict], warnings)."""
+    eps: dict[tuple, dict[str, Any]] = {}
+    dups: list[dict[str, Any]] = []
     for run in runs:
         for jd in job_dirs(run):
             meta = json.loads((jd / "run_meta.json").read_text()) if (jd / "run_meta.json").exists() else {}
-            eps += [normalize(r, meta, jd, run) for r in read_jsonl(jd / "episodes.jsonl")]
-    return eps
+            for r in read_jsonl(jd / "episodes.jsonl"):
+                r = normalize(r, meta, jd, run)
+                k = episode_key(r)
+                if k not in eps:
+                    eps[k] = r
+                    continue
+                kept = eps[k]
+                conflict = any(kept.get(f) != r.get(f) for f in OUTCOME_FIELDS)
+                dups.append(
+                    {
+                        "key": list(k),
+                        "used": f"{kept['_run']}/{Path(kept['_root']).name}",
+                        "dropped": f"{r['_run']}/{jd.name}",
+                        "conflict": conflict,
+                    }
+                )
+                kept.setdefault("_dropped_from", []).append(r["_run"])
+    warns = []
+    if dups:
+        n_conf = sum(d["conflict"] for d in dups)
+        warns.append(
+            f"{len(dups)} duplicate episodes across inputs counted once (first run in --runs order used; "
+            f"duplicates.csv); {n_conf} of them have different outcomes"
+        )
+        warns += [
+            f"conflicting duplicate {d['key']}: used {d['used']}, dropped {d['dropped']}"
+            for d in dups
+            if d["conflict"]
+        ][:20]
+    return list(eps.values()), dups, warns
 
 
 # ---------------------------------------------------------------- tables
@@ -265,10 +310,13 @@ def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
 # ---------------------------------------------------------------- videos
 
 
-def video_cases(eps: list[dict[str, Any]], models: list[str], n: int) -> list[list[dict[str, Any]]]:
-    """Same (benchmark, suite, task, init, perturbation, variant, repeat) with a video for ≥ 2 models.
-    Disagreeing outcomes first, then shortcut-relevant (dual) cases; at most one case per (suite, detail)
-    until every (suite, detail) had one."""
+def video_cases(
+    eps: list[dict[str, Any]], models: list[str], n: int
+) -> tuple[list[list[dict[str, Any]]], list[str]]:
+    """Same (benchmark, suite, task, init, perturbation, variant, repeat, seed) with a video for ≥ 2 models.
+    Models that ran the same episode with another seed are not paired (warning). Disagreeing outcomes first,
+    then shortcut-relevant (dual) cases; at most one case per (suite, detail) until every (suite, detail)
+    had one."""
     by: dict[tuple, dict[str, dict]] = defaultdict(dict)
     for r in eps:
         if r.get("video"):
@@ -280,8 +328,20 @@ def video_cases(eps: list[dict[str, Any]], models: list[str], n: int) -> list[li
                 *pkey(r),
                 r["variant_id"],
                 r.get("repeat_idx", 0),
+                r["seed"],
             )
             by[k].setdefault(r["model"], r)
+    seeds: dict[tuple, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+    for k, per in by.items():
+        for m in per:
+            seeds[k[:-1]][m].add(k[-1])
+    warns = []
+    for k, per_model in seeds.items():
+        if len(per_model) > 1 and len({frozenset(v) for v in per_model.values()}) > 1:
+            desc = ", ".join(f"{m} seed {sorted(v)}" for m, v in per_model.items())
+            warns.append(
+                f"not paired for videos, seeds differ: {k[0]} {k[1]} t{k[2]} init {k[3]} {k[6]}/{k[7]} ({desc})"
+            )
     cands = []
     for k, per in by.items():
         if len(per) < 2:
@@ -300,7 +360,7 @@ def video_cases(eps: list[dict[str, Any]], models: list[str], n: int) -> list[li
                 continue
             used.add(sd)
             picked.append(c[5])
-    return picked
+    return picked, warns
 
 
 def case_type(row: list[dict[str, Any]]) -> str:
@@ -322,7 +382,7 @@ def make_videos(cases: list[list[dict[str, Any]]], out: Path, views: str) -> lis
         p = r0["perturbation"]
         cid = (
             f"M_{r0['benchmark']}_{SUITE_SHORT.get(r0['suite'], r0['suite'])}_t{r0['task_id']:02d}_i{r0['init_idx']}"
-            f"_{p['detail']}-{r0['variant_id']}"
+            f"_{p['detail']}-{r0['variant_id']}_r{r0.get('repeat_idx', 0)}_s{r0['seed']}"
         ).replace("/", "-")
         clips = [read_clip(Path(r["_root"]) / r["video"], views) for r in row]
         frames = hstack_clips(clips)
@@ -350,6 +410,8 @@ def make_videos(cases: list[list[dict[str, Any]]], out: Path, views: str) -> lis
                 "suite": r0["suite"],
                 "task_id": r0["task_id"],
                 "init": r0["init_idx"],
+                "repeat_idx": r0.get("repeat_idx", 0),
+                "seed": r0["seed"],
                 "conditions": [f"{p['detail']}/{r0['variant_id']}"] * len(row),
                 "instructions": [r["instruction_given"] for r in row],
                 "instruction_original": r0["instruction_original"],
@@ -394,19 +456,25 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     root = registry.out_root(args.out_root)
     runs = resolve_runs([x for x in args.runs.split(",") if x], root)
-    eps = load(runs)
+    eps, dups, load_warns = load(runs)
     if not eps:
         raise SystemExit("no episodes in " + ", ".join(map(str, runs)))
     models = list(dict.fromkeys(r["model"] for r in eps))
     out = Path(args.out) if args.out else root / "reports" / "_vs_".join(models)
     out.mkdir(parents=True, exist_ok=True)
     rows = table(eps)
-    warns = warnings(rows)
+    cases, video_warns = video_cases(eps, models, args.videos) if args.videos else ([], [])
+    warns = load_warns + warnings(rows) + video_warns
+    if dups:
+        with open(out / "duplicates.csv", "w", newline="") as f:
+            dw = csv.DictWriter(f, fieldnames=["key", "used", "dropped", "conflict"])
+            dw.writeheader()
+            dw.writerows({**d, "key": "|".join(map(str, d["key"]))} for d in dups)
     for w in warns:
         print(f"[warn] {w}")
     write_csv(rows, out / "table.csv")
     (out / "report.md").write_text(markdown(rows, models, warns, runs, eps))
-    manifest = make_videos(video_cases(eps, models, args.videos), out, args.views) if args.videos else []
+    manifest = make_videos(cases, out, args.views)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(
         f"{out}: {len(eps)} episodes, models {models}, {len(rows)} rows, {len(manifest)} videos, {len(warns)} warnings"
