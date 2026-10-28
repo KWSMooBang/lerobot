@@ -136,6 +136,7 @@ def test_battery_expand_and_shipped_files():
     for name in ("quick", "full", "smoke"):
         jobs = battery.expand_jobs(battery.load_battery(name))
         assert all(j["benchmark"] in ADAPTERS for j in jobs)  # T012 / T013 add their benchmarks' jobs
+        assert {j["benchmark"] for j in jobs} <= set(records.BENCHMARKS)
     quick = battery.expand_jobs(battery.load_battery("quick"))
     assert {j["condition"] for j in quick if j["benchmark"] == "ours"} == {"C0", "C1", "C4", "C5"}
     tm = battery.TimeModel()

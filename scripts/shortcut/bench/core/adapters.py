@@ -26,7 +26,7 @@ from typing import Any
 
 ADAPTERS = {
     "ours": "bench.ours.adapter:OursAdapter",
-    # "libero_plus": "bench.libero_plus.adapter:LiberoPlusAdapter",   (T012)
+    "libero_plus": "bench.libero_plus.adapter:LiberoPlusAdapter",  # T012
     "libero_pro": "bench.libero_pro.adapter:LiberoProAdapter",  # T013
 }
 

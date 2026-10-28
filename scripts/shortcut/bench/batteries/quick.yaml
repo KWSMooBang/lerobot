@@ -19,6 +19,20 @@ jobs:
     conditions: [C4, C5]
     tasks: 0-9
     episodes: 10
+  # --- LIBERO-Plus (T012): language (LLM rewrites) and objects layout (added / moved objects), the
+  # shortcut-related axes; `none` = the original tasks in the Plus env (clean baseline, seeds = ours C0).
+  # 10 registered variants per task (2 per difficulty level where the task has them), init 0 (upstream protocol).
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none]
+    tasks: 0-9
+    episodes: 5
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [language, layout]
+    tasks: 0-9
+    variants: 10
+    episodes: 1
   # LIBERO-PRO (T013, bench/libero_pro): clean baseline; task axis (new goal + instruction in the same scene:
   # success = PRO goal, success_orig = original goal checked every step → Shortcut Rate as in ours C4/C5);
   # position axis (swap on every suite; x/y shifts exist for libero_object only: both ends + middle).
