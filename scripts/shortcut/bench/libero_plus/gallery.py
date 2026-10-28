@@ -18,6 +18,7 @@ import argparse
 import json
 import sys
 import textwrap
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +72,32 @@ def same_image(a: np.ndarray, b: np.ndarray, tol: float = 2.0) -> bool:
     return float(np.abs(a.astype(np.int16) - b.astype(np.int16)).mean()) < tol
 
 
+Frame = tuple[np.ndarray, np.ndarray]  # (image, robot qpos)
+
+
+def choose(
+    cands: list[list[reg.PlusVariant]], render: Callable[[reg.PlusVariant], Frame], dim: str, tries: int = 12
+) -> list[tuple[reg.PlusVariant, np.ndarray, np.ndarray]]:
+    """One example per candidate list: its first variant whose frame is not (almost) the same as an earlier
+    pick of the axis (language: the scene never changes, so just the first). Empty lists, and lists whose
+    `tries` first candidates all repeat an earlier pick, give no example."""
+    seen: list[np.ndarray] = []
+    chosen: list[tuple[reg.PlusVariant, np.ndarray, np.ndarray]] = []
+    for cs in cands:
+        found = None
+        for v in cs[:tries]:
+            img, qpos = render(v)
+            if dim == "language" or not any(same_image(img, x) for x in seen):
+                found = (v, img, qpos)
+                break
+            print(f"[gallery] {v.name}: renders (almost) like an earlier pick, next candidate", flush=True)
+        if found is None or (dim == "language" and any(c[0].name == found[0].name for c in chosen)):
+            continue
+        seen.append(found[1])
+        chosen.append(found)
+    return chosen
+
+
 def text_band(width: int, lines: list[str]) -> np.ndarray:
     import cv2
 
@@ -121,23 +148,7 @@ def main(argv: list[str] | None = None) -> int:
                 if dim == "none"
                 else picks(vs, task_id, dim, b["wand"])
             )
-            seen: list[np.ndarray] = []
-            chosen: list[tuple[reg.PlusVariant, np.ndarray, np.ndarray]] = []
-            for cs in cands:
-                for v in cs[:12]:
-                    img, qpos = first_frame(v, args.hw)
-                    if dim == "language" or not any(same_image(img, x) for x in seen):
-                        break
-                    print(
-                        f"[gallery] {v.name}: renders (almost) like an earlier pick, next candidate",
-                        flush=True,
-                    )
-                if dim == "language" and chosen and v.name == chosen[-1][0].name:
-                    continue
-                if any(same_image(img, x) for x in seen) and dim != "language":
-                    continue
-                seen.append(img)
-                chosen.append((v, img, qpos))
+            chosen = choose(cands, lambda v: first_frame(v, args.hw), dim)
             for v, img, qpos in chosen:
                 if dim == "none":
                     q0 = qpos

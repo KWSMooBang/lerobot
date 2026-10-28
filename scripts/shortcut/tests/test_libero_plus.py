@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 pytest.importorskip("websockets")
@@ -297,3 +298,38 @@ def test_resume_refuses_another_selection(tmp_path, monkeypatch):
     assert sc_bench.main(argv(bat("l5", ", levels: [5]"), root, "--run-id", "sel5")) == 0
     l5 = records.read_jsonl(root / "runs" / "sel5" / "jobs" / "plus-goal-layout" / "episodes.jsonl")
     assert {r["perturbation"]["level"] for r in l5} == {5}
+
+
+def test_gallery_choose_empty_pool_and_duplicates(tmp_path):
+    """gallery.choose with a fake renderer: an axis without variants gives no example (no stale pick from the
+    previous axis), and a candidate that renders like an earlier pick is skipped."""
+    from bench.libero_plus import gallery
+
+    vs = reg.load_variants(Path(json.loads((fake_fork(tmp_path) / "sc_env.json").read_text())["src"]), SUITE)
+    rendered: list[str] = []
+
+    def render(v: reg.PlusVariant) -> tuple:
+        rendered.append(v.name)
+        img: np.ndarray = np.full((8, 8, 3), 10 * (v.level or 0), np.uint8)  # same level → same image
+        return img, np.zeros(7)
+
+    # no camera variants in the fake fork: picks() gives [[]] → nothing chosen, nothing rendered
+    assert gallery.picks(vs, 8, "camera", True) == [[]]
+    assert gallery.choose(gallery.picks(vs, 8, "camera", True), render, "camera") == []
+    assert gallery.choose([], render, "camera") == [] and rendered == []
+    # the axis before an empty one must not leak into it (the old loop reused v/img of the previous axis)
+    lay = gallery.choose(gallery.picks(vs, 8, "layout", True), render, "layout")
+    assert [v.level for v, _, _ in lay] == [1, 5]
+    assert gallery.choose([[]], render, "camera") == []
+    # duplicates: the second list starts with an image equal to the first pick → next candidate
+    layout8 = [v for v in vs if v.task_id == 8 and v.dimension == "layout"]
+    a, b = (v for v in layout8 if v.level == 1)  # two level-1 variants: same fake image
+    c = next(v for v in layout8 if v.level == 2)
+    got = gallery.choose([[a], [b, c]], render, "layout")
+    assert [v.name for v, _, _ in got] == [a.name, c.name]
+    # all candidates repeat the first pick → no second example
+    assert [v.name for v, _, _ in gallery.choose([[a], [b]], render, "layout")] == [a.name]
+    # language: the scene never changes, the first candidate of each list is taken (no repeats of a variant)
+    lang = gallery.picks(vs, 8, "language", True)
+    got = gallery.choose(lang, render, "language")
+    assert [v.level for v, _, _ in got] == [1, 5]
