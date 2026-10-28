@@ -86,3 +86,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 T010 관찰: 기존 in-process 경로도 긴 C4 에피소드에서 action 이 bit 단위로 재현되지 않음 (같은 설정 반복 8/12 bit 동일, 결과 수준은 일치). 짝 비교는 결과 수준(성공·파지)으로만 해석.
 - 2026-10-28 T010 병합 (exp/sc-bench-core 458606fd). 프로토콜 sc-policy/1, server↔in-process 결과 24/24 일치. T012 LIBERO-Plus·T013 LIBERO-PRO 시작.
 - 2026-10-28 다른 세션이 테스트 예시 탭에 Object 설계 추가 → lead 가 일관성 정리 (C4-c 추가, C6·C7·C8·판정은 미구현 표시, 한눈에 표·설계 탭 반영, T014 백로그).
+- 2026-10-28 T012·T013 [DONE] (수정 중). Plus: 모든 변형이 원래 goal 유지 → Plus 는 겉모습 강건성만 잰다. PRO: task 축 π0.5 새 goal 0/8, 원래 goal 5/8; 단 PRO 지시문·init 혼선 확인 중.
