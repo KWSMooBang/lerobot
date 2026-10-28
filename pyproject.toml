@@ -280,6 +280,8 @@ lawam = [
 # Remote inference transport and serialization.
 remote = ["eclipse-zenoh>=1.9.0,<1.11.0", "msgpack>=1.1.0,<2.0.0"]
 peft = ["lerobot[transformers-dep]", "lerobot[peft-dep]"]
+# Shortcut testbed policy server / benchmark clients (scripts/shortcut/serve, scripts/shortcut/bench).
+shortcut-bench = ["websockets>=13.0,<18.0", "msgpack>=1.1.0,<2.0.0"]
 
 # Annotation pipeline (lerobot-annotate). The only backend is ``openai``,
 # which talks to any OpenAI-compatible server (``vllm serve`` /

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# sc-report: model × benchmark × perturbation tables, cross-model videos, manifest (bench/core/report.py).
+#   scripts/shortcut/bench/sc-report --runs bench-pi05lib-quick,bench-tb-smolvla-a-quick [--out DIR]
+set -euo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=$(cd "$HERE/../../.." && pwd)
+exec uv run --project "$REPO" --extra shortcut-bench python "$HERE/core/report.py" "$@"

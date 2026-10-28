@@ -1,0 +1,13 @@
+# Smoke battery (T010 checks, minutes on GPU 0): goal + spatial × C0/C4 × 2 tasks × 2 inits.
+# The in-process vs server equality check runs it with --suites libero_goal --tasks 1,8 --episodes 4.
+name: smoke
+description: goal·spatial × C0/C4 × tasks 1,8 × 2 inits
+defaults:
+  seed: 7
+  video: "first:2"
+jobs:
+  - benchmark: ours
+    suites: [libero_goal, libero_spatial]
+    conditions: [C0, C4]
+    tasks: "1,8"
+    episodes: 2

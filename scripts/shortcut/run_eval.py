@@ -603,9 +603,12 @@ def default_max_steps(args: argparse.Namespace) -> int:
     return int(libero().TASK_SUITE_MAX_STEPS[args.suite])
 
 
-def prepare_run(args: argparse.Namespace, exec_mode: str, gpu: str | None) -> RunSpec:
+def prepare_run(
+    args: argparse.Namespace, exec_mode: str, gpu: str | None, identity_extra: dict[str, Any] | None = None
+) -> RunSpec:
     """Resolve checkpoint/adapter/tag/video/max_steps, load the instruction set and suite, build the
-    identity (incl. exec_mode, GPU model, torch, CUDA) and check it against an existing --out."""
+    identity (incl. exec_mode, GPU model, torch, CUDA) and check it against an existing --out.
+    `identity_extra` is merged last (bench/ours: the policy server's exec fields and `via`)."""
     ckpt = args.checkpoint or POLICY_CKPT[args.policy]
     adapter = args.libero_adapter
     if adapter == "auto":
@@ -638,6 +641,7 @@ def prepare_run(args: argparse.Namespace, exec_mode: str, gpu: str | None) -> Ru
         "n_action_steps": args.n_action_steps,
         "max_steps": max_steps,
         **exec_identity(exec_mode, gpu),
+        **(identity_extra or {}),
     }
     if args.backend != "libero":
         identity["backend"] = args.backend

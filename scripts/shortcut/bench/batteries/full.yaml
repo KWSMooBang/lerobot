@@ -1,0 +1,18 @@
+# Full shortcut battery: the whole design (P2 of "LIBERO Shortcut Learning 관측 실험 설계" for one checkpoint).
+# ours: C0–C6 × 4 suites × 50 inits, C0 repeated 3× (repeat 1, 2 measure C0-vs-C0 agreement / DTW baseline).
+# LIBERO-Plus / LIBERO-PRO jobs are added by T012 / T013.
+name: full
+description: ours C0–C6 × 4 suites × 50 inits, C0 × 3 repeats
+defaults:
+  seed: 7
+  video: "first:5"
+  tasks: 0-9
+  episodes: 50
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C0]
+    repeats: [0, 1, 2]
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C1, C2, C3, C4, C5, C6]

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# sc-bench: evaluate a checkpoint on a battery (bench/core/runner.py; --help for options).
+#   scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery quick [--gpus 0,1,2,3] [--dry-run]
+set -euo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=$(cd "$HERE/../../.." && pwd)
+exec uv run --project "$REPO" --extra shortcut-bench python "$HERE/core/runner.py" "$@"
