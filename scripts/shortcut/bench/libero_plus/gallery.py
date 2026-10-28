@@ -54,12 +54,14 @@ def picks(vs: list[reg.PlusVariant], task_id: int, dim: str, wand: bool) -> list
     a level; main() takes the first candidate whose frame differs from the axis' earlier picks (half of the
     light variants render the same unlit scene: both spotlights aim away from the table)."""
     pool = [v for v in vs if v.task_id == task_id and v.dimension == dim and (wand or not reg.motion_blur(v))]
-    levels = sorted({v.level for v in pool if v.level is not None})
+    levels: list[int] = sorted({v.level for v in pool if v.level is not None})
     if not levels:
         return [sorted(pool, key=lambda v: v.index)]
     ends = [levels, levels[::-1]] if len(levels) > 1 else [levels]
     return [
-        sorted((v for v in pool if v.level is not None), key=lambda v: (order.index(v.level), v.index))
+        sorted(
+            (v for v in pool if v.level is not None), key=lambda v: (order.index(int(v.level or 0)), v.index)
+        )
         for order in ends
     ]
 
@@ -120,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
                 else picks(vs, task_id, dim, b["wand"])
             )
             seen: list[np.ndarray] = []
-            chosen = []
+            chosen: list[tuple[reg.PlusVariant, np.ndarray, np.ndarray]] = []
             for cs in cands:
                 for v in cs[:12]:
                     img, qpos = first_frame(v, args.hw)
