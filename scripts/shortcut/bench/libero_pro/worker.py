@@ -146,7 +146,13 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
     done = {episode_key(r) for r in read_jsonl(ep_path)}
     root = Path(unit["pro_root"])
     entry = catalog.task_entry(
-        root, unit["suite"], unit["axis"], unit["level"], unit["task_id"], unit["instruction_source"]
+        root,
+        unit["suite"],
+        unit["axis"],
+        unit["level"],
+        unit["task_id"],
+        unit["instruction_source"],
+        unit["init_source"],
     )
     env = None
     cap = unit.get("video_cap")
@@ -185,8 +191,11 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
             "variant": unit["level"],
             "instruction": entry["instruction_given"],
             "original_instruction": entry["instruction_original"],
+            "pro_instruction_original": entry["pro_instruction_original"],
             "instruction_bddl": entry["instruction_bddl"],
             "instruction_source": unit["instruction_source"],
+            "init_source": entry["init_source"],
+            "init_file": entry["init"],
             "pro_task": entry["task_name"],
             "pro_dir": entry["dir"],
             **res,

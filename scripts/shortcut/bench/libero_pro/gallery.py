@@ -29,18 +29,33 @@ if str(SHORTCUT) not in sys.path:
 from common import episode_seed  # noqa: E402
 
 from bench.libero_pro import catalog, sim  # noqa: E402
+from bench.libero_pro.instruction_table import word_edit  # noqa: E402
 
 EXAMPLES = [("libero_spatial", 0), ("libero_goal", 8)]
 # x/y shifts exist for libero_object only (PRO repo): shown on Object t0 at both ends of each axis
 POSITION_EXTREMES = [("libero_object", 0, lv) for lv in ("x0.1", "x0.5", "y0.1", "y0.5")]
 CUE = {
-    "none": "기준 화면 (원래 LIBERO 태스크)",
-    "object": "물체 외형 단서를 끊는다: 학습 때 본 색·크기·모양으로 대상을 찾는 지름길이면 바뀐 물체({change})에서 실패",
-    "position": "위치 단서를 끊는다: 물체들이 서로의 초기 자리로 바뀌어({change}) '그 자리 → 그 동작' 암기면 엉뚱한 물체·자리로 간다",
-    "position_xy": "절대 위치 단서를 끊는다: 대상 물체의 초기 영역을 {axis}축으로 {level} 이동({change}) — 작은 이동(0.1)과 큰 이동(0.5) 양 끝",
-    "semantic": "문장 템플릿 단서를 끊는다: 장면·목표는 그대로, 지시문만 바꿔 써서 학습 문장 암기에 기대면 실패",
-    "task": "장면→궤적 단서를 끊는다: 장면은 그대로, 목표·지시문을 바꿈 — 지시를 무시하고 익숙한 동작을 재생하면 원래 goal 을 달성(success_orig)",
-    "environment": "배경 단서를 끊는다: 작업대를 바꿔({change}) 테이블 외형과 동작의 연합에 기대면 실패",
+    "none": "기준 화면: 원래 LIBERO 태스크, 학습 지시문",
+    "object": "물체 외형 단서를 끊는다: 물체 색·크기 교체({change}) — 학습 때 본 외형으로 대상을 찾는 지름길이면 실패",
+    "position": "위치 단서를 끊는다: 물체들이 서로의 초기 자리로 바뀜({change}) — '그 자리 → 그 동작' 암기면 엉뚱한 물체·자리로 간다",
+    "position_xy": "절대 위치 단서를 끊는다: 대상 물체의 초기 영역을 {axis}축으로 {level} 단위 이동({change}) — 작은(0.1)·큰(0.5) 이동 양 끝",
+    "semantic": "문장 템플릿 단서를 끊는다: 장면·목표는 그대로 두고 지시문만 바꿔 씀({edit}) — 학습 문장 암기에 기대면 실패",
+    "task": "장면→궤적 단서를 끊는다: 장면은 그대로, 목표·지시문을 바꿈({edit}) — 지시를 무시하고 익숙한 동작을 재생하면 원래 goal 달성(success_orig)",
+    "environment": "배경 단서를 끊는다: 작업대 교체({change}) — 테이블 외형과 동작의 연합에 기대면 실패",
+}
+AXIS_TITLE = {
+    "none": "원본",
+    "object": "PRO 물체(object)",
+    "position": "PRO 위치(position)",
+    "semantic": "PRO 문장(semantic)",
+    "task": "PRO 태스크(task)",
+    "environment": "PRO 환경(environment)",
+}
+SUITE_TITLE = {
+    "libero_spatial": "Spatial",
+    "libero_object": "Object",
+    "libero_goal": "Goal",
+    "libero_10": "LIBERO-10",
 }
 
 
@@ -115,7 +130,10 @@ def change_text(axis: str, ch: dict[str, Any]) -> str:
     return ""
 
 
-def render(entry: dict[str, Any], seed: int, drift_steps: int = 50) -> tuple[np.ndarray, float, str]:
+def render(
+    entry: dict[str, Any], seed: int, drift_steps: int = 50
+) -> tuple[np.ndarray, float, str, list[np.ndarray]]:
+    """First frame (after settling), worst object drift over drift_steps no-op steps, object xyz in BDDL order."""
     env = sim.ProEnv(entry, hw=360)
     obs = env.reset(0, seed)
     img = sim.upright(obs["agentview_image"])
@@ -127,7 +145,7 @@ def render(entry: dict[str, Any], seed: int, drift_steps: int = 50) -> tuple[np.
     drift = {n: float(np.linalg.norm(e.sim.data.body_xpos[b] - p0[n])) for n, b in bodies.items()}
     worst = max(drift, key=lambda n: drift[n]) if drift else ""
     env.close()
-    return img, drift.get(worst, 0.0), worst
+    return img, drift.get(worst, 0.0), worst, list(p0.values())
 
 
 def caption(img: np.ndarray, lines: list[str]) -> np.ndarray:
@@ -155,34 +173,52 @@ def main(argv: list[str] | None = None) -> int:
     todo += [("libero_object", 0, "none", "original")] + [
         (s, t, "position", lv) for s, t, lv in POSITION_EXTREMES
     ]
-    clean: dict[tuple[str, int], np.ndarray] = {}
+    clean: dict[tuple[str, int], tuple[np.ndarray, list[np.ndarray]]] = {}
     manifest = []
     for suite, tid, axis, lv in todo:
         e = catalog.task_entry(root, suite, axis, lv, tid)
         seed = episode_seed(args.seed, 0, tid, 0)
-        img, drift, worst = render(e, seed)
+        img, drift, worst, pos = render(e, seed)
         short = catalog.SUITE_SHORT[suite]
         eid = f"PRO_{short}_t{tid:02d}_{axis}_{lv}"
         png = out / f"{eid}.png"
         imageio.imwrite(png, img)
         if axis == "none":
-            clean[suite, tid] = img
+            clean[suite, tid] = (img, pos)
+        # placement vs the clean scene at the same init (objects in BDDL order; the object axis renames them)
+        cpos = clean[suite, tid][1]
+        moved_cm = (
+            max((float(np.linalg.norm(a[:2] - b[:2])) for a, b in zip(pos, cpos, strict=False)), default=0.0)
+            * 100
+        )
         ch = describe_change(e)
         key = "position_xy" if axis == "position" and lv != "swap" else axis
-        why = CUE[key].format(change=change_text(axis, ch), axis=lv[:1], level=lv[1:])
+        edit = word_edit(e["instruction_original"], e["instruction_given"]) or "변경 없음"
+        why = CUE[key].format(change=change_text(axis, ch), axis=lv[:1], level=lv[1:], edit=edit)
+        if axis not in ("none", "position") and moved_cm > 1:
+            why += f" [init {e['init_source']}: 원본 대비 물체 배치도 최대 {moved_cm:.1f} cm 다름]"
         if drift > 0.01:
             why += f" (주의: settle 후 50 step 동안 {worst} 가 {drift * 100:.1f} cm 움직임)"
         pair = None
         if axis != "none":
-            left = caption(clean[suite, tid], ["original", e["instruction_original"]])
-            right = caption(img, [f"PRO {axis}/{lv}", e["instruction_given"]])
+            left = caption(clean[suite, tid][0], ["original (training sentence)", e["instruction_original"]])
+            lines = [f"PRO {axis}/{lv} (init {e['init_source']})", e["instruction_given"]]
+            if e["instruction_given"] != e["instruction_original"]:
+                lines.append(f"vs training: {edit}")
+            right = caption(img, lines)
             hgt = max(left.shape[0], right.shape[0])
             pair = out / f"{eid}_vs_orig.png"
             gap = np.full((hgt, 6, 3), 255, np.uint8)
             imageio.imwrite(pair, np.concatenate([pad_to(left, hgt), gap, pad_to(right, hgt)], axis=1))
+        title = f"{SUITE_TITLE[suite]} t{tid} · {AXIS_TITLE[axis]}" + (
+            f" {lv}" if lv not in (axis, "original") else ""
+        )
         manifest.append(
             {
                 "id": eid,
+                "title": title,
+                "caption": why,
+                "path": str(pair or png),
                 "category": "example",
                 "benchmark": "libero_pro",
                 "suite": suite,
@@ -195,7 +231,13 @@ def main(argv: list[str] | None = None) -> int:
                 "conditions": [f"pro:{axis}/{lv}"],
                 "instructions": [e["instruction_given"]],
                 "instruction_original": e["instruction_original"],
+                "pro_instruction_original": e["pro_instruction_original"],
                 "instruction_changed": e["instruction_given"] != e["instruction_original"],
+                "instruction_edit_vs_training": edit
+                if e["instruction_given"] != e["instruction_original"]
+                else "",
+                "init_source": e["init_source"],
+                "placement_vs_clean_max_cm": round(moved_cm, 1),
                 "bddl_changes": ch,
                 "object_drift_50_steps_m": round(drift, 4),
                 "object_drift_worst": worst,

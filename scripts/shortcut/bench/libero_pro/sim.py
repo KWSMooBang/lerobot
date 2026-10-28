@@ -153,6 +153,14 @@ class ProEnv:
             bddl_file_name=entry["bddl"], camera_heights=hw, camera_widths=hw, control_freq=control_freq
         )
         self.init_states = load_init_states(entry["init"])
+        n_state = len(self.env.get_sim_state())
+        if (
+            len(self.init_states) and self.init_states.shape[1] != n_state
+        ):  # e.g. init_source clean on object axis
+            raise ValueError(
+                f"{entry['init']} ({entry['init_source']}) states have {self.init_states.shape[1]} values, "
+                f"{entry['dir']}/{entry['task_name']} needs {n_state}"
+            )
         self.language = self.env.language_instruction
         self.orig_goal = robosuite_parse_problem(entry["orig_bddl"])["goal_state"] if entry["dual"] else None
         self.orig_missing: list[str] = []

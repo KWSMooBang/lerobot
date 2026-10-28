@@ -13,14 +13,19 @@ Five PRO axes (+ the clean suite as baseline) → perturbed BDDL / init dirs und
 | environment | <suite>_env (bench/libero_pro/gen_env_axis.py) | <from>-><to> table               | environment |
 
 Task ids are the clean suite's order (= lerobot / hf-libero), matched by file name: PRO keeps each task's file
-name in every axis dir. The instruction given to the policy is the perturbed BDDL's `(:language ...)`
-(`instruction_source: bddl`); PRO's own `Benchmark.get_task(i).language` is derived from the *file name*,
-i.e. the original instruction even on the semantic and task axes (`instruction_source: filename` reproduces that).
+name in every axis dir. Instructions (`instruction_source`): `training` (default) gives the LIBERO training
+sentence (= ours C0) on the non-language axes and PRO's sentence on semantic / task; PRO's BDDL `:language`
+differs from the training sentences even on the clean suite ("Pick the akita black bowl ..."), so `pro_bddl`
+(PRO's text everywhere) mixes a language shift into the visual axes. `filename` = PRO's own
+`Benchmark.get_task(i).language` (file name: the original sentence even on semantic / task).
+`instruction_original` is always the training sentence; PRO's clean-suite sentence is `pro_instruction_original`.
+Init states (`init_source`): see `DEFAULT_INIT_SOURCE`.
 """
 
 from __future__ import annotations
 
 import ast
+import json
 import os
 import pickle  # nosec B403: LIBERO init-state files are pickled numpy arrays
 import re
@@ -48,6 +53,26 @@ ENV_TARGET_DEFAULT = "main_table"
 # lerobot TASK_SUITE_MAX_STEPS (= ours); PRO's OpenVLA script uses 220 / 280 / 300 / 520 (spatial shorter)
 MAX_STEPS = {"libero_spatial": 280, "libero_object": 280, "libero_goal": 300, "libero_10": 520}
 SUITE_SHORT = {"libero_spatial": "spat", "libero_object": "obj", "libero_goal": "goal", "libero_10": "l10"}
+
+
+INSTRUCTIONS_DIR = Path(__file__).resolve().parents[2] / "instructions"  # ours: <suite>.json "original"
+LANGUAGE_AXES = ("semantic", "task")  # the sentence is (part of) the perturbation
+INSTRUCTION_SOURCES = ("training", "pro_bddl", "filename")
+INIT_SOURCES = ("default", "pro", "clean")
+# init_source "default": which init file each axis starts from (compare_inits.py; README "Init states")
+# PRO re-samples placements for every axis (1–8 cm from the clean init at the same index); where only the sentence /
+# goal should change, start from the clean suite's init states instead.
+DEFAULT_INIT_SOURCE = {"task": "clean", "semantic": "clean"}
+
+
+def resolve_init_source(axis: str, init_source: str) -> str:
+    """pro = the axis' own PRO init file; clean = the clean suite's init file at the same index (same sim-state
+    layout required; pairs with ours C0 at the same init)."""
+    if init_source not in INIT_SOURCES:
+        raise ValueError(f"init_source {init_source!r} not in {INIT_SOURCES}")
+    if axis == "none":
+        return "pro"  # the clean suite's file either way
+    return DEFAULT_INIT_SOURCE.get(axis, "pro") if init_source == "default" else init_source
 
 
 def repo_root() -> Path:
@@ -146,20 +171,49 @@ def filename_language(task_name: str) -> str:
     return " ".join(x.split("_"))
 
 
+@cache
+def training_instructions(suite: str) -> dict[str, str]:
+    """BDDL file stem → the LIBERO training instruction (HuggingFaceVLA/libero task string = ours C0)."""
+    data = json.loads((INSTRUCTIONS_DIR / f"{suite}.json").read_text())
+    return {Path(t["bddl"]).stem: t["original"] for t in data["tasks"]}
+
+
+def given_instruction(axis: str, source: str, training: str, pro_bddl: str, filename: str) -> str:
+    """training (default): the training sentence on the non-language axes, PRO's sentence where the sentence
+    *is* the perturbation (semantic, task); pro_bddl: the axis BDDL's :language everywhere (PRO's text);
+    filename: PRO Benchmark.get_task().language (file name, unchanged on every axis)."""
+    if source == "training":
+        return pro_bddl if axis in LANGUAGE_AXES else training
+    if source == "pro_bddl":
+        return pro_bddl
+    if source == "filename":
+        return filename
+    raise ValueError(f"instruction_source {source!r} not in {INSTRUCTION_SOURCES}")
+
+
 def task_entry(
-    root: Path, suite: str, axis: str, level: str, task_id: int, instruction_source: str = "bddl"
+    root: Path,
+    suite: str,
+    axis: str,
+    level: str,
+    task_id: int,
+    instruction_source: str = "training",
+    init_source: str = "default",
 ) -> dict[str, Any]:
     name = suite_task_names(root, suite)[task_id]
     d = axis_dir(suite, axis, level)
     bddl = root / "bddl_files" / d / f"{name}.bddl"
     init = root / "init_files" / d / f"{name}.pruned_init"
     orig = root / "bddl_files" / suite / f"{name}.bddl"
-    for p in (bddl, init, orig):
+    clean_init = root / "init_files" / suite / f"{name}.pruned_init"
+    for p in (bddl, init, orig, clean_init):
         if not p.exists():
             raise FileNotFoundError(
                 f"LIBERO-PRO file missing: {p} (bench/libero_pro/setup_venv.sh installs them)"
             )
-    given = bddl_language(bddl) if instruction_source == "bddl" else filename_language(name)
+    src = resolve_init_source(axis, init_source)
+    training = training_instructions(suite)[name]
+    pro_bddl = bddl_language(bddl)
     return {
         "suite": suite,
         "task_id": task_id,
@@ -168,11 +222,15 @@ def task_entry(
         "level": level,
         "dir": d,
         "bddl": str(bddl),
-        "init": str(init),
+        "init": str(clean_init if src == "clean" else init),
+        "init_source": src,
         "orig_bddl": str(orig),
-        "instruction_original": bddl_language(orig),
-        "instruction_given": given,
-        "instruction_bddl": bddl_language(bddl),
+        "instruction_original": training,
+        "pro_instruction_original": bddl_language(orig),
+        "instruction_given": given_instruction(
+            axis, instruction_source, training, pro_bddl, filename_language(name)
+        ),
+        "instruction_bddl": pro_bddl,
         # task axis: new goal → both goals tracked every step, no early stop (T001 dual-goal rule)
         "dual": axis == "task",
         "goal_changed": bddl_goal(bddl) != bddl_goal(orig),

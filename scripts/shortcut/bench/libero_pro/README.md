@@ -42,16 +42,28 @@ task and init counts and checks that the task axis' original goals are evaluable
   `success_new` = PRO goal, `success_orig` = original goal → `sc-report` Shortcut Rate as for ours C4–C6.
   All 40 task-axis tasks keep the original goal's objects and regions (checked with the live env).
   Other axes: the goal is the original one (renamed objects on the object axis), `success_orig = success`.
-- **instructions**: `instruction_given` = the perturbed BDDL's `:language` (default `instruction_source: bddl`).
-  PRO's own `Benchmark.get_task(i).language` is derived from the _file name_, which PRO keeps unchanged, so a
-  harness that uses it (PRO's OpenVLA example does) gives the _original_ instruction on the semantic and task
-  axes; `instruction_source: filename` reproduces that. Both strings are in every record
-  (`instruction_original`, `instruction_given`, `instruction_bddl`).
+- **instructions** (`instruction_source`): PRO's BDDL `:language` differs from the LIBERO training sentence even
+  on the clean suite in 25 / 40 tasks ("Pick the akita black bowl …" vs "pick up the black bowl …"; goal "layer of
+  the drawer"; table: `instructions.csv` from `instruction_table.py`). Default `training`: the training sentence
+  (= ours C0) on none / object / position / environment, PRO's sentence on semantic / task (there the sentence is
+  the perturbation), so visual axes carry no language shift. `pro_bddl` = the axis BDDL's `:language` everywhere;
+  `filename` = PRO's own `Benchmark.get_task(i).language`, derived from the file name, which PRO keeps unchanged
+  (= the training sentence on every axis, also semantic / task: a harness using it, like PRO's OpenVLA example,
+  never shows the policy the changed sentence). Records: `instruction_original` = training sentence,
+  `pro_instruction_original` = PRO's clean-suite sentence, `instruction_given`, `instruction_bddl`.
+- **init states** (`init_source`): PRO ships its own re-sampled init file for every axis, so at the same init index
+  objects sit 1–8 cm away from the clean suite's placement even on semantic / task (`compare_inits.py`,
+  `init_compare_*.csv`). Default: task and semantic start from the **clean** suite's init file (same sim-state layout,
+  the only change is the sentence / goal, paired with ours C0 at the same init); the other axes use PRO's file
+  (position: the move is the perturbation; object / environment: different object sizes / table height).
+  `init_source: pro` / `clean` overrides it (job id gets `-initpro` / `-initclean` when it differs from the default).
 - **environment axis**: PRO's `EnvironmentReplacePerturbator` rewrite (table name, problem class, fixture type)
   with target `living_room_table` for main-table scenes (spatial, goal: PRO's hard-coded choice) and
   `main_table` otherwise (PRO hard-codes living_room_table, a no-op for those scenes; its README recommends
   main_table because other tables can let objects drift; the gallery measures drift ≤ 0.1 cm over 50 no-op steps).
-  Init states: 50 fresh placements per task as PRO's `generate_init_states.py`, without a renderer, seeded.
+  Init states: 50 fresh placements per task as PRO's `generate_init_states.py`, without a renderer, seeded; a
+  `.meta.json` sidecar per file (seed, number of inits, PRO commit, script version) — a rerun refuses to fill gaps
+  next to files made with other settings (`--force` regenerates all).
 - Episode = lerobot `LiberoEnv` + T001: `env.seed(seed)` → reset → `set_init_state` → 10 no-op steps, delta
   control, 360 px, max steps 280 / 280 / 300 / 520 (lerobot, = ours; PRO's OpenVLA script uses 220 for spatial),
   seed = `episode_seed(seed, repeat, task, init)` as in ours (pairs with ours C0 at the same task / init).
@@ -66,16 +78,18 @@ task and init counts and checks that the task axis' original goals are evaluable
 
 ## Files
 
-| file               | venv | what                                                                                  |
-| ------------------ | ---- | ------------------------------------------------------------------------------------- |
-| `catalog.py`       | both | axes, levels, dirs, task entries (stdlib; numpy for init files)                       |
-| `adapter.py`       | main | `LiberoProAdapter`: jobs, units = (level, task), run_meta identity, worker command    |
-| `worker.py`        | PRO  | units through the policy server; records, steps npz, 512×256 videos                   |
-| `sim.py`           | PRO  | `ProEnv` (reset / step / original goal / contact probe), frames, `MockProEnv` (tests) |
-| `gen_env_axis.py`  | PRO  | environment-axis bddl + init files                                                    |
-| `check_install.py` | PRO  | install check, task-axis goal table (`--json`)                                        |
-| `gallery.py`       | PRO  | example gallery (Spatial t0, Goal t8 × axes; Object t0 x/y extremes) + manifest.json  |
-| `compare_obs.py`   | both | observation-convention check against the main harness                                 |
+| file                   | venv | what                                                                                         |
+| ---------------------- | ---- | -------------------------------------------------------------------------------------------- |
+| `catalog.py`           | both | axes, levels, dirs, task entries (stdlib; numpy for init files)                              |
+| `adapter.py`           | main | `LiberoProAdapter`: jobs, units = (level, task), run_meta identity, worker command           |
+| `worker.py`            | PRO  | units through the policy server; records, steps npz, 512×256 videos                          |
+| `sim.py`               | PRO  | `ProEnv` (reset / step / original goal / contact probe), frames, `MockProEnv` (tests)        |
+| `gen_env_axis.py`      | PRO  | environment-axis bddl + init files                                                           |
+| `check_install.py`     | PRO  | install check, task-axis goal table (`--json`)                                               |
+| `gallery.py`           | PRO  | example gallery (Spatial t0, Goal t8 × axes; Object t0 x/y extremes) + manifest.json         |
+| `compare_obs.py`       | both | observation-convention check against the main harness                                        |
+| `compare_inits.py`     | PRO  | per axis: placement vs the clean init at the same index, clean-init feasibility, goal at t=0 |
+| `instruction_table.py` | any  | PRO `:language` vs training sentence for 40 tasks (csv)                                      |
 
 Tests: `uv run --extra shortcut-bench pytest scripts/shortcut/tests/test_libero_pro.py -q` (CPU, fake PRO tree,
 mock env + mock policy server).

@@ -14,14 +14,18 @@ but without a renderer (no GPU), seeded per task.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import io
+import json
 import pickle  # nosec B403
+import subprocess  # nosec B404
 import sys
 import zipfile
 import zlib
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -33,6 +37,9 @@ from common import parse_range  # noqa: E402
 
 from bench.libero_pro import catalog  # noqa: E402
 from bench.libero_pro.sim import ensure_libero_config  # noqa: E402
+
+# bump when the generation procedure changes (init sampling, BDDL rewrite, file format): cached files are refused
+SCRIPT_VERSION = "gen_env_axis-v1"
 
 
 def pro_perturbation(src: Path):  # noqa: ANN201
@@ -62,24 +69,70 @@ def save_init(path: Path, states: np.ndarray) -> None:
     """Same container as PRO's generate_init_states.py (torch.load / sim.load_init_states read it)."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("archive/data.pkl", pickle.dumps(states))
-        z.writestr("archive/version", b"1")
+        for name, data in (("archive/data.pkl", pickle.dumps(states)), ("archive/version", b"1")):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))  # fixed: same states → same bytes
+            info.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(info, data)
     tmp = path.with_suffix(".tmp")
     tmp.write_bytes(buf.getvalue())
     tmp.replace(path)
 
 
-def gen_task(args: tuple[str, str, str, int, int, bool]) -> str:
-    root_s, suite, task, n, seed, force = args
+def pro_commit(src: Path) -> str:
+    try:
+        return subprocess.check_output(["git", "-C", str(src), "rev-parse", "HEAD"], text=True).strip()  # nosec
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def out_paths(root: Path, suite: str, task: str) -> tuple[Path, Path, Path]:
+    """(bddl, init, sidecar meta) of one generated task."""
+    init = root / "init_files" / f"{suite}_env" / f"{task}.pruned_init"
+    return root / "bddl_files" / f"{suite}_env" / f"{task}.bddl", init, init.with_suffix(".meta.json")
+
+
+def wanted_meta(seed: int, n: int, commit: str) -> dict[str, Any]:
+    """What a generated file depends on; stored next to it and compared before reusing it."""
+    return {"seed": seed, "num_inits": n, "pro_commit": commit, "script_version": SCRIPT_VERSION}
+
+
+def cache_state(root: Path, suite: str, task: str, want: dict[str, Any]) -> str:
+    """'missing' (no init file), 'ok' (sidecar = want), 'mismatch' (no sidecar or another configuration)."""
+    _, init, meta = out_paths(root, suite, task)
+    if not init.exists():
+        return "missing"
+    if not meta.exists():
+        return "mismatch"
+    have = json.loads(meta.read_text())
+    return "ok" if {k: have.get(k) for k in want} == want else "mismatch"
+
+
+def preflight(root: Path, items: list[tuple[str, str]], want: dict[str, Any], force: bool) -> None:
+    """Refuse to fill gaps next to files made with another seed / PRO commit / script version: one axis would mix
+    generation settings. --force regenerates every requested task instead."""
+    if force:
+        return
+    bad = [f"{s}/{t}" for s, t in items if cache_state(root, s, t, want) == "mismatch"]
+    if bad:
+        raise SystemExit(
+            f"gen_env_axis: {len(bad)} existing init files were generated with another configuration than {want} "
+            f"(or have no .meta.json sidecar), e.g. {bad[:3]}; rerun with --force to regenerate all of them"
+        )
+
+
+def gen_task(args: tuple[str, str, str, int, int, bool, str]) -> str:
+    root_s, suite, task, n, seed, force, commit = args
     root = Path(root_s)
     src = root.parents[1]
-    bddl_dir, init_dir = root / "bddl_files" / f"{suite}_env", root / "init_files" / f"{suite}_env"
-    bddl_dir.mkdir(parents=True, exist_ok=True)
-    init_dir.mkdir(parents=True, exist_ok=True)
-    out_bddl, out_init = bddl_dir / f"{task}.bddl", init_dir / f"{task}.pruned_init"
+    out_bddl, out_init, out_meta = out_paths(root, suite, task)
+    out_bddl.parent.mkdir(parents=True, exist_ok=True)
+    out_init.parent.mkdir(parents=True, exist_ok=True)
     content, cur, new = rewrite(src, suite, task, (root / "bddl_files" / suite / f"{task}.bddl").read_text())
-    if out_init.exists() and out_bddl.exists() and out_bddl.read_text() == content and not force:
+    want = wanted_meta(seed, n, commit)
+    fresh = out_bddl.exists() and out_bddl.read_text() == content
+    if not force and fresh and cache_state(root, suite, task, want) == "ok":
         return f"{suite}/{task}: {cur}->{new} (exists)"
+    out_meta.unlink(missing_ok=True)  # no sidecar = not trusted, if we die mid-way
     out_bddl.write_text(content)
     ensure_libero_config()
     from libero.libero.envs.env_wrapper import ControlEnv
@@ -92,6 +145,8 @@ def gen_task(args: tuple[str, str, str, int, int, bool]) -> str:
         states.append(env.get_sim_state())
     env.close()
     save_init(out_init, np.asarray(states))
+    bddl_sha = hashlib.sha256(content.encode()).hexdigest()
+    out_meta.write_text(json.dumps({**want, "table": f"{cur}->{new}", "bddl_sha256": bddl_sha}, indent=2))
     return f"{suite}/{task}: {cur}->{new}, {n} inits"
 
 
@@ -106,11 +161,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     root = catalog.pro_root()
     tids = parse_range(args.tasks)
-    work = [
-        (str(root), s, catalog.suite_task_names(root, s)[t], args.num_inits, args.seed, args.force)
-        for s in args.suites.split(",")
-        for t in tids
-    ]
+    commit = pro_commit(root.parents[1])
+    items = [(s, catalog.suite_task_names(root, s)[t]) for s in args.suites.split(",") for t in tids]
+    preflight(root, items, wanted_meta(args.seed, args.num_inits, commit), args.force)
+    work = [(str(root), s, t, args.num_inits, args.seed, args.force, commit) for s, t in items]
     with Pool(args.jobs) as pool:
         for line in pool.imap_unordered(gen_task, work):
             print("[gen_env_axis]", line, flush=True)

@@ -3,10 +3,11 @@
 Battery job keys: suite(s), perturbation(s) = axis (none | object | position | semantic | task | environment),
 levels (default: all of the axis, see catalog.levels; e.g. position on libero_object: swap, x0.1 … y0.5),
 tasks (default 0-9), episodes (inits per task × level, ≤ 50), seed, video (all | none | first:N), max_steps,
-instruction_source (bddl = the perturbed BDDL's :language, default | filename = PRO Benchmark's task.language),
+instruction_source (training = LIBERO training sentence on the non-language axes, PRO's on semantic / task,
+default | pro_bddl | filename, see catalog), init_source (default | pro | clean, catalog.DEFAULT_INIT_SOURCE),
 repeat.
 
-One job = (suite, axis[, instruction_source, repeat]) → `jobs/pro-<suite>-<axis>/` (run_meta.json,
+One job = (suite, axis[, instruction_source, init_source, repeat]) → `jobs/pro-<suite>-<axis>/` (run_meta.json,
 episodes.jsonl, steps/, videos/). One unit = one (level, task) × its inits. The worker runs in the PRO venv
 (`.venvs/libero_pro`, setup_venv.sh); the mock backend runs it in this interpreter with a numpy env.
 Records: perturbation = {dimension: catalog.DIMENSION[axis], level, detail: "pro:<axis>"}, variant_id = level,
@@ -73,9 +74,12 @@ class LiberoProAdapter(BenchmarkAdapter):
             raise SystemExit(
                 f"libero_pro {job['suite']} {axis}: levels {bad} not in {catalog.levels(job['suite'], axis)}"
             )
-        src = job.get("instruction_source", "bddl")
-        if src not in ("bddl", "filename"):
-            raise SystemExit(f"libero_pro: instruction_source {src!r} not in (bddl, filename)")
+        src = job.get("instruction_source", "training")
+        if src not in catalog.INSTRUCTION_SOURCES:
+            raise SystemExit(f"libero_pro: instruction_source {src!r} not in {catalog.INSTRUCTION_SOURCES}")
+        init_src = job.get("init_source", "default")
+        if init_src not in catalog.INIT_SOURCES:
+            raise SystemExit(f"libero_pro: init_source {init_src!r} not in {catalog.INIT_SOURCES}")
         max_steps = int(
             job.get("max_steps")
             or (MOCK_MAX_STEPS if ctx.backend == "mock" else catalog.MAX_STEPS[job["suite"]])
@@ -87,6 +91,7 @@ class LiberoProAdapter(BenchmarkAdapter):
             "task_ids": _parse_range(job.get("tasks", "0-9")),
             "episodes": int(job.get("episodes", 10)),
             "instruction_source": src,
+            "init_source": catalog.resolve_init_source(axis, init_src),
             "max_steps": max_steps,
             "repeat": int(job.get("repeat", 0) or 0),
             "seed": int(job.get("seed", 7)),
@@ -94,8 +99,14 @@ class LiberoProAdapter(BenchmarkAdapter):
 
     def job_id(self, job: dict[str, Any]) -> str:
         jid = f"pro-{catalog.SUITE_SHORT[job['suite']]}-{job.get('perturbation', 'none')}"
-        if job.get("instruction_source", "bddl") != "bddl":
+        if job.get("instruction_source", "training") != "training":
             jid += f"-{job['instruction_source']}"
+        axis = job.get("perturbation", "none")
+        init_src = job.get("init_source", "default")
+        if init_src != "default" and catalog.resolve_init_source(
+            axis, init_src
+        ) != catalog.resolve_init_source(axis, "default"):
+            jid += f"-init{init_src}"
         rep = int(job.get("repeat", 0) or 0)
         return jid + (f"-r{rep}" if rep else "")
 
@@ -107,7 +118,9 @@ class LiberoProAdapter(BenchmarkAdapter):
         n_eps = {(lv, t): j["episodes"] for lv in j["levels"] for t in j["task_ids"]}
         if root.exists():  # every unit's files must exist (catches a missing env-axis generation early)
             for lv, t in n_eps:
-                e = catalog.task_entry(root, j["suite"], j["axis"], lv, t, j["instruction_source"])
+                e = catalog.task_entry(
+                    root, j["suite"], j["axis"], lv, t, j["instruction_source"], j["init_source"]
+                )
                 n_init = catalog.n_init_states(e["init"])
                 if n_init < j["episodes"]:  # PRO ships one empty file: libero_object_temp_y0.5 cream cheese
                     n_eps[lv, t] = n_init
@@ -173,6 +186,7 @@ class LiberoProAdapter(BenchmarkAdapter):
             "suite": j["suite"],
             "axis": j["axis"],
             "instruction_source": j["instruction_source"],
+            "init_source": j["init_source"],
             "seed": j["seed"],
             "repeat_idx": j["repeat"],
             "max_steps": j["max_steps"],
@@ -218,6 +232,7 @@ class LiberoProAdapter(BenchmarkAdapter):
             "backend": ctx.backend,
             "bench_version": bv,
             "instruction_source": j["instruction_source"],
+            "init_source": j["init_source"],
             "pro_root": str(catalog.pro_root()),
             "requires_step": bool(hello.get("requires_step")),
         }
