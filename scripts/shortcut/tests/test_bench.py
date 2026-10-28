@@ -29,6 +29,7 @@ from bench.core import (  # noqa: E402
     report as sc_report,  # noqa: E402
     runner as sc_bench,  # noqa: E402
 )
+from bench.core.adapters import ADAPTERS  # noqa: E402
 from bench.core.client import PolicyClient, libero_state, quat2axisangle  # noqa: E402
 from bench.core.protocol import ORIENT_RAW, ProtocolError, packb, unpackb, validate_obs  # noqa: E402
 
@@ -134,6 +135,7 @@ def test_battery_expand_and_shipped_files():
     assert jobs[0]["episodes"] == 5 and jobs[-1]["episodes"] == 2 and jobs[-1]["repeat"] == 1
     for name in ("quick", "full", "smoke"):
         jobs = battery.expand_jobs(battery.load_battery(name))
+        assert all(j["benchmark"] in ADAPTERS for j in jobs)  # T012 / T013 add their benchmarks' jobs
         assert {j["benchmark"] for j in jobs} <= set(records.BENCHMARKS)
     quick = battery.expand_jobs(battery.load_battery("quick"))
     assert {j["condition"] for j in quick if j["benchmark"] == "ours"} == {"C0", "C1", "C4", "C5"}

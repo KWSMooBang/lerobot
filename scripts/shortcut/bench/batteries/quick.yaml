@@ -33,3 +33,28 @@ jobs:
     tasks: 0-9
     variants: 10
     episodes: 1
+  # LIBERO-PRO (T013, bench/libero_pro): clean baseline; task axis (new goal + instruction in the same scene:
+  # success = PRO goal, success_orig = original goal checked every step → Shortcut Rate as in ours C4/C5);
+  # position axis (swap on every suite; x/y shifts exist for libero_object only: both ends + middle).
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none]
+    tasks: 0-9
+    episodes: 5
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [task]
+    tasks: 0-9
+    episodes: 10
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_goal, libero_10]
+    perturbations: [position]
+    levels: [swap]
+    tasks: 0-9
+    episodes: 10
+  - benchmark: libero_pro
+    suites: [libero_object]
+    perturbations: [position]
+    levels: [swap, x0.1, x0.3, x0.5, y0.1, y0.3, y0.5]
+    tasks: 0-9
+    episodes: 5
