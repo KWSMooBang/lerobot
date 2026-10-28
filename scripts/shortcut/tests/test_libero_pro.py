@@ -211,13 +211,23 @@ def test_gen_env_axis_refuses_mixed_generation_settings(tmp_path):
         init_file(init, 50)
         meta.write_text(json.dumps({**want13, "table": "main_table->living_room_table"}))
     assert {g.cache_state(root, s, t, want13) for s, t in items} == {"ok"}
-    g.preflight(root, items, want13, force=False)  # same settings: reuse
+    assert g.existing(root) == items
+    g.preflight(root, want13, force=False)  # same settings: reuse / fill gaps
     g.out_paths(root, *items[0])[1].unlink()  # one task deleted, the others are from seed 13
     assert g.cache_state(root, *items[0], want42) == "missing"
+    # regenerating only that task (--tasks 0) with seed 42 would mix seeds across the axis: the check covers every
+    # existing env-axis file, not just the requested ones
     with pytest.raises(SystemExit, match="another configuration"):
-        g.preflight(root, items, want42, force=False)  # would mix seeds 13 and 42
-    g.preflight(root, items, want42, force=True)  # --force regenerates all of them
-    g.preflight(root, items, want13, force=False)  # filling the gap with seed 13 is fine
+        g.preflight(root, want42, force=False)
+    g.preflight(root, want42, force=True)  # --force: main() regenerates the whole axis
+    g.preflight(root, want13, force=False)  # filling the gap with seed 13 is fine
+    # a file of another suite made with another seed also blocks (same axis)
+    _, init, meta = g.out_paths(root, "libero_spatial", "s0")
+    init_file(init, 50)
+    meta.write_text(json.dumps(want42))
+    with pytest.raises(SystemExit, match="libero_spatial/s0"):
+        g.preflight(root, want13, force=False)
+    meta.write_text(json.dumps(want13))
     g.out_paths(root, *items[1])[2].unlink()  # no sidecar (older generator) → not trusted
     assert g.cache_state(root, *items[1], want13) == "mismatch"
     assert g.cache_state(root, *items[2], g.wanted_meta(13, 50, "other")) == "mismatch"

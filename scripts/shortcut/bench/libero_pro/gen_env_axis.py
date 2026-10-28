@@ -107,16 +107,25 @@ def cache_state(root: Path, suite: str, task: str, want: dict[str, Any]) -> str:
     return "ok" if {k: have.get(k) for k in want} == want else "mismatch"
 
 
-def preflight(root: Path, items: list[tuple[str, str]], want: dict[str, Any], force: bool) -> None:
-    """Refuse to fill gaps next to files made with another seed / PRO commit / script version: one axis would mix
-    generation settings. --force regenerates every requested task instead."""
+def existing(root: Path) -> list[tuple[str, str]]:
+    """(suite, task) of every environment-axis init file already on disk, any suite."""
+    return sorted(
+        (p.parent.name.removesuffix("_env"), p.name.removesuffix(".pruned_init"))
+        for p in (root / "init_files").glob("libero_*_env/*.pruned_init")
+    )
+
+
+def preflight(root: Path, want: dict[str, Any], force: bool) -> None:
+    """The whole environment axis must come from one generation setting: refuse to (re)generate anything while any
+    existing env-axis init file — requested or not, any suite — has another seed / PRO commit / script version or no
+    sidecar. --force regenerates the whole axis instead (main)."""
     if force:
         return
-    bad = [f"{s}/{t}" for s, t in items if cache_state(root, s, t, want) == "mismatch"]
+    bad = [f"{s}/{t}" for s, t in existing(root) if cache_state(root, s, t, want) == "mismatch"]
     if bad:
         raise SystemExit(
-            f"gen_env_axis: {len(bad)} existing init files were generated with another configuration than {want} "
-            f"(or have no .meta.json sidecar), e.g. {bad[:3]}; rerun with --force to regenerate all of them"
+            f"gen_env_axis: {len(bad)} existing environment-axis init files were generated with another configuration "
+            f"than {want} (or have no .meta.json sidecar), e.g. {bad[:3]}; rerun with --force to regenerate the whole axis"
         )
 
 
@@ -163,7 +172,13 @@ def main(argv: list[str] | None = None) -> int:
     tids = parse_range(args.tasks)
     commit = pro_commit(root.parents[1])
     items = [(s, catalog.suite_task_names(root, s)[t]) for s in args.suites.split(",") for t in tids]
-    preflight(root, items, wanted_meta(args.seed, args.num_inits, commit), args.force)
+    preflight(root, wanted_meta(args.seed, args.num_inits, commit), args.force)
+    if args.force:  # one setting for the whole axis: every suite × task, not only the requested ones
+        items = [(s, t) for s in catalog.SUITES for t in catalog.suite_task_names(root, s)]
+        print(
+            f"[gen_env_axis] --force: regenerating the whole environment axis ({len(items)} tasks)",
+            flush=True,
+        )
     work = [(str(root), s, t, args.num_inits, args.seed, args.force, commit) for s, t in items]
     with Pool(args.jobs) as pool:
         for line in pool.imap_unordered(gen_task, work):
