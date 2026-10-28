@@ -29,6 +29,8 @@ DIMENSIONS = (
     "robot",
     "noise",
     "position",
+    "task",  # LIBERO-PRO task axis: new goal + instruction in the same scene (T013)
+    "environment",  # LIBERO-PRO environment axis: work table replaced (T013)
 )
 REQUIRED = (
     "benchmark",
