@@ -31,6 +31,13 @@ scripts/shortcut/bench/sc-report --runs tb-smolvla-a,pi05lib                    
 | K > 1                 | `batched-K` | K clients' requests in one call padded to K rows, per-episode noise generators (T004 `batched-N`) |
 | (stateful policy)     | `step`      | n_obs_steps > 1 / temporal ensembling / memory: `select_action` per env step, one live episode    |
 
+Measured on GPU 0 (RTX 4090, pi05lib, libero_goal tasks 1/8 × init 0–3, C0 + C4: 24 episodes; outputs in
+`/outputs/VLA-shortcut-exps/smoke/T010/`): server single vs `run_eval.py` → success_orig / success_new / t_orig /
+t_new / first grasp / n_steps agree 24/24, actions bit-identical in 21/24. The other 3 (long C4 episodes)
+first differ at step 130–290; `run_eval.py` against itself differs the same way (8/12 bit-identical, the same
+episodes, first difference step 130–290), so this is run-to-run nondeterminism of the existing pipeline, not
+the server. Throughput: single 23–26 env-steps/s (≈ in-process), batched-2 38 env-steps/s (221 ms/call).
+
 Each job's `run_meta.json → identity` holds `exec_mode`, GPU model, torch, CUDA and `via: policy_server`;
 `metrics.py` and `sc-report` warn when results of different exec modes / GPU models / bench versions are compared.
 

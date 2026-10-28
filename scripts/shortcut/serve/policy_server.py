@@ -214,13 +214,9 @@ def resolve_ckpt(args: argparse.Namespace) -> dict[str, Any]:
     elif args.libero_adapter != "auto":
         row["adapter"] = args.libero_adapter
     elif not row.get("adapter"):
-        from common import POLICY_CKPT, needs_libero_adapter
+        from engine import auto_libero_adapter
 
-        from lerobot.configs.policies import PreTrainedConfig
-
-        ptype = PreTrainedConfig.from_pretrained(row["path_or_hub"]).type
-        if ptype in POLICY_CKPT and needs_libero_adapter(row["path_or_hub"]):
-            row["adapter"] = POLICY_CKPT[ptype]
+        row["adapter"] = auto_libero_adapter(row["path_or_hub"])
     return row
 
 
@@ -253,6 +249,8 @@ def build_engine(args: argparse.Namespace) -> Any:
     }
     eng = Engine(loaded, device, args.n_action_steps, args.batch, info, image_map)
     eng.hello["exec"] = exec_identity(eng.exec_mode, gpu)
+    # inference meta may hold torch dtypes / paths: hello must be msgpack-safe
+    eng.hello = json.loads(json.dumps(eng.hello, default=str))
     return eng
 
 

@@ -455,6 +455,11 @@ def main(argv: list[str] | None = None) -> int:
         if registry.ensure_registry(args.registry_path):
             print(f"[sc-bench] created {args.registry_path} (pi05lib, pi05base)")
         ckpt = registry.resolve(args.ckpt, args.registry_path)
+        if not ckpt.get("adapter"):  # registry notes without adapter=: decide from the checkpoint config
+            sys.path.insert(0, str(SHORTCUT / "serve"))
+            from engine import auto_libero_adapter
+
+            ckpt["adapter"] = auto_libero_adapter(ckpt["path_or_hub"])
     battery = load_battery(args.battery)
     run_id = args.run_id or f"bench-{ckpt['ckpt_id']}-{battery['name']}"
     run_dir = root / "runs" / run_id

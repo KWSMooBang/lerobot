@@ -62,6 +62,18 @@ class Loaded:
     policy_type: str
 
 
+def auto_libero_adapter(ckpt: str) -> str | None:
+    """LIBERO finetune whose config + processors a non-LIBERO checkpoint of the same type needs
+    (pi05_base → pi05lib); None when the checkpoint already has the LIBERO input keys."""
+    from common import POLICY_CKPT, needs_libero_adapter
+
+    import lerobot.policies  # noqa: F401  (registers config types)
+    from lerobot.configs.policies import PreTrainedConfig
+
+    ptype = PreTrainedConfig.from_pretrained(ckpt).type
+    return POLICY_CKPT[ptype] if ptype in POLICY_CKPT and needs_libero_adapter(ckpt) else None
+
+
 def stateful_reason(policy: Any, pre: Any) -> str | None:
     cfg = policy.config
     if int(getattr(cfg, "n_obs_steps", 1) or 1) > 1:
