@@ -89,3 +89,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 T012·T013 [DONE] (수정 중). Plus: 모든 변형이 원래 goal 유지 → Plus 는 겉모습 강건성만 잰다. PRO: task 축 π0.5 새 goal 0/8, 원래 goal 5/8; 단 PRO 지시문·init 혼선 확인 중.
 - 2026-10-28 PRO 혼선 정리 (T013): PRO :language 는 40 중 15 만 학습 문장과 같음, 모든 축이 init 재추출 → testbed 기본 = 비언어 축은 학습 문장, task·semantic 축은 clean init. 재검증 task 축 새 goal 0/8, 원래 goal 6/8; position swap 4/8. 문서 테스트 예시 탭 PRO 섹션·한눈에 표 반영 (PRO task 축은 대상 물체를 주로 바꾸고 목적지는 Goal t2·L10 t4 만).
 - 2026-10-28 T012 조명 축: fork 조명 변형의 약 절반이 같은 '불 꺼진' 화면 (Spatial t0 23/42, Goal t8 11/26, 레벨 무관; 렌더 경로 정상). 조명 결과는 레벨이 아니라 실제 화면별로 묶어 해석.
+- 2026-10-28 T012 병합 (e086ef9f), T013 병합 (a621c4c2). testbed = ours + LIBERO-Plus + LIBERO-PRO. 벤치마크 venv 는 아직 L2 worktree 안에 있음 (Plus 12 GB, PRO 2.4 GB) → quick 을 돌리는 checkout 에서 setup 필요.
