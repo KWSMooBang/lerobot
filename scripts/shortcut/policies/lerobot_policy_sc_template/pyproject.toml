@@ -1,0 +1,14 @@
+[project]
+name = "lerobot_policy_sc_template"
+version = "0.1.0"
+description = "Small LIBERO policy template for the shortcut testbed (out-of-tree lerobot plugin)"
+requires-python = ">=3.12"
+# torch, torchvision and lerobot come from the main repo venv; nothing extra.
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

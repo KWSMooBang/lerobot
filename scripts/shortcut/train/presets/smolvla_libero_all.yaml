@@ -1,0 +1,29 @@
+# SmolVLA (450 M; SmolVLM2-500M backbone + action expert) on all 4 LIBERO suites.
+# Same recipe as docs/source/libero.mdx (policy.type=smolvla, load_vlm_weights=true, bs 64, 100k steps),
+# on HuggingFaceVLA/libero (PNG frames, the data pi05lib was trained on) instead of lerobot/libero, with the
+# same 6.4 M samples as effective batch 256 x 25k updates on every machine (the doc's 64 x 100k on one GPU).
+# T011 smoke (GPU 0, 200 steps via accelerate launch, 1 process): loss 1.97 -> 0.95, checkpoint + resume OK.
+#
+# effective batch and optimizer updates are fixed; sc-train derives batch/GPU x GPUs x grad accum for any
+# GPU count (error if it does not divide). save_freq / log_freq below are in optimizer updates.
+# GPUs      batch/GPU x GPUs x accum  lerobot --steps  expected time
+# 1 (GPU0)  64 x 1 x 4                100000           ~16 h (measured on RTX 4090: 0.52-0.58 s/micro-batch, 12.2 GB, data_s ~0.01)
+# 4 A100    64 x 4 x 1                 25000           ~3 h (estimate: ~0.4 s/step on A100 + DDP overhead)
+description: SmolVLA from the SmolVLM2 VLM weights (lerobot LIBERO recipe)
+policy_type: smolvla
+train_data: HuggingFaceVLA/libero
+lerobot:
+  policy.type: smolvla
+  policy.load_vlm_weights: true
+  policy.device: cuda
+  num_workers: 12
+  save_freq: 2500
+  log_freq: 50
+effective_batch: 256
+optimizer_updates: 25000
+micro_batch: 64
+schedule: {warmup_frac: 0.01}   # policy.scheduler_decay_steps = steps, warmup = 1 % of steps
+estimate:
+  mem_gb_per_gpu: 13
+  hours_gpu0: 16
+  hours_a100x4: 3

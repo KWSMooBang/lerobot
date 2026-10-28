@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# sc-train CLI: see scripts/shortcut/train/README.md (python entry: sc_train.py).
+set -euo pipefail
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+exec uv run --project "$REPO" python "$REPO/scripts/shortcut/train/sc_train.py" "$@"
