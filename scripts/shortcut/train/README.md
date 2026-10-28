@@ -89,6 +89,7 @@ It starts with `pi05lib` (`lerobot/pi05_libero_finetuned`) and `pi05base` (`lero
 adapter). A successful `sc-train` run adds `<run_id>` → `runs/<run_id>/train/checkpoints/<last step>/pretrained_model`.
 
 ```bash
+sc-train register --init                                                      # create the file with pi05lib, pi05base
 sc-train register --run-id tb-tmpl-a [--ckpt-id tmpl-a] [--replace]            # (re-)register a run
 sc-train register --ckpt-id act-x --path org/act_libero --policy-type act --notes "..."   # external ckpt
 ```

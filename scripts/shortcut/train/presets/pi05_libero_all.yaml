@@ -1,5 +1,6 @@
 # π0.5 LIBERO, same as lerobot's official run that produced lerobot/pi05_libero_finetuned (= ckpt pi05lib):
-# its train_config.json: weights from lerobot/pi05_libero (features from the dataset + 1 empty camera, MEAN_STD), HuggingFaceVLA/libero, bf16, gradient checkpointing,
+# its train_config.json: weights from lerobot/pi05_libero (features from the dataset + 1 empty camera,
+# MEAN_STD stats), HuggingFaceVLA/libero, bf16, gradient checkpointing,
 # torch.compile max-autotune, AdamW lr 2.5e-5 (betas 0.9/0.95, wd 0.01, clip 1.0), cosine warmup 1000 ->
 # decay 6000 to 2.5e-6, 32/GPU x 8 GPUs = effective batch 256, 6000 optimizer steps, seed 1000.
 # lerobot-train `--steps` counts micro-batches, so with grad accumulation steps and the schedule scale by it.

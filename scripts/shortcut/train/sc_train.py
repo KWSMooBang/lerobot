@@ -512,6 +512,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_register(args: argparse.Namespace) -> int:
     out_root = Path(args.out_root).resolve()
+    if args.init:
+        added = ensure_seed_rows(out_root / REGISTRY_NAME)
+        print(f"[sc-train] {out_root / REGISTRY_NAME}: added {added or 'nothing (seed rows present)'}")
+        return 0
     if args.run_id:
         register_run(out_root / "runs" / args.run_id, args.ckpt_id, args.replace, args.notes)
         return 0
@@ -601,6 +605,7 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--steps", type=int)
     g.add_argument("--notes", default="")
     g.add_argument("--replace", action="store_true")
+    g.add_argument("--init", action="store_true", help="only add the seed rows (pi05lib, pi05base) if absent")
     sub.add_parser("presets", help="list presets")
     args = ap.parse_args(argv)
     args.extra = extra

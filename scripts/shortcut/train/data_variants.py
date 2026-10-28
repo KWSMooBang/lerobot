@@ -229,10 +229,8 @@ def install(variant: DataVariant) -> None:
     import lerobot.scripts.lerobot_train as lt
     from lerobot.datasets import (
         LeRobotDatasetMetadata,
-        make_train_eval_datasets as make_train_eval_datasets_orig,
+        make_train_eval_datasets as orig,
     )
-
-    orig = make_train_eval_datasets_orig
 
     def make_train_eval_datasets(cfg: Any) -> tuple[Any, Any]:
         if variant.suites is not None:
@@ -245,6 +243,14 @@ def install(variant: DataVariant) -> None:
             cfg.dataset.episodes = eps
         train_ds, eval_ds = orig(cfg)
         seed = cfg.seed or 0
-        return wrap_dataset(train_ds, variant, seed), wrap_dataset(eval_ds, variant, seed + 1)
+        train_ds = wrap_dataset(train_ds, variant, seed)
+        eval_ds = wrap_dataset(eval_ds, variant, seed + 1)
+        sample = [train_ds[i]["task"] for i in (0, len(train_ds) // 2, len(train_ds) - 1)]
+        print(
+            f"[sc-train] data variant {variant.id}: {train_ds.num_episodes} episodes, "
+            f"{len(train_ds)} frames, sample tasks {sample}",
+            flush=True,
+        )
+        return train_ds, eval_ds
 
     setattr(lt, "make_train_eval_datasets", make_train_eval_datasets)  # noqa: B010
