@@ -54,6 +54,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- **T014 Object 조건 반영 (T009 뒤)**: 문서 "Shortcut Testbed 설계" > 테스트 예시 > "Object 에서의 C0–C8" (다른 세션 작성, 2026-10-28). C4-a·b·c 는 instruction 세트와 같음. 바꿀 것: C6 = 장면에 없고 반대쪽 대상 자리에서 학습한 물체의 문장 (지금 cross_task 는 다음 태스크 = C4 와 같은 문장), C7 = 두 대상 자리 물체 맞바꿈, C8 = 대상 제거 (init state free joint 편집), 물체별 In(basket) + 첫 파지로 장면/문장 자리/지시/그 밖 4분류. Object quick = C0·C1·C4 (+C7).
 - **평가 환경 ≠ 학습 데이터 (T008, P2 전 필수)**: LIBERO-10 t0·t1·t7 (LIVING_ROOM_SCENE1/2) 은 평가 렌더에서 milk·orange juice·ketchup 이 테이블 위에 없음 (sim z≈0.9–1.05 m), Object 는 바닥 텍스처·조명이 다름. Spatial·Goal 은 일치. 원인(자산·BDDL 버전) 조사 후 Object·LIBERO-10 평가.
 - paraphrase 6개 사람 검수 필요 (spatial 2, goal 2, l10 2; instructions/<suite>.json 의 review 필드). C3 실행 전에.
 - libero_10 t9 C4-a feasible=false 는 스크립트 정책 한계 (C0 도 실패). 포함하려면 teleop 확인 필요.
@@ -84,3 +85,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 T011 병합 (exp/sc-train ce58993e). preset: sc_template·smolvla·pi05·pi0, effective batch 고정 (pi05 256, 6k update), 변형 instr=blank|paraphrase (frame 별 결정적)·suites=, --variant-eval same|none. ckpt_registry.tsv = /outputs/VLA-shortcut-exps/ckpt_registry.tsv. W&B 키 거부 → offline.
 - 2026-10-28 T010 관찰: 기존 in-process 경로도 긴 C4 에피소드에서 action 이 bit 단위로 재현되지 않음 (같은 설정 반복 8/12 bit 동일, 결과 수준은 일치). 짝 비교는 결과 수준(성공·파지)으로만 해석.
 - 2026-10-28 T010 병합 (exp/sc-bench-core 458606fd). 프로토콜 sc-policy/1, server↔in-process 결과 24/24 일치. T012 LIBERO-Plus·T013 LIBERO-PRO 시작.
+- 2026-10-28 다른 세션이 테스트 예시 탭에 Object 설계 추가 → lead 가 일관성 정리 (C4-c 추가, C6·C7·C8·판정은 미구현 표시, 한눈에 표·설계 탭 반영, T014 백로그).
