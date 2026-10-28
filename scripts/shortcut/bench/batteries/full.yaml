@@ -16,3 +16,15 @@ jobs:
   - benchmark: ours
     suites: [libero_spatial, libero_object, libero_goal, libero_10]
     conditions: [C1, C2, C3, C4, C5, C6]
+  # --- LIBERO-Plus (T012): all 7 axes × 4 suites. 20 registered variants per task (stratified over
+  # difficulty levels; all of them where a task has fewer), init 0 = upstream protocol; clean baseline 10 inits.
+  # Motion-blur noise variants run only with libMagickWand (apt libmagickwand-6.q16-6), else they are skipped.
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none]
+    episodes: 10
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [language, layout, camera, robot, lighting, texture, noise]
+    variants: 20
+    episodes: 1
