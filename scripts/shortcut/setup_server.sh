@@ -58,8 +58,8 @@ for lib in libEGL.so.1 libEGL_nvidia.so.0 libGL.so.1; do
 done
 
 # ------------------------------------------------------------ venv
-note "uv sync (Python 3.12, extras libero + pi + smolvla + training)"
-uv sync --locked --python 3.12 --extra libero --extra pi --extra smolvla --extra training
+note "uv sync (Python 3.12, extras libero + pi + smolvla + training + shortcut-bench)"
+uv sync --locked --python 3.12 --extra libero --extra pi --extra smolvla --extra training --extra shortcut-bench
 # `uv sync` removes packages not in the lockfile, so the plugins are (re)installed after it. sc-train itself
 # imports them from source; the install is for lerobot's own plugin discovery (lerobot-eval, policy server).
 for p in scripts/shortcut/policies/lerobot_policy_*/; do
