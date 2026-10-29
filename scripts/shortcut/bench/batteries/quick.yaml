@@ -1,0 +1,60 @@
+# Quick shortcut battery (TESTBED_DESIGN.md §4): the shortcut-related axes of each benchmark.
+# Target: ≈ 1 h on 4×A100, one night on GPU 0 (`sc-bench --ckpt X --battery quick --dry-run` prints the estimate).
+# ours: C0 (reference), C1 (blank instruction: language sensitivity), C4/C5 (object/target swap: Shortcut Rate,
+# SR_new) on all 4 suites. Infeasible swaps are skipped (T002). LIBERO-Plus (language, layout) and LIBERO-PRO
+# (instruction, position) jobs are added by T012 / T013.
+name: quick
+description: ours C0/C1/C4/C5 × 4 suites (C0/C1 20 inits per task, C4/C5 10 inits per variant)
+defaults:
+  seed: 7
+  video: "first:3"
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C0, C1]
+    tasks: 0-9
+    episodes: 20
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C4, C5]
+    tasks: 0-9
+    episodes: 10
+  # --- LIBERO-Plus (T012): language (LLM rewrites) and objects layout (added / moved objects), the
+  # shortcut-related axes; `none` = the original tasks in the Plus env (clean baseline, seeds = ours C0).
+  # 10 registered variants per task (2 per difficulty level where the task has them), init 0 (upstream protocol).
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none]
+    tasks: 0-9
+    episodes: 5
+  - benchmark: libero_plus
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [language, layout]
+    tasks: 0-9
+    variants: 10
+    episodes: 1
+  # LIBERO-PRO (T013, bench/libero_pro): clean baseline; task axis (new goal + instruction in the same scene:
+  # success = PRO goal, success_orig = original goal checked every step → Shortcut Rate as in ours C4/C5);
+  # position axis (swap on every suite; x/y shifts exist for libero_object only: both ends + middle).
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none]
+    tasks: 0-9
+    episodes: 5
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [task]
+    tasks: 0-9
+    episodes: 10
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_goal, libero_10]
+    perturbations: [position]
+    levels: [swap]
+    tasks: 0-9
+    episodes: 10
+  - benchmark: libero_pro
+    suites: [libero_object]
+    perturbations: [position]
+    levels: [swap, x0.1, x0.3, x0.5, y0.1, y0.3, y0.5]
+    tasks: 0-9
+    episodes: 5
