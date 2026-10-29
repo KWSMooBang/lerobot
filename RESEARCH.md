@@ -34,7 +34,7 @@ LIBERO 로 학습한 VLA 가 instruction 이 아니라 장면 레이아웃에서
 ## Testbed (2026-10-28 사람 지시)
 임의 모델(lerobot 내장·직접 만든 플러그인)을 LIBERO 학습 데이터로 학습하고, 우리 instruction 변환 + LIBERO-Plus + LIBERO-PRO 로
 shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4×A100 서버, 검증 = GPU 0. 설계: /outputs/VLA-shortcut-exps/tasks/TESTBED_DESIGN.md, 문서 "Shortcut Testbed 설계" https://claude.ai/artifact/N5RnamMWSYwxoQ54RsEfXF.
-작업: T009 평가 env 수정 · T010 policy server + battery + report · T011 학습 harness + 플러그인 템플릿 → T012 LIBERO-Plus · T013 LIBERO-PRO adapter.
+작업: T009 평가 env 수정 (병합) · T010 policy server + battery + report · T011 학습 harness + 플러그인 템플릿 → T012 LIBERO-Plus · T013 LIBERO-PRO adapter.
 
 ## 단계와 관문
 - P0 코드 (GPU 거의 없음): T001 평가 harness (override·이중 goal·로깅·영상), T002 instruction 세트·swap BDDL·feasibility
@@ -56,7 +56,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 ## 백로그
 - **T014 Object 조건 반영 (T009 뒤)**: 문서 "Shortcut Testbed 설계" > 테스트 예시 > "Object 에서의 C0–C8" (다른 세션 작성, 2026-10-28). C4-a·b·c 는 instruction 세트와 같음. 바꿀 것: C6 = 장면에 없고 반대쪽 대상 자리에서 학습한 물체의 문장 (지금 cross_task 는 다음 태스크 = C4 와 같은 문장), C7 = 두 대상 자리 물체 맞바꿈, C8 = 대상 제거 (init state free joint 편집), 물체별 In(basket) + 첫 파지로 장면/문장 자리/지시/그 밖 4분류. Object quick = C0·C1·C4 (+C7).
 - **LIBERO-Plus·PRO 도 MuJoCo 3.8.1 + 자체 config → T009 수정 미적용, 같은 렌더·튕김 문제 가능성** (T009 병합 후 확인).
-- **평가 환경 ≠ 학습 데이터 (T008, P2 전 필수) → T009 에서 수정 중**: LIBERO-10 t0·t1·t7 (LIVING_ROOM_SCENE1/2) 은 평가 렌더에서 milk·orange juice·ketchup 이 테이블 위에 없음 (sim z≈0.9–1.05 m), Object 는 바닥 텍스처·조명이 다름. Spatial·Goal 은 일치. 원인(자산·BDDL 버전) 조사 후 Object·LIBERO-10 평가.
+- ~~평가 환경 ≠ 학습 데이터~~ → T009 병합으로 해결 (아래 결정 로그). Object·LIBERO-10 평가 가능. 이후 run 은 run_meta.libero_env 로 raw/fix 구분: LIBERO-10 t0·t1·t7 (LIVING_ROOM_SCENE1/2) 은 평가 렌더에서 milk·orange juice·ketchup 이 테이블 위에 없음 (sim z≈0.9–1.05 m), Object 는 바닥 텍스처·조명이 다름. Spatial·Goal 은 일치. 원인(자산·BDDL 버전) 조사 후 Object·LIBERO-10 평가.
 - paraphrase 6개 사람 검수 필요 (spatial 2, goal 2, l10 2; instructions/<suite>.json 의 review 필드). C3 실행 전에.
 - libero_10 t9 C4-a feasible=false 는 스크립트 정책 한계 (C0 도 실패). 포함하려면 teleop 확인 필요.
 - submit.sh (T003) codex 리뷰 3건, 파일럿 후 수정: driver 가 죽으면 run 이 running 으로 남음(check-runs 에선 stale 로 보임),
@@ -92,3 +92,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 T012 조명 축: fork 조명 변형의 약 절반이 같은 '불 꺼진' 화면 (Spatial t0 23/42, Goal t8 11/26, 레벨 무관; 렌더 경로 정상). 조명 결과는 레벨이 아니라 실제 화면별로 묶어 해석.
 - 2026-10-28 T012 병합 (e086ef9f), T013 병합 (a621c4c2). testbed = ours + LIBERO-Plus + LIBERO-PRO. 벤치마크 venv 는 아직 L2 worktree 안에 있음 (Plus 12 GB, PRO 2.4 GB) → quick 을 돌리는 checkout 에서 setup 필요.
 - 2026-10-29 T009 [DONE]: 원인은 MuJoCo 버전 (lerobot 3.8.1 vs 학습 데이터 ≤3.3.2; ≥3.3.3 sRGB → Object 바닥·salad dressing 어두움, ≥3.4 box-box 침투 → L10 t0·t1·t7 물체 튕김). 자산·init mirror 로 40 task 일치 27→40/40, Spatial·Goal 바이트 동일 (P1 비교 유지). P1 은 raw env 결과. codex 수정 요청 중.
+- 2026-10-29 T009 병합 (7bc7a64f, exp/sc-env-fix fbfb6553; T008 시각화 코드 함께 병합). 기본 = fix env, SC_LIBERO_RAW=1 = P1 env. run_meta·resume identity·ours bench_version 에 libero_env 기록 (없으면 raw), raw↔fix resume 양방향 거부. codex 리뷰 3회 (blocking 3건 수정). mypy 는 기존 파일(p1_videos·train_overlap·train_data_*) 에러로 실패 상태.
