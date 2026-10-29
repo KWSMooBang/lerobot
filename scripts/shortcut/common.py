@@ -61,39 +61,183 @@ USER_TOKENIZER_DIR = Path.home() / ".cache" / "shortcut_libero" / "paligemma_tok
 # ---------------------------------------------------------------- LIBERO config
 
 
+# The LIBERO files (assets, BDDL, init states) are byte-identical to the original LIBERO repo, but the
+# MuJoCo that lerobot pins (3.8) renders two things differently from the MuJoCo (<= 3.3.2) that rendered
+# HuggingFaceVLA/libero:
+#   * >= 3.3.3 honours the PNG sRGB chunk (texture colorspace "auto"); the floor textures have one, are
+#     linearised and turn dark brown. The floor fills the view in the floor scenes (Object suite); in the
+#     table scenes only a 2-pixel strip behind the table shows it. Of the object textures only the two salad
+#     dressings (Object suite only) have the chunk; they render near-black instead of green.
+#   * >= 3.4 computes deeper box-box penetrations; milk / orange juice / ketchup start ~2.7 cm inside the
+#     table in the LIVING_ROOM_SCENE1/2 init states and are thrown off it during the settle steps.
+# Fix (LIBERO_FIX): a mirror of the asset dir in which the object textures have no sRGB chunk (same pixels)
+# and the floor scenes (FLOOR_SCENES) take their textures from textures_nosrgb/ (likewise), and a mirror of init_files with the penetrating
+# objects lifted by their penetration depth (libero_init_patch.json, made by libero_init_patch.py).
+# The table scenes are left alone so Spatial/Goal renders stay identical to the P1 pilot.
+# SC_LIBERO_RAW=1 keeps the unfixed env.
+LIBERO_FIX = "fix1"  # bump when the fix changes: it keys the cached config + mirrors
+FLOOR_SCENES = "scenes/libero_floor_*_style.xml"
+INIT_PATCH = Path(__file__).with_name("libero_init_patch.json")
+
+
+def libero_raw() -> bool:
+    return os.environ.get("SC_LIBERO_RAW", "0") == "1"
+
+
+def _strip_png_srgb(data: bytes) -> bytes | None:
+    """PNG bytes without the sRGB chunk (pixel data untouched); None if there is no sRGB chunk."""
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    out, i, found = [data[:8]], 8, False
+    while i < len(data):
+        n = int.from_bytes(data[i : i + 4], "big")
+        end = i + 12 + n
+        if data[i + 4 : i + 8] == b"sRGB":
+            found = True
+        else:
+            out.append(data[i:end])
+        i = end
+    return b"".join(out) if found else None
+
+
+def _publish_dir(tmp: Path, dst: Path) -> None:
+    """Atomically move a finished temp dir into place (another process may have won the race)."""
+    import shutil
+
+    try:
+        tmp.replace(dst)
+    except OSError:
+        shutil.rmtree(tmp, ignore_errors=True)
+        if not dst.exists():
+            raise
+
+
+def _fixed_assets(src: Path, dst: Path) -> Path:
+    """Mirror `src` with symlinked files, except object textures with an sRGB chunk (copied without it), plus
+    textures_nosrgb/ (textures/ with the sRGB chunk removed) used by the FLOOR_SCENES XMLs. The arenas swap
+    the floor/wall file name by style but keep the XML's directory, so redirecting the directory reaches the
+    style textures too.
+
+    Directories are real so that relative paths in the scene XMLs (`../textures/...`) stay in the mirror.
+    """
+    if dst.exists():
+        return dst
+    tmp = dst.with_name(f"{dst.name}.tmp{os.getpid()}")
+    for p in sorted(src.rglob("*")):
+        rel = p.relative_to(src)
+        if rel.parts[0].startswith("."):
+            continue
+        q = tmp / rel
+        if p.is_dir():
+            q.mkdir(parents=True, exist_ok=True)
+            continue
+        q.parent.mkdir(parents=True, exist_ok=True)
+        own_texture = p.suffix.lower() == ".png" and rel.parts[0] not in ("textures", "scenes")
+        stripped = _strip_png_srgb(p.read_bytes()) if own_texture else None
+        if stripped is None:
+            q.symlink_to(p.resolve())
+        else:
+            q.write_bytes(stripped)
+    nosrgb = tmp / "textures_nosrgb"
+    nosrgb.mkdir()
+    for p in sorted((src / "textures").iterdir()):
+        stripped = _strip_png_srgb(p.read_bytes()) if p.suffix.lower() == ".png" else None
+        if stripped is None:
+            (nosrgb / p.name).symlink_to(p.resolve())
+        else:
+            (nosrgb / p.name).write_bytes(stripped)
+    for scene in sorted(src.glob(FLOOR_SCENES)):
+        q = tmp / scene.relative_to(src)
+        q.unlink()
+        q.write_text(scene.read_text().replace('file="../textures/', 'file="../textures_nosrgb/'))
+    _publish_dir(tmp, dst)
+    return dst
+
+
+def _fixed_init_states(src: Path, dst: Path) -> Path:
+    """Mirror init_files (symlinks) with the lifts of libero_init_patch.json applied."""
+    if dst.exists():
+        return dst
+    import numpy as np
+    import torch
+
+    patch = json.loads(INIT_PATCH.read_text())
+    tmp = dst.with_name(f"{dst.name}.tmp{os.getpid()}")
+    for p in sorted(src.rglob("*")):
+        rel = p.relative_to(src)
+        q = tmp / rel
+        if p.is_dir():
+            q.mkdir(parents=True, exist_ok=True)
+            continue
+        q.parent.mkdir(parents=True, exist_ok=True)
+        lifts = patch["files"].get(str(rel))
+        if not lifts:
+            q.symlink_to(p.resolve())
+            continue
+        states = np.array(torch.load(p, weights_only=False))  # nosec B614 (LIBERO's own numpy pickles)
+        for lift in lifts:
+            i, j = lift["init"], lift["state_index"]
+            assert abs(states[i, j] - lift["z0"]) < 1e-6, (rel, lift)
+            states[i, j] += lift["dz"]
+        torch.save(states, q)
+    _publish_dir(tmp, dst)
+    return dst
+
+
 def ensure_libero_config() -> str:
     """Point LIBERO at a config.yaml for *this* interpreter's libero install (no input() prompt).
 
     Must run before the first `import libero`. Keyed by the libero install path so worktrees with
-    different venvs do not clobber each other.
+    different venvs do not clobber each other. Unless SC_LIBERO_RAW=1, the config points at the fixed
+    init states and LIBERO's asset path is redirected to the fixed asset mirror (see LIBERO_FIX).
     """
     if (
         os.environ.get("LIBERO_CONFIG_PATH")
         and Path(os.environ["LIBERO_CONFIG_PATH"], "config.yaml").exists()
     ):
+        _redirect_libero_assets(Path(os.environ["LIBERO_CONFIG_PATH"]))
         return os.environ["LIBERO_CONFIG_PATH"]
     spec = importlib.util.find_spec("libero")
     assert spec is not None and spec.submodule_search_locations is not None
     libero_dir = os.path.join(list(spec.submodule_search_locations)[0], "libero")
     key = hashlib.sha1(libero_dir.encode(), usedforsecurity=False).hexdigest()[:10]
+    if not libero_raw():
+        patch_key = hashlib.sha1(INIT_PATCH.read_bytes(), usedforsecurity=False).hexdigest()[:8]
+        key = f"{key}-{LIBERO_FIX}-{patch_key}"
     cfg_dir = Path.home() / ".cache" / "shortcut_libero" / key
     cfg = cfg_dir / "config.yaml"
     if not cfg.exists():
         from huggingface_hub import snapshot_download
 
         cfg_dir.mkdir(parents=True, exist_ok=True)
-        assets = snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset")
+        assets = Path(snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset"))
+        init_states = Path(libero_dir) / "init_files"
+        if not libero_raw():
+            assets = _fixed_assets(assets, cfg_dir / "assets")
+            init_states = _fixed_init_states(init_states, cfg_dir / "init_files")
         tmp = cfg.with_suffix(f".tmp{os.getpid()}")
         tmp.write_text(
             f"assets: {assets}\n"
             f"bddl_files: {libero_dir}/bddl_files\n"
             f"benchmark_root: {libero_dir}\n"
             f"datasets: {libero_dir}/../datasets\n"
-            f"init_states: {libero_dir}/init_files\n"
+            f"init_states: {init_states}\n"
         )
         tmp.replace(cfg)
     os.environ["LIBERO_CONFIG_PATH"] = str(cfg_dir)
+    _redirect_libero_assets(cfg_dir)
     return str(cfg_dir)
+
+
+def _redirect_libero_assets(cfg_dir: Path) -> None:
+    """hf-libero ignores the config's `assets` key (its get_assets_path() uses a package-local dir or
+    ~/.cache/libero/assets); point its path cache at the config's assets so the fixed mirror is used."""
+    if libero_raw() or not (cfg_dir / "assets").is_dir():
+        return
+    import libero.libero as libero_pkg
+
+    libero_pkg._assets_path_cache = str(cfg_dir / "assets")
+    assert libero_pkg.get_assets_path() == str(cfg_dir / "assets"), "hf-libero asset path API changed"
 
 
 # ---------------------------------------------------------------- instruction set
