@@ -58,8 +58,11 @@ def bench_version(instr_set: str, backend: str) -> str:
     _paths()
     from common import libero_env_tag
 
-    # raw = SC_LIBERO_RAW=1 (the P1 env); fix-... = the T009 env fix. report.py flags mixed versions.
-    return f"{BENCH_VERSION}/instr-{sha}/hf-libero-{lib}/{libero_env_tag()}"
+    # The T009 env fix is appended (/fix-...); raw (SC_LIBERO_RAW=1, the P1 env) keeps the string it had
+    # before T009, so old and new raw results are one version and report.py flags only raw vs fix mixes.
+    bv = f"{BENCH_VERSION}/instr-{sha}/hf-libero-{lib}"
+    tag = libero_env_tag()
+    return bv if tag == "raw" else f"{bv}/{tag}"
 
 
 def suite_short(suite: str) -> str:

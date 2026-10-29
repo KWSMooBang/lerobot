@@ -231,16 +231,18 @@ def _source_key(libero_dir: str) -> str:
     return h.hexdigest()[:8]
 
 
-def _marker_matches(cfg_dir: Path, tag: str, source: str) -> bool:
+def _marker(tag: str, source: str, libero_dir: str) -> dict[str, str]:
+    return {"libero_env": tag, "source": source, "libero_dir": str(Path(libero_dir).resolve())}
+
+
+def _marker_matches(cfg_dir: Path, tag: str, source: str, libero_dir: str) -> bool:
+    """The config dir was built for this env tag, from this source, for this libero install (another venv
+    with the same versions still has its own bddl/init paths)."""
     try:
         marker = json.loads((cfg_dir / LIBERO_ENV_MARKER).read_text())
     except (OSError, ValueError):
         return False
-    return (
-        marker.get("libero_env") == tag
-        and marker.get("source") == source
-        and (cfg_dir / "config.yaml").exists()
-    )
+    return marker == _marker(tag, source, libero_dir) and (cfg_dir / "config.yaml").exists()
 
 
 def _build_config(cfg_dir: Path, libero_dir: str, raw: bool) -> None:
@@ -280,18 +282,21 @@ def ensure_libero_config() -> str:
     libero_dir = _libero_dir()
     source = _source_key(libero_dir)
     inherited = os.environ.get("LIBERO_CONFIG_PATH")
-    if inherited and _marker_matches(Path(inherited), tag, source):
+    if inherited and _marker_matches(Path(inherited), tag, source, libero_dir):
         cfg_dir = Path(inherited)
     else:
         if inherited:
             print(
-                f"[libero] ignoring inherited LIBERO_CONFIG_PATH={inherited} (not a {tag} config)", flush=True
+                f"[libero] ignoring inherited LIBERO_CONFIG_PATH={inherited} (not a {tag} config of this "
+                "libero install)",
+                flush=True,
             )
         path_key = hashlib.sha1(libero_dir.encode(), usedforsecurity=False).hexdigest()[:10]
         cfg_dir = Path.home() / ".cache" / "shortcut_libero" / f"{path_key}-{source}-{tag}"
-        if not _marker_matches(cfg_dir, tag, source):
+        if not _marker_matches(cfg_dir, tag, source, libero_dir):
             _build_config(cfg_dir, libero_dir, raw=tag == "raw")
-            (cfg_dir / LIBERO_ENV_MARKER).write_text(json.dumps({"libero_env": tag, "source": source}) + "\n")
+            marker = _marker(tag, source, libero_dir)
+            (cfg_dir / LIBERO_ENV_MARKER).write_text(json.dumps(marker) + "\n")
     os.environ["LIBERO_CONFIG_PATH"] = str(cfg_dir)
     _redirect_libero_assets(cfg_dir)
     _configured_env = tag
@@ -441,7 +446,10 @@ def check_resume(identity: dict[str, Any], prev_meta: dict[str, Any] | None, ep_
                 f"{ep_path.parent}: run_meta.json has no identity (older harness); use a new --out"
             )
         prev = legacy_exec_identity(prev, prev_meta, identity)
-        diff = {k: (prev.get(k), v) for k, v in identity.items() if prev.get(k) != v}
+        # libero_env is only in fixed-env identities (raw ones stay as before T009): absent = raw, both ways
+        prev = {**prev, "libero_env": prev.get("libero_env", "raw")}
+        new = {**identity, "libero_env": identity.get("libero_env", "raw")}
+        diff = {k: (prev.get(k), v) for k, v in new.items() if prev.get(k) != v}
         if diff:
             raise SystemExit(f"{ep_path.parent} was written with another configuration (old, new): {diff}")
     elif ep_path.exists() and ep_path.stat().st_size > 0:
