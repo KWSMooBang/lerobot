@@ -62,6 +62,7 @@ from common import (  # noqa: E402
     ensure_libero_config,
     episode_seed,
     exec_identity,
+    libero_env_tag,
     load_instruction_set,
     load_policy,
     model_tag,
@@ -645,6 +646,8 @@ def prepare_run(
     }
     if args.backend != "libero":
         identity["backend"] = args.backend
+    elif libero_env_tag() != "raw":  # raw (the P1 env) leaves the identity as it was before T009
+        identity["libero_env"] = libero_env_tag()
     prev_meta = json.loads((out / "run_meta.json").read_text()) if (out / "run_meta.json").exists() else None
     check_resume(identity, prev_meta, out / "episodes.jsonl")
     return RunSpec(args, ckpt, adapter, tag, out, video_cap, max_steps, suite, instr_set, k_by_task, identity)
@@ -700,6 +703,8 @@ def run_meta(
         "python": platform.python_version(),
         "torch": torch.__version__,
         "gpu": spec.identity["gpu"] if spec.identity["gpu"] != "cpu" else None,
+        # raw = SC_LIBERO_RAW=1 (P1 env), fix-... = T009 env fix; runs without the key predate T009 (raw)
+        "libero_env": libero_env_tag() if spec.args.backend == "libero" else None,
     }
     meta.update(extra)
     return meta

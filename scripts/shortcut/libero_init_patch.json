@@ -1,0 +1,2462 @@
+{
+ "doc": "objects lifted out of fixtures in the LIBERO init states; see scripts/shortcut/libero_init_patch.py",
+ "min_pen": 0.02,
+ "files": {
+  "libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket.pruned_init": [
+   {
+    "init": 0,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 0,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 0,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 1,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 1,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 1,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 2,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 2,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 2,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 3,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 3,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 3,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 4,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 4,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 4,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 5,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 5,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 5,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 6,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 6,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 6,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 7,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 7,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 7,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 8,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 8,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 8,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 9,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 9,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 9,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 10,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 10,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 10,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 11,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 11,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 11,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 12,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 12,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 12,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 13,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 13,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 13,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 14,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 14,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 14,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 15,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 15,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 15,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 16,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 16,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 16,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 17,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 17,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 17,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 18,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 18,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 18,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 19,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 19,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 19,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 20,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 20,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 20,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 21,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 21,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 21,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 22,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 22,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 22,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 23,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 23,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 23,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 24,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 24,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 24,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 25,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 25,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 25,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 26,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 26,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 26,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 27,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 27,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 27,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 28,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 28,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 28,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 29,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 29,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 29,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 30,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 30,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 30,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 31,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 31,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 31,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 32,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 32,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 32,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 33,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 33,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 33,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 34,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 34,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 34,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 35,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 35,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 35,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 36,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 36,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 36,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 37,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 37,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 37,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 38,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 38,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 38,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 39,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 39,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 39,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 40,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 40,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 40,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 41,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 41,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 41,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 42,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 42,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 42,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 43,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 43,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 43,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 44,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 44,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 44,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 45,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 45,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 45,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 46,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 46,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 46,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 47,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 47,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 47,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 48,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 48,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 48,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 49,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 49,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 49,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   }
+  ],
+  "libero_10/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket.pruned_init": [
+   {
+    "init": 0,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 0,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 0,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 1,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 1,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 1,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 2,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 2,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 2,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 3,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 3,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 3,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 4,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 4,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 4,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 5,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 5,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 5,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 6,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 6,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 6,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 7,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 7,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 7,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 8,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 8,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 8,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 9,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 9,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 9,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 10,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 10,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 10,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 11,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 11,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 11,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 12,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 12,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 12,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 13,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 13,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 13,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 14,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 14,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 14,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 15,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 15,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 15,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 16,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 16,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 16,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 17,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 17,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 17,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 18,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 18,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 18,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 19,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 19,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 19,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 20,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 20,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 20,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 21,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 21,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 21,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 22,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 22,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 22,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 23,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 23,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 23,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 24,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 24,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 24,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 25,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 25,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 25,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 26,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 26,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 26,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 27,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 27,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 27,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 28,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 28,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 28,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 29,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 29,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 29,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 30,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 30,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 30,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 31,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 31,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 31,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 32,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 32,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 32,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 33,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 33,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 33,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 34,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 34,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 34,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 35,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 35,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 35,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 36,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 36,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 36,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 37,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 37,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 37,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 38,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 38,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 38,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 39,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 39,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 39,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 40,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 40,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 40,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 41,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 41,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 41,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 42,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 42,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 42,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 43,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 43,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 43,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 44,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 44,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 44,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 45,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 45,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 45,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 46,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 46,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 46,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 47,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 47,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 47,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 48,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 48,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 48,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 49,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 49,
+    "object": "milk_1",
+    "state_index": 47,
+    "z0": 0.48,
+    "dz": 0.02651
+   },
+   {
+    "init": 49,
+    "object": "orange_juice_1",
+    "state_index": 40,
+    "z0": 0.48,
+    "dz": 0.02651
+   }
+  ],
+  "libero_10/LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket.pruned_init": [
+   {
+    "init": 0,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 1,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 2,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 3,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 4,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 5,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 6,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 7,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 8,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 9,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 10,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 11,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 12,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 13,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 14,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 15,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 16,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 17,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 18,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 19,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 20,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 21,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 22,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 23,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 24,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 25,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 26,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 27,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 28,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 29,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 30,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 31,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 32,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 33,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 34,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 35,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 36,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 37,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 38,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 39,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 40,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 41,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 42,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 43,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 44,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 45,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 46,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 47,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 48,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   },
+   {
+    "init": 49,
+    "object": "ketchup_1",
+    "state_index": 33,
+    "z0": 0.48,
+    "dz": 0.02918
+   }
+  ]
+ }
+}

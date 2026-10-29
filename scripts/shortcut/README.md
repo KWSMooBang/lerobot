@@ -56,3 +56,15 @@ goal 300, libero_10 520).
 - This container lists only mesa in glvnd, so MuJoCo EGL fell back to llvmpipe (~100 ms/frame).
   `common.py` points `__EGL_VENDOR_LIBRARY_FILENAMES` at a user-level NVIDIA vendor JSON. Env steps go from 175 ms to 10 ms.
 - Tokenizer: `google/paligemma-3b-pt-224` is gated. We fall back to `/cache/pid_demo_dl/paligemma_tok_hf` (`SC_TOKENIZER_DIR`), as `exp/pid-demo` does.
+- LIBERO env fix (T009, on by default; `SC_LIBERO_RAW=1` turns it off and gives the env the P1 pilot used).
+  The LIBERO files match the original repo, but MuJoCo 3.8 (lerobot's pin) renders two things unlike the MuJoCo
+  (<= 3.3.2) that rendered `HuggingFaceVLA/libero`: it honours the PNG sRGB chunk (>= 3.3.3: dark brown floor in the
+  Object suite, near-black salad dressing), and its box-box contacts throw milk / orange juice / ketchup off the
+  table in LIBERO-10 t0, t1, t7 (>= 3.4). `ensure_libero_config()` builds a config with an asset mirror (sRGB chunk
+  removed for object textures and the floor scenes' textures) and an init-state mirror (those objects lifted out of
+  the table, `libero_init_patch.json` from `libero_init_patch.py`). Spatial and Goal renders are byte-identical to
+  the unfixed env. Check: `analysis/env_fix_render.sh` + `analysis/env_fix_compare.py`.
+  Each config dir carries `libero_env.json` (env tag + source key: hf-libero version, init_files content, assets
+  revision); an inherited `LIBERO_CONFIG_PATH` of another mode or source is ignored. Runs record the env as
+  `libero_env` = `raw` | `fix-<LIBERO_FIX>-<patch hash>` in `run_meta.json` (also in the identity when not raw) and
+  at the end of the ours `bench_version`. Runs without the field (P1) are raw.
