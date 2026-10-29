@@ -55,7 +55,11 @@ def bench_version(instr_set: str, backend: str) -> str:
         lib = metadata.version("hf-libero")
     except metadata.PackageNotFoundError:
         lib = "unknown"
-    return f"{BENCH_VERSION}/instr-{sha}/hf-libero-{lib}"
+    _paths()
+    from common import libero_env_tag
+
+    # raw = SC_LIBERO_RAW=1 (the P1 env); fix-... = the T009 env fix. report.py flags mixed versions.
+    return f"{BENCH_VERSION}/instr-{sha}/hf-libero-{lib}/{libero_env_tag()}"
 
 
 def suite_short(suite: str) -> str:

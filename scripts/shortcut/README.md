@@ -64,3 +64,7 @@ goal 300, libero_10 520).
   removed for object textures and the floor scenes' textures) and an init-state mirror (those objects lifted out of
   the table, `libero_init_patch.json` from `libero_init_patch.py`). Spatial and Goal renders are byte-identical to
   the unfixed env. Check: `analysis/env_fix_render.sh` + `analysis/env_fix_compare.py`.
+  Each config dir carries `libero_env.json` (env tag + source key: hf-libero version, init_files content, assets
+  revision); an inherited `LIBERO_CONFIG_PATH` of another mode or source is ignored. Runs record the env as
+  `libero_env` = `raw` | `fix-<LIBERO_FIX>-<patch hash>` in `run_meta.json` (also in the identity when not raw) and
+  at the end of the ours `bench_version`. Runs without the field (P1) are raw.

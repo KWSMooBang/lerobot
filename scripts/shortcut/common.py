@@ -184,55 +184,124 @@ def _fixed_init_states(src: Path, dst: Path) -> Path:
     return dst
 
 
+LIBERO_ENV_MARKER = "libero_env.json"  # in each config dir: {"libero_env": tag, "source": source key}
+_configured_env: str | None = None  # libero_env tag this interpreter's LIBERO was configured with
+
+
+def libero_env_tag() -> str:
+    """'raw' (SC_LIBERO_RAW=1, the env of the P1 pilot) or 'fix-<LIBERO_FIX>-<hash of the init patch>'."""
+    if libero_raw():
+        return "raw"
+    patch_key = hashlib.sha1(INIT_PATCH.read_bytes(), usedforsecurity=False).hexdigest()[:8]
+    return f"fix-{LIBERO_FIX}-{patch_key}"
+
+
+def _libero_dir() -> str:
+    spec = importlib.util.find_spec("libero")
+    assert spec is not None and spec.submodule_search_locations is not None
+    return os.path.join(list(spec.submodule_search_locations)[0], "libero")
+
+
+def _assets_snapshot() -> Path:
+    """lerobot/libero-assets snapshot dir (its name is the dataset revision); downloads it if not cached."""
+    from huggingface_hub import snapshot_download
+
+    try:
+        return Path(
+            snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset", local_files_only=True)
+        )
+    except Exception:  # nosec B110 (not cached yet)
+        return Path(snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset"))
+
+
+def _source_key(libero_dir: str) -> str:
+    """What the mirrors are built from: hf-libero version, init_files content, libero-assets revision."""
+    from importlib import metadata
+
+    h = hashlib.sha1(usedforsecurity=False)
+    try:
+        h.update(metadata.version("hf-libero").encode())
+    except metadata.PackageNotFoundError:
+        h.update(b"hf-libero-unknown")
+    for f in sorted(Path(libero_dir, "init_files").rglob("*")):
+        if f.is_file():
+            h.update(str(f.relative_to(libero_dir)).encode())
+            h.update(f.read_bytes())
+    h.update(_assets_snapshot().name.encode())
+    return h.hexdigest()[:8]
+
+
+def _marker_matches(cfg_dir: Path, tag: str, source: str) -> bool:
+    try:
+        marker = json.loads((cfg_dir / LIBERO_ENV_MARKER).read_text())
+    except (OSError, ValueError):
+        return False
+    return (
+        marker.get("libero_env") == tag
+        and marker.get("source") == source
+        and (cfg_dir / "config.yaml").exists()
+    )
+
+
+def _build_config(cfg_dir: Path, libero_dir: str, raw: bool) -> None:
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    assets = _assets_snapshot()
+    init_states = Path(libero_dir) / "init_files"
+    if not raw:
+        assets = _fixed_assets(assets, cfg_dir / "assets")
+        init_states = _fixed_init_states(init_states, cfg_dir / "init_files")
+    tmp = cfg_dir / f"config.yaml.tmp{os.getpid()}"
+    tmp.write_text(
+        f"assets: {assets}\n"
+        f"bddl_files: {libero_dir}/bddl_files\n"
+        f"benchmark_root: {libero_dir}\n"
+        f"datasets: {libero_dir}/../datasets\n"
+        f"init_states: {init_states}\n"
+    )
+    tmp.replace(cfg_dir / "config.yaml")
+
+
 def ensure_libero_config() -> str:
     """Point LIBERO at a config.yaml for *this* interpreter's libero install (no input() prompt).
 
-    Must run before the first `import libero`. Keyed by the libero install path so worktrees with
-    different venvs do not clobber each other. Unless SC_LIBERO_RAW=1, the config points at the fixed
-    init states and LIBERO's asset path is redirected to the fixed asset mirror (see LIBERO_FIX).
+    Must run before the first `import libero`. The config dir is keyed by the libero install path, the
+    source key (hf-libero version, init_files content, assets revision) and the env tag (libero_env_tag()).
+    Unless SC_LIBERO_RAW=1 it points at the fixed init states and LIBERO's asset path is redirected to the
+    fixed asset mirror (see LIBERO_FIX). An inherited LIBERO_CONFIG_PATH is reused only if its marker names
+    the same tag and source, otherwise it is ignored. Asking for another tag in the same interpreter after
+    LIBERO was configured raises: LIBERO keeps the paths it read first.
     """
-    if (
-        os.environ.get("LIBERO_CONFIG_PATH")
-        and Path(os.environ["LIBERO_CONFIG_PATH"], "config.yaml").exists()
-    ):
-        _redirect_libero_assets(Path(os.environ["LIBERO_CONFIG_PATH"]))
-        return os.environ["LIBERO_CONFIG_PATH"]
-    spec = importlib.util.find_spec("libero")
-    assert spec is not None and spec.submodule_search_locations is not None
-    libero_dir = os.path.join(list(spec.submodule_search_locations)[0], "libero")
-    key = hashlib.sha1(libero_dir.encode(), usedforsecurity=False).hexdigest()[:10]
-    if not libero_raw():
-        patch_key = hashlib.sha1(INIT_PATCH.read_bytes(), usedforsecurity=False).hexdigest()[:8]
-        key = f"{key}-{LIBERO_FIX}-{patch_key}"
-    cfg_dir = Path.home() / ".cache" / "shortcut_libero" / key
-    cfg = cfg_dir / "config.yaml"
-    if not cfg.exists():
-        from huggingface_hub import snapshot_download
-
-        cfg_dir.mkdir(parents=True, exist_ok=True)
-        assets = Path(snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset"))
-        init_states = Path(libero_dir) / "init_files"
-        if not libero_raw():
-            assets = _fixed_assets(assets, cfg_dir / "assets")
-            init_states = _fixed_init_states(init_states, cfg_dir / "init_files")
-        tmp = cfg.with_suffix(f".tmp{os.getpid()}")
-        tmp.write_text(
-            f"assets: {assets}\n"
-            f"bddl_files: {libero_dir}/bddl_files\n"
-            f"benchmark_root: {libero_dir}\n"
-            f"datasets: {libero_dir}/../datasets\n"
-            f"init_states: {init_states}\n"
+    global _configured_env
+    tag = libero_env_tag()
+    if _configured_env is not None and _configured_env != tag:
+        raise AssertionError(
+            f"LIBERO is configured as {_configured_env} in this process, now asked for {tag}"
         )
-        tmp.replace(cfg)
+    libero_dir = _libero_dir()
+    source = _source_key(libero_dir)
+    inherited = os.environ.get("LIBERO_CONFIG_PATH")
+    if inherited and _marker_matches(Path(inherited), tag, source):
+        cfg_dir = Path(inherited)
+    else:
+        if inherited:
+            print(
+                f"[libero] ignoring inherited LIBERO_CONFIG_PATH={inherited} (not a {tag} config)", flush=True
+            )
+        path_key = hashlib.sha1(libero_dir.encode(), usedforsecurity=False).hexdigest()[:10]
+        cfg_dir = Path.home() / ".cache" / "shortcut_libero" / f"{path_key}-{source}-{tag}"
+        if not _marker_matches(cfg_dir, tag, source):
+            _build_config(cfg_dir, libero_dir, raw=tag == "raw")
+            (cfg_dir / LIBERO_ENV_MARKER).write_text(json.dumps({"libero_env": tag, "source": source}) + "\n")
     os.environ["LIBERO_CONFIG_PATH"] = str(cfg_dir)
     _redirect_libero_assets(cfg_dir)
+    _configured_env = tag
     return str(cfg_dir)
 
 
 def _redirect_libero_assets(cfg_dir: Path) -> None:
     """hf-libero ignores the config's `assets` key (its get_assets_path() uses a package-local dir or
     ~/.cache/libero/assets); point its path cache at the config's assets so the fixed mirror is used."""
-    if libero_raw() or not (cfg_dir / "assets").is_dir():
+    if not (cfg_dir / "assets").is_dir():
         return
     import libero.libero as libero_pkg
 
