@@ -105,31 +105,61 @@ def resolve_model(name: str, out_root: Path) -> dict[str, Any]:
     return {"model": row["ckpt_id"], "ckpt": row["path_or_hub"], "adapter": adapter}
 
 
+def _hash_local(p: Path) -> str:
+    h = hashlib.sha256()
+    files = sorted(p.glob("*.safetensors")) + sorted(p.glob("*.json")) if p.is_dir() else [p]
+    for f in files:
+        h.update(f.name.encode())
+        with open(f, "rb") as fh:
+            while block := fh.read(1 << 24):
+                h.update(block)
+    return "sha256:" + h.hexdigest()[:20]
+
+
 @functools.cache
 def checkpoint_fingerprint(ckpt: str) -> str:
-    """Unique id of the weights: `sha256:<hash>` of a local checkpoint dir's *.safetensors + *.json, or
-    `hub:<commit sha>` of the Hub snapshot the policy loader resolves (config.json's snapshot dir)."""
+    """Content id of the weights now: `sha256:<hash>` of a local checkpoint's *.safetensors + *.json, or
+    `hub:<commit sha>` of the Hub repo's current main. Recorded in the plan; every loader then loads exactly
+    that revision (`pinned_path`) and re-checks it after loading (`verify_pinned`)."""
     p = Path(ckpt)
     if p.exists():
-        h = hashlib.sha256()
-        files = sorted(p.glob("*.safetensors")) + sorted(p.glob("*.json")) if p.is_dir() else [p]
-        for f in files:
-            h.update(f.name.encode())
-            with open(f, "rb") as fh:
-                while block := fh.read(1 << 24):
-                    h.update(block)
-        return "sha256:" + h.hexdigest()[:20]
-    from huggingface_hub import hf_hub_download
+        return _hash_local(p)
+    from huggingface_hub import HfApi
 
-    return "hub:" + Path(hf_hub_download(ckpt, "config.json")).parent.name
+    sha = HfApi().model_info(ckpt).sha
+    if not sha:
+        raise SystemExit(f"{ckpt}: no commit sha from the Hub")
+    return "hub:" + sha
 
 
-def policy_dtype(ckpt: str, adapter: str | None) -> str:
+def pinned_path(locator: str, revision: str, config_only: bool = False) -> str:
+    """Local dir holding exactly `revision` of the checkpoint (`locator` = this pod's hub id or path).
+    Hub: the snapshot of that commit (config.json only with `config_only`). Local: the dir itself."""
+    if revision.startswith("hub:"):
+        from huggingface_hub import hf_hub_download, snapshot_download
+
+        sha = revision[4:]
+        if config_only:
+            return str(Path(hf_hub_download(locator, "config.json", revision=sha)).parent)
+        return snapshot_download(locator, revision=sha)
+    if not Path(locator).exists():
+        raise SystemExit(f"{locator}: local checkpoint not found (plan revision {revision})")
+    return locator
+
+
+def verify_pinned(path: str, revision: str) -> None:
+    """The files at `path` are `revision` (hub: snapshot dir named by the commit; local: content hash)."""
+    got = "hub:" + Path(path).name if revision.startswith("hub:") else _hash_local(Path(path))
+    if got != revision:
+        raise SystemExit(f"checkpoint at {path} is {got}, the plan says {revision}: not mixing weights")
+
+
+def policy_dtype(ckpt_dir: str, adapter_dir: str | None) -> str:
     """Inference dtype: the config the loader uses (the adapter's when there is one)."""
     import lerobot.policies  # noqa: F401  (registers config types)
     from lerobot.configs.policies import PreTrainedConfig
 
-    return str(getattr(PreTrainedConfig.from_pretrained(adapter or ckpt), "dtype", None))
+    return str(getattr(PreTrainedConfig.from_pretrained(adapter_dir or ckpt_dir), "dtype", None))
 
 
 def dataset_source(out_root: Path) -> tuple[str, Path | None, str]:
@@ -178,13 +208,19 @@ def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
     layers = parse_layers(args.layers)
     ae_steps = parse_ae_steps(args.ae_steps)
     repo, root, rev = dataset_source(out_root)
+    ck_rev = checkpoint_fingerprint(m["ckpt"])
+    ad_rev = checkpoint_fingerprint(m["adapter"]) if m["adapter"] else None
+    dtype = policy_dtype(
+        pinned_path(m["ckpt"], ck_rev, config_only=True),
+        pinned_path(m["adapter"], ad_rev, config_only=True) if m["adapter"] and ad_rev else None,
+    )
+    # compared between pods: content only (revisions, dtype, data, settings). Locations (hub id or mount path
+    # of the checkpoint, dataset root) differ between pods and are kept under "source" for reference.
     identity = {
         "model": m["model"],
-        "ckpt": m["ckpt"],
-        "ckpt_revision": checkpoint_fingerprint(m["ckpt"]),
-        "adapter": m["adapter"],
-        "adapter_revision": checkpoint_fingerprint(m["adapter"]) if m["adapter"] else None,
-        "dtype": policy_dtype(m["ckpt"], m["adapter"]),
+        "ckpt_revision": ck_rev,
+        "adapter_revision": ad_rev,
+        "dtype": dtype,
         "dataset": repo,
         "dataset_revision": rev,
         "layers": layers,
@@ -202,7 +238,7 @@ def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
             {"part_id": store.part_id(p), "episodes": p, "n_frames": int(sum(lengths[e] for e in p))}
             for p in parts
         ],
-        "dataset_root": str(root) if root else None,
+        "source": {"ckpt": m["ckpt"], "adapter": m["adapter"], "dataset_root": str(root) if root else None},
         "groups": list(GROUPS),
     }
     return plan
@@ -215,7 +251,11 @@ def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespac
     n_mine = sum(parts[j]["n_frames"] for j in mine)
     bpt = bytes_per_timestep(ident["layers"], len(ident["ae_steps"]))
     n_pg = sum(layer_family(x) == "pg" for x in ident["layers"])
-    print(f"[collect] model {ident['model']} = {ident['ckpt']} (adapter {ident['adapter']})")
+    src = plan.get("source", {})
+    print(
+        f"[collect] model {ident['model']} = {src.get('ckpt')} @ {ident['ckpt_revision']} "
+        f"(adapter {src.get('adapter')} @ {ident['adapter_revision']}), dtype {ident['dtype']}"
+    )
     print(
         f"[collect] layers {len(ident['layers'])}: {n_pg} PaliGemma/emb × {len(GROUPS)} groups × 2048, "
         f"{len(ident['layers']) - n_pg} action expert × {len(ident['ae_steps'])} steps × 1024"
@@ -302,18 +342,23 @@ class PartWriter:
         return {k: str(v.dtype) for k, v in self.arrs.items()}
 
 
-def load_for_collect(ident: dict[str, Any], device: str) -> tuple[Any, Any, Any, dict[str, Any]]:
-    """(policy, preprocessor, postprocessor, inference meta), loaded like lerobot-eval / sc-bench."""
+def load_for_collect(
+    ident: dict[str, Any], device: str, src: dict[str, Any]
+) -> tuple[Any, Any, Any, dict[str, Any]]:
+    """(policy, preprocessor, postprocessor, inference meta), loaded like lerobot-eval / sc-bench, from the
+    exact checkpoint revisions in the plan (`src` = this pod's locations of them), re-verified after loading."""
     from common import load_policy
 
+    ck = pinned_path(src["ckpt"], ident["ckpt_revision"])
+    ad = pinned_path(src["adapter"], ident["adapter_revision"]) if ident["adapter_revision"] else None
+    if bool(src["adapter"]) != bool(ad):
+        raise SystemExit(f"adapter {src['adapter']} vs plan adapter_revision {ident['adapter_revision']}")
     policy, pre, post, *_, inf_meta = load_policy(
-        "pi05",
-        ident["ckpt"],
-        "libero_spatial",
-        n_action_steps=10,
-        device=device,
-        libero_adapter=ident["adapter"],
+        "pi05", ck, "libero_spatial", n_action_steps=10, device=device, libero_adapter=ad
     )
+    verify_pinned(ck, ident["ckpt_revision"])
+    if ad:
+        verify_pinned(ad, ident["adapter_revision"])
     return policy, pre, post, inf_meta
 
 
@@ -346,7 +391,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     if not todo:
         return
     device = "cpu" if args.gpus == "cpu" else "cuda"
-    policy, pre, post, inf_meta = load_for_collect(ident, device)
+    src = resolve_model(args.model, Path(args.out_root))  # this pod's locations of the plan's checkpoints
+    policy, pre, post, inf_meta = load_for_collect(ident, device, src)
     cfg = policy.config
     if cfg.num_inference_steps != N_DENOISE:
         raise SystemExit(f"num_inference_steps {cfg.num_inference_steps} != {N_DENOISE}")
@@ -366,10 +412,12 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
         if is_done(p):
             print(f"[collect] {pid} finished by another writer, skip", flush=True)
             continue
-        if not store.try_lease(parts_dir, pid):
+        lease = store.Lease(parts_dir, pid)
+        if not lease.acquire():
             print(f"[collect] {pid} is being written by another writer (fresh lease), skip", flush=True)
             elsewhere.append(pid)
             continue
+        lease.start_heartbeat()  # keeps the lease fresh through data loading / flushes too
         tmp = parts_dir / f".{pid}.tmp-{store.unique_tag()}"
         try:
             if is_done(p):  # finished between our check and the lease
@@ -393,7 +441,7 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
             n_seen_steps = None
             rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
             for batch in loader:
-                store.refresh_lease(parts_dir, pid)
+                lease.check()  # raises LeaseLostError if the part was taken over
                 bsz = len(batch["task"])
                 ep = batch["episode_index"].numpy()
                 fr = batch["frame_index"].numpy()
@@ -461,6 +509,7 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                     },
                 },
             )
+            lease.check()
             if store.publish_part(tmp, parts_dir / pid):
                 print(
                     f"[collect] {pid}: {pos} timesteps in {secs:.0f}s ({pos / secs:.1f}/s) on {gpu_name}",
@@ -468,9 +517,12 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                 )
             else:
                 print(f"[collect] {pid}: another writer published it first; dropped this copy", flush=True)
+        except store.LeaseLostError as e:
+            print(f"[collect] {pid}: {e}; dropping this copy, the new owner writes the part", flush=True)
+            elsewhere.append(pid)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-            store.release_lease(parts_dir, pid)
+            lease.release()  # only removes the lease file while it still holds our token
     if elsewhere:
         print(
             f"[collect] {len(elsewhere)} parts left to other writers: {elsewhere}; re-run later to pick up "
@@ -512,19 +564,21 @@ def main(argv: list[str] | None = None) -> None:
     out_root = Path(args.out_root)
     gpus = [] if args.gpus == "cpu" else [int(g) for g in str(args.gpus).split(",") if g != ""]
 
+    if args.worker_parts is not None:  # child: uses the plan.json its parent created / verified
+        if not args.acts_dir:
+            raise SystemExit("--worker-parts needs --acts-dir")
+        plan = store.read_plan(Path(args.acts_dir))
+        run_parts(args, plan, Path(args.acts_dir), [int(x) for x in args.worker_parts.split(",")])
+        return
     plan = make_plan(args, out_root)
     acts_dir = Path(args.acts_dir) if args.acts_dir else out_root / "sae" / plan["identity"]["model"] / "acts"
-    if (
-        args.worker_parts is not None
-    ):  # child process: CUDA_VISIBLE_DEVICES and the lock are set by the parent
-        run_parts(args, plan, acts_dir, [int(x) for x in args.worker_parts.split(",")])
-        return
     mine = store.shard_parts(len(plan["parts"]), *args.shard)
     print_dry_run(plan, mine, args, gpus)
     print(f"[collect] out {acts_dir}", flush=True)
     if args.dry_run:
         return
     store.create_or_check_plan(acts_dir / "plan.json", plan)
+    plan = store.read_plan(acts_dir)  # the verified plan on disk is what every writer (and child) uses
     if not gpus:
         run_parts(args, plan, acts_dir, mine)
         print(f"[collect] parts done: {len(store.done_parts(acts_dir))}/{len(plan['parts'])} in {acts_dir}")
@@ -552,6 +606,8 @@ def main(argv: list[str] | None = None) -> None:
                     sys.executable,
                     str(Path(__file__).resolve()),
                     *base,
+                    "--acts-dir",
+                    str(acts_dir),
                     "--worker-parts",
                     ",".join(map(str, sorted(js))),
                 ]

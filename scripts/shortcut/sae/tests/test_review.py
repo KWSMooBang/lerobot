@@ -69,27 +69,165 @@ def test_local_checkpoint_fingerprint_changes_with_weights(tmp_path):
     assert f1.startswith("sha256:") and f1 != f2
 
 
-def test_plan_identity_has_dtype_and_revisions(monkeypatch):
-    monkeypatch.setattr(collect, "checkpoint_fingerprint", lambda c: f"hub:{c}-sha")
-    args = collect.main.__globals__["argparse"].Namespace(
+def test_plan_identity_has_dtype_and_revisions():
+    import argparse
+
+    args = argparse.Namespace(
         model="pi05base", episodes="379", layers="pg:5", ae_steps="all", parts=1, noise_seed=0
     )
     plan = collect.make_plan(args, Path("/outputs/VLA-shortcut-exps"))
     ident = plan["identity"]
-    assert ident["ckpt_revision"] == "hub:lerobot/pi05_base-sha"
-    assert ident["adapter_revision"] == "hub:lerobot/pi05_libero_finetuned-sha"
+    for k in ("ckpt_revision", "adapter_revision"):
+        assert ident[k].startswith("hub:") and len(ident[k]) == 4 + 40
     assert "bfloat16" in ident["dtype"]
+    # re-review 3: no locations in the identity (hub id / mount path live under "source")
+    assert not {"ckpt", "adapter", "dataset_root", "acts_dir"} & set(ident)
+    assert plan["source"]["ckpt"] == "lerobot/pi05_base"
+
+
+# ---------------------------------------------------------------------------- re-review 1: pinned loading
+def _ckpt(dirpath: Path, payload: bytes) -> Path:
+    dirpath.mkdir(parents=True)
+    (dirpath / "config.json").write_text("{}")
+    (dirpath / "model.safetensors").write_bytes(payload)
+    return dirpath
+
+
+def test_load_uses_pinned_local_ckpt_and_reverifies(tmp_path, monkeypatch):
+    import common
+
+    ck = _ckpt(tmp_path / "ck", b"w1")
+    rev = collect.checkpoint_fingerprint.__wrapped__(str(ck))
+    ident = {"ckpt_revision": rev, "adapter_revision": None}
+    seen = {}
+
+    def fake_load(ptype, path, *a, **k):
+        seen["path"] = path
+        return "pol", "pre", "post", None, None, None, {}
+
+    monkeypatch.setattr(common, "load_policy", fake_load)
+    collect.load_for_collect(ident, "cpu", {"ckpt": str(ck), "adapter": None})
+    assert seen["path"] == str(ck)
+
+    # the weights change between planning and loading (or during the load) → refused
+    def swap_then_load(*a, **k):
+        (ck / "model.safetensors").write_bytes(b"w2")
+        return fake_load(*a, **k)
+
+    monkeypatch.setattr(common, "load_policy", swap_then_load)
+    with pytest.raises(SystemExit, match="not mixing weights"):
+        collect.load_for_collect(ident, "cpu", {"ckpt": str(ck), "adapter": None})
+
+
+def test_hub_ckpt_loaded_at_recorded_commit(tmp_path, monkeypatch):
+    import huggingface_hub
+
+    calls = []
+
+    def fake_snapshot(repo, revision=None, **k):
+        calls.append((repo, revision))
+        d = tmp_path / "snapshots" / revision
+        d.mkdir(parents=True, exist_ok=True)
+        return str(d)
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot)
+    sha = "a" * 40
+    path = collect.pinned_path("org/model", "hub:" + sha)
+    assert calls == [("org/model", sha)] and Path(path).name == sha
+    collect.verify_pinned(path, "hub:" + sha)
+    with pytest.raises(SystemExit, match="not mixing weights"):
+        collect.verify_pinned(str(tmp_path / "snapshots" / ("b" * 40)), "hub:" + sha)
+
+
+# ---------------------------------------------------------------------------- re-review 3: paths not compared
+def test_same_ckpt_at_two_mount_paths_same_identity(tmp_path):
+    a = _ckpt(tmp_path / "mntA" / "ck", b"weights")
+    b = _ckpt(tmp_path / "mntB" / "x" / "ck", b"weights")
+    fp = collect.checkpoint_fingerprint.__wrapped__
+    assert fp(str(a)) == fp(str(b))
+    ident = {"model": "m", "ckpt_revision": fp(str(a))}
+    path = tmp_path / "acts" / "plan.json"
+    assert store.create_or_check_plan(path, {"identity": ident, "source": {"ckpt": str(a)}, "parts": []})
+    # another pod, other mount path, same content: accepted
+    assert not store.create_or_check_plan(path, {"identity": ident, "source": {"ckpt": str(b)}, "parts": []})
+
+
+def test_train_config_independent_of_acts_mount_path(tmp_path):
+    import argparse
+    import shutil
+
+    import train
+    from test_sae import fake_acts
+
+    acts = fake_acts(tmp_path / "podA")
+    other = tmp_path / "podB" / "mnt" / "acts"
+    shutil.copytree(acts, other)
+    common = {
+        "input": "pooled_all",
+        "ae_steps": "all",
+        "k_pg": 100,
+        "k_ae": 64,
+        "k_aux": 512,
+        "aux_coef": 1 / 32,
+        "dead_steps": 500,
+        "lr": 1e-4,
+        "batch": 4096,
+        "epochs": 100,
+        "steps": 0,
+        "grad_clip": 1.0,
+        "gm_samples": 10000,
+        "expansion": 1.0,
+        "sae_dir": str(tmp_path / "sae"),
+        "force": False,
+    }
+    ca = train.job_config(argparse.Namespace(acts_dir=str(acts), **common), "pg05", 0)
+    cb = train.job_config(argparse.Namespace(acts_dir=str(other), **common), "pg05", 0)
+    assert ca == cb and "acts_dir" not in ca
 
 
 # ---------------------------------------------------------------------------- 3. per-writer tmp, lease, publish
 def test_lease_fresh_blocks_stale_taken_over(tmp_path):
-    assert store.try_lease(tmp_path, "ep1-2")
-    assert not store.try_lease(tmp_path, "ep1-2")  # another writer, fresh
+    a, b = store.Lease(tmp_path, "ep1-2"), store.Lease(tmp_path, "ep1-2")
+    assert a.acquire()
+    assert not b.acquire()  # another writer, fresh
     old = time.time() - 2 * store.LEASE_TTL_S
     os.utime(store.lease_path(tmp_path, "ep1-2"), (old, old))
-    assert store.try_lease(tmp_path, "ep1-2")  # stale → taken over
-    store.release_lease(tmp_path, "ep1-2")
+    assert b.acquire()  # stale → taken over
+    b.release()
     assert not store.lease_path(tmp_path, "ep1-2").exists()
+
+
+# ---------------------------------------------------------------------------- re-review 4: lease owner token
+def test_lease_owner_token(tmp_path):
+    lp = store.lease_path(tmp_path, "ep1-2")
+    a, b = store.Lease(tmp_path, "ep1-2"), store.Lease(tmp_path, "ep1-2")
+    assert a.acquire() and a.refresh() and a.owned()
+    old = time.time() - 2 * store.LEASE_TTL_S
+    os.utime(lp, (old, old))  # a stalls past the TTL
+    assert b.acquire()  # b takes the part over
+    assert not a.refresh() and a.lost.is_set()
+    with pytest.raises(store.LeaseLostError):
+        a.check()
+    before = lp.read_text()
+    a.release()  # not ours any more: b's lease is left alone
+    assert lp.read_text() == before and b.owned()
+    b.release()
+    assert not lp.exists()
+    # the lease file vanishing between check and touch is "lost", not an exception
+    c = store.Lease(tmp_path, "ep1-2")
+    assert c.acquire()
+    lp.unlink()
+    assert not c.refresh()
+
+
+def test_lease_heartbeat_keeps_it_fresh(tmp_path):
+    a = store.Lease(tmp_path, "ep1-2", ttl=0.5)
+    assert a.acquire()
+    a.start_heartbeat(every=0.05)
+    time.sleep(1.0)  # well past the TTL with no main-loop refresh (e.g. a long data fetch)
+    assert not store.Lease(tmp_path, "ep1-2", ttl=0.5).acquire()
+    a.release()
+    assert store.Lease(tmp_path, "ep1-2", ttl=0.5).acquire()
 
 
 def test_publish_keeps_first_writer(tmp_path):
@@ -101,15 +239,16 @@ def test_publish_keeps_first_writer(tmp_path):
     assert store.publish_part(a, final) and (final / "done.json").read_text() == "A"
     assert not store.publish_part(b, final)
     assert (final / "done.json").read_text() == "A" and not b.exists()
-    # a final dir without done.json (not made by this code) is set aside, not merged into
+    # re-review 2: a final dir without done.json (never made by this code) → clear error, nothing moved
     junk = tmp_path / "ep3-4"
     junk.mkdir()
     (junk / "x").write_text("junk")
     c = tmp_path / ".ep3-4.tmp-C"
     c.mkdir()
     (c / "done.json").write_text("C")
-    assert store.publish_part(c, junk) and (junk / "done.json").read_text() == "C"
-    assert len(list(tmp_path.glob(".ep3-4.stale-*"))) == 1
+    with pytest.raises(SystemExit, match=r"ep3-4 exists without done.json"):
+        store.publish_part(c, junk)
+    assert sorted(x.name for x in junk.iterdir()) == ["x"] and (c / "done.json").exists()
 
 
 # ---------------------------------------------------------------------------- 4. NaN / inf fail the part
@@ -148,7 +287,7 @@ def test_collect_nan_leaves_no_done(tmp_path, monkeypatch):
         return orig(obs, noise)
 
     pol.predict_action_chunk = nan_chunk
-    monkeypatch.setattr(collect, "load_for_collect", lambda i, d: (pol, mock_pre, lambda a: a, {}))
+    monkeypatch.setattr(collect, "load_for_collect", lambda i, d, src: (pol, mock_pre, lambda a: a, {}))
     argv = ["--model", "pi05lib", "--out-root", str(tmp_path), "--episodes", "379", "--parts", "1"]
     argv += ["--gpus", "cpu", "--workers", "0", "--batch", "16", "--layers", "pg:17"]
     with pytest.raises(collect.NonFiniteActivationError):
@@ -164,7 +303,7 @@ def test_train_done_identity_and_force(tmp_path, monkeypatch, capsys):
     from test_collect_mock import MockPolicy, mock_pre
 
     pol = MockPolicy()
-    monkeypatch.setattr(collect, "load_for_collect", lambda i, d: (pol, mock_pre, lambda a: a, {}))
+    monkeypatch.setattr(collect, "load_for_collect", lambda i, d, src: (pol, mock_pre, lambda a: a, {}))
     collect.main(
         [
             "--model",
@@ -294,3 +433,41 @@ def test_stats_use_fp32_codes():
         np.zeros((2, 1), np.int16), np.array([[0.0], [v]], np.float32), np.zeros(2, int), n=1
     )
     assert em["onsets"][0, 0] == 1
+
+
+@needs_data
+def test_worker_child_uses_parent_plan_and_lease_loss_drops_part(tmp_path, monkeypatch, capsys):
+    """re-review 1: a --worker-parts child reads the verified plan.json (no make_plan). re-review 4: a writer
+    whose lease is taken over mid-part drops its copy and leaves the new owner's lease alone."""
+    from test_collect_mock import MockPolicy, mock_pre
+
+    pol = MockPolicy()
+    monkeypatch.setattr(collect, "load_for_collect", lambda i, d, src: (pol, mock_pre, lambda a: a, {}))
+    argv = ["--model", "pi05lib", "--out-root", str(tmp_path), "--episodes", "379", "--parts", "1"]
+    argv += ["--gpus", "cpu", "--workers", "0", "--batch", "16", "--layers", "pg:5"]
+    collect.main(argv)
+    acts = tmp_path / "sae" / "pi05lib" / "acts"
+    pdir = acts / "parts"
+    import shutil
+
+    shutil.rmtree(pdir / "ep00379-00379")
+
+    def no_plan(*a, **k):
+        raise AssertionError("child must not recompute the plan")
+
+    monkeypatch.setattr(collect, "make_plan", no_plan)
+    orig = pol.predict_action_chunk
+
+    def steal(obs, noise):  # another pod takes the lease over during the second batch
+        if obs["frame_index"][0] >= 16:
+            (pdir / "ep00379-00379.lease").write_text(json.dumps({"token": "other-pod"}))
+        return orig(obs, noise)
+
+    pol.predict_action_chunk = steal
+    capsys.readouterr()
+    collect.main([*argv, "--acts-dir", str(acts), "--worker-parts", "0"])
+    log = capsys.readouterr().out
+    assert "lease taken over by another writer" in log and "dropping this copy" in log
+    assert not (pdir / "ep00379-00379").exists()
+    assert json.loads((pdir / "ep00379-00379.lease").read_text())["token"] == "other-pod"
+    assert not list(pdir.glob(".ep00379-00379.tmp-*"))

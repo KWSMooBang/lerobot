@@ -84,25 +84,38 @@ where a key works).
 
 ### Running many pods on one shared acts dir
 
-Pods may overlap (a replacement pod starting before the old one is gone, or two shard specs covering the same
-parts); every pod is often PID 1. Collection is safe under that:
+Assumption: all pods share **one PVC** (same filesystem, with hard links — NFS / CephFS have them; without them
+the scripts stop with an error). Mount paths may differ between pods. Pods may overlap (a replacement pod
+starting before the old one is gone, or two shard specs covering the same parts), and every pod is often PID 1.
+Collection is safe under that:
 
 - `plan.json` is created exclusively (a complete temp file hard-linked into place); a pod that finds it compares
-  the identity and stops if it differs. The identity has the checkpoint id (`hub:<commit sha>` or `sha256:` of a
-  local checkpoint's files), the adapter's, and the inference dtype, besides layers, steps, episodes, parts, seed.
-- a part is claimed with an O_EXCL lease `parts/<part>.lease` (host, pid, time; touched every batch). A fresh
-  lease of another writer → the part is skipped (re-run later to pick it up); a lease not touched for
-  `SC_SAE_LEASE_TTL` s (default 3600) is stale and taken over.
+  the identity and stops if it differs. Multi-GPU worker processes read the verified `plan.json`; they never
+  recompute it.
+- the identity is content only: checkpoint and adapter revisions (`hub:<commit sha>`, or `sha256:` of a local
+  checkpoint's `*.safetensors` + `*.json`), inference dtype, dataset revision, layers, steps, episodes, parts,
+  noise seed. Locations (hub id, mount path of a local checkpoint, dataset root) are kept under `plan.json →
+source` for reference and are not compared. Each pod resolves `--model` to its own location and loads
+  **exactly the recorded revision** (Hub: that commit's snapshot; local: the dir, whose hash must match), and
+  re-checks the revision after loading, so a moved Hub `main` or edited local checkpoint cannot mix weights.
+- a part is claimed with a lease `parts/<part>.lease` holding an owner token (host, pid, token, start). A
+  heartbeat thread touches it during the whole part (also through data loading and flushes) while the main loop
+  checks it every batch and before publishing. A fresh lease of another writer → the part is skipped (re-run
+  later to pick it up); a lease not touched for `SC_SAE_LEASE_TTL` s (default 3600) is stale and taken over by
+  replacing it with a new token. A writer that finds another token in its lease (it stalled past the TTL and
+  the part was taken over) drops its work and never touches the new owner's lease.
 - each writer works in its own `parts/.<part>.tmp-<host>.<pid>.<rand>/` and publishes with one rename; if the
   final part already exists (another writer was first), its own copy is dropped. Its tmp dir and lease are
   removed when it finishes or fails; a killed pod's tmp dir stays behind (safe to delete once its lease is stale).
+  A final part dir without `done.json` is never made by this code; if one exists, collection stops with its
+  path (delete it by hand).
 - NaN/inf in any activation fails the part (no done.json, the run exits non-zero); only finite values beyond the
   fp16 range switch a layer to fp32.
 
 Training: a job is skipped only if its `done.json` was written for the same config — SAE hyperparameters, input,
-ae steps, the collection identity and the exact list of collected parts. A finished job of another config stops
-the run (`--force` retrains it, or use another `--sae-dir`); an unfinished job deletes any old `done.json` before
-training, so a crash never leaves a stale "done".
+ae steps, the collection identity and the exact list of collected parts (not the acts dir path). A finished job
+of another config stops the run (`--force` retrains it, or use another `--sae-dir`); an unfinished job deletes
+any old `done.json` before training, so a crash never leaves a stale "done".
 
 Pod split examples: collection N=8 pods × 4 GPUs = 32 workers over 64 parts (2 parts each). Training: 37 jobs; the
 18 action-expert jobs are 10× bigger (2.7 M samples) than the PaliGemma/emb ones, so `--shard i/2 --gpus 0,1,2,3`
@@ -185,7 +198,7 @@ GPU work for T015, so the times below come from FLOP counts; `smoke.sh` prints t
   group mean vs all-token mean rel. error 1e-9; policy first action vs dataset action L1 0.029.
 - This run found that lerobot calls `gemma_expert.model.forward()` directly, so a hook on the expert model never
   fires; denoising steps are counted on action-expert layer 0 instead (the mock test now calls `.forward()` too).
-- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 30): layer specs, part / shard split, fp16 overflow →
+- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 37): layer specs, part / shard split, fp16 overflow →
   fp32, SAE init / constraints / loss decrease / AuxK / save-load, C.1 hysteresis, interventions on a toy layout
   (`project_out` leaves no v component, `add`, `replace_with` matches the SAE metrics), and a mock π0.5 on the
   real 3-episode LIBERO data through collect (shard 0/2 + 1/2, resume, config clash), reader, train (stop + resume),

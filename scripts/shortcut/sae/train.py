@@ -87,7 +87,6 @@ def job_config(args: argparse.Namespace, layer: str, seed: int) -> dict[str, Any
         "input": "action_tokens_mean" if ae else args.input,
         "ae_steps": ae_steps_list(args) if ae else None,
         "seed": seed,
-        "acts_dir": str(args.acts_dir),
         "acts_identity": store.identity_hash(plan["identity"]),
         "collection_identity": plan["identity"],
         "parts": [p["part_id"] for p in parts],
@@ -313,13 +312,18 @@ def train_job(args: argparse.Namespace, layer: str, seed: int, x: Any, meta: Any
         "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
     }
     np.save(jdir / "fire_freq.npy", fire_freq)
-    sae.save(jdir, extra={k: v for k, v in cfg.items() if k not in ("d", "n_latents", "k", "k_aux")})
+    extra = {k: v for k, v in cfg.items() if k not in ("d", "n_latents", "k", "k_aux")}
+    sae.save(
+        jdir, extra={**extra, "acts_dir": str(args.acts_dir)}
+    )  # where the data was (this pod; not compared)
     if not args.no_stats:
         t1 = time.time()
         metrics["stats"] = run_stats(jdir, sae, x, meta)
         metrics["stats_seconds"] = round(time.time() - t1, 1)
     (jdir / "metrics.json").write_text(json.dumps(metrics, indent=1) + "\n")
-    store.write_json_atomic(jdir / "done.json", {"config": cfg, "metrics": metrics})
+    store.write_json_atomic(
+        jdir / "done.json", {"config": cfg, "metrics": metrics, "acts_dir": str(args.acts_dir)}
+    )
     print(
         f"[train] {layer} seed{seed}: nmse {metrics['nmse']:.4f} var_expl {metrics['var_explained']:.4f} "
         f"dead {metrics['dead_frac_never_fired']:.3f} in {train_sec:.0f}s",

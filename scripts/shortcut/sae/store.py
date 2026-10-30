@@ -13,11 +13,12 @@
     done.json                   identity hash, rows, dtypes, overflow layers, seconds
   parts/.<part_id>.tmp-<host>.<pid>.<rand>/   a writer's private work dir; renamed to parts/<part_id>/ when
                                 complete (done.json inside), so a final part dir is always complete
-  parts/<part_id>.lease         {host, pid, started, ...}: a writer is on this part (mtime refreshed every batch)
+  parts/<part_id>.lease         {host, pid, token, started}: a writer is on this part (heartbeat refreshes mtime)
 
 Several pods may share acts_dir (k8s pods often all have PID 1): temp names carry host + pid + random,
-plan.json is created exclusively (hard link of a complete temp file), a part is claimed with an O_EXCL lease
-and published with a single rename; a writer that finds the final part already there drops its own copy.
+plan.json is created exclusively (hard link of a complete temp file), a part is claimed with an owner-token
+lease and published with a single rename; a writer that finds the final part already there drops its own copy.
+Assumes all pods share one PVC (same filesystem, hard links supported); mount paths may differ.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import hashlib
 import json
 import os
 import socket
+import threading
 import time
 import uuid
 from collections.abc import Sequence
@@ -83,6 +85,20 @@ def write_json_atomic(path: Path, obj: Any) -> None:
     tmp.replace(path)
 
 
+def link_exclusive(src: Path, dst: Path) -> None:
+    """Atomically put the complete file `src` at `dst`; FileExistsError if `dst` exists. Needs hard links
+    (NFS / CephFS PVCs have them); any other failure stops with a clear message instead of racing."""
+    try:
+        os.link(src, dst)
+    except FileExistsError:
+        raise
+    except OSError as e:
+        raise SystemExit(
+            f"cannot hard-link {src} -> {dst} ({e}); the acts dir must be on a filesystem with hard links "
+            "(the pods share one PVC), exclusive creation depends on it"
+        ) from e
+
+
 def create_or_check_plan(path: Path, plan: dict[str, Any]) -> bool:
     """Create plan.json exclusively (complete file hard-linked into place: fails if it exists). If it exists,
     its identity must equal ours. True if this call created it."""
@@ -90,7 +106,7 @@ def create_or_check_plan(path: Path, plan: dict[str, Any]) -> bool:
     tmp = path.with_name(f".{path.name}.tmp-{unique_tag()}")
     tmp.write_text(json.dumps(plan, indent=1) + "\n")
     try:
-        os.link(tmp, path)
+        link_exclusive(tmp, path)
         created = True
     except FileExistsError:
         created = False
@@ -115,40 +131,100 @@ def lease_path(parts_dir: Path, pid: str) -> Path:
     return parts_dir / f"{pid}.lease"
 
 
-def try_lease(parts_dir: Path, pid: str, ttl: float = LEASE_TTL_S) -> bool:
-    """Claim a part. False if another writer holds a fresh lease. A stale lease (not refreshed for `ttl` s,
-    e.g. a killed pod) is taken over."""
-    parts_dir.mkdir(parents=True, exist_ok=True)
-    lp = lease_path(parts_dir, pid)
-    info = {"host": socket.gethostname(), "pid": os.getpid(), "tag": unique_tag(), "started": time.time()}
-    for _ in range(2):
+class LeaseLostError(RuntimeError):
+    pass
+
+
+class Lease:
+    """Owner-token lease on one part: `parts/<part>.lease` = {host, pid, token, started}.
+
+    acquire: exclusive create (complete file hard-linked into place). A lease whose mtime is older than `ttl`
+    (its writer died or stalled) is taken over by an atomic replace, then re-read: only the writer whose token
+    is in the file owns it. refresh / release act only while the file holds our token; a writer that finds
+    another token (it was too slow and the part was taken over) has lost the part and must drop its work.
+    A heartbeat thread refreshes it during long stretches (data loading, flushes) without the main loop.
+    """
+
+    def __init__(self, parts_dir: Path, pid: str, ttl: float = LEASE_TTL_S):
+        self.parts_dir = parts_dir
+        self.path = lease_path(parts_dir, pid)
+        self.ttl = ttl
+        self.token = uuid.uuid4().hex
+        self.lost = threading.Event()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def _info(self, **extra: Any) -> dict[str, Any]:
+        return {
+            "host": socket.gethostname(),
+            "pid": os.getpid(),
+            "token": self.token,
+            "started": time.time(),
+            **extra,
+        }
+
+    def owned(self) -> bool:
         try:
-            fd = os.open(lp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            try:
-                age = time.time() - lp.stat().st_mtime
-            except FileNotFoundError:
-                continue  # released meanwhile: retry the exclusive create
-            if age < ttl:
-                return False
-            # stale: take over by atomic replace; if two writers do this at once, both run and the
-            # part's single rename keeps exactly one result
-            write_json_atomic(lp, {**info, "took_over_after_s": round(age)})
-            return True
-        with os.fdopen(fd, "w") as f:
-            json.dump(info, f)
+            return json.loads(self.path.read_text()).get("token") == self.token
+        except (FileNotFoundError, ValueError):
+            return False
+
+    def acquire(self) -> bool:
+        self.parts_dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_name(f".{self.path.name}.tmp-{unique_tag()}")
+        tmp.write_text(json.dumps(self._info()))
+        try:
+            for _ in range(3):
+                try:
+                    link_exclusive(tmp, self.path)
+                    return True
+                except FileExistsError:
+                    try:
+                        age = time.time() - self.path.stat().st_mtime
+                    except FileNotFoundError:
+                        continue  # released meanwhile: retry the exclusive create
+                    if age < self.ttl:
+                        return False
+                    write_json_atomic(self.path, self._info(took_over_after_s=round(age)))
+                    return (
+                        self.owned()
+                    )  # two takers at once: the last replace wins, the other sees its token gone
+            return False
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def refresh(self) -> bool:
+        if not self.owned():
+            self.lost.set()
+            return False
+        try:
+            os.utime(self.path)
+        except FileNotFoundError:
+            self.lost.set()
+            return False
         return True
-    return False
 
+    def check(self) -> None:
+        if self.lost.is_set() or not self.refresh():
+            raise LeaseLostError(f"{self.path}: lease taken over by another writer")
 
-def refresh_lease(parts_dir: Path, pid: str) -> None:
-    lp = lease_path(parts_dir, pid)
-    if lp.exists():
-        os.utime(lp)
+    def start_heartbeat(self, every: float | None = None) -> None:
+        every = every or max(1.0, min(60.0, self.ttl / 4))
 
+        def beat() -> None:
+            while not self._stop.wait(every):
+                if not self.refresh():
+                    return
 
-def release_lease(parts_dir: Path, pid: str) -> None:
-    lease_path(parts_dir, pid).unlink(missing_ok=True)
+        self._thread = threading.Thread(target=beat, daemon=True, name=f"lease-{self.path.name}")
+        self._thread.start()
+
+    def release(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join()
+        if self.owned():
+            self.path.unlink(missing_ok=True)
 
 
 def publish_part(tmp: Path, final: Path) -> bool:
@@ -156,17 +232,17 @@ def publish_part(tmp: Path, final: Path) -> bool:
     writer finished first), our copy is dropped. True if ours was published."""
     import shutil
 
-    for _ in range(2):
-        try:
-            os.rename(tmp, final)  # fails on an existing non-empty dir
-            return True
-        except OSError:
-            if (final / "done.json").exists():
-                shutil.rmtree(tmp, ignore_errors=True)
-                return False
-            # a final dir without done.json is not made by this code (old layout / manual copy): set it aside
-            final.rename(final.with_name(f".{final.name}.stale-{unique_tag()}"))
-    raise RuntimeError(f"could not publish {tmp} as {final}")
+    try:
+        os.rename(tmp, final)  # fails on an existing non-empty dir
+        return True
+    except OSError as e:
+        if (final / "done.json").exists():
+            shutil.rmtree(tmp, ignore_errors=True)
+            return False
+        raise SystemExit(
+            f"{final} exists without done.json. This code never makes such a dir (parts appear by one rename of a "
+            f"complete dir); inspect and delete it by hand, then re-run. ({e})"
+        ) from e
 
 
 def read_plan(acts_dir: Path) -> dict[str, Any]:

@@ -142,7 +142,7 @@ def mock_loader(monkeypatch):
     monkeypatch.setattr(
         collect,
         "load_for_collect",
-        lambda ident, device: (pol, mock_pre, lambda a: a, {"num_inference_steps": 10}),
+        lambda ident, device, src: (pol, mock_pre, lambda a: a, {"num_inference_steps": 10}),
     )
     return pol
 
