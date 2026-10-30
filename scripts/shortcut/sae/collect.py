@@ -1,0 +1,490 @@
+"""Collect π0.5 residual-stream activations on the LIBERO training data (Swann et al. 2026, App. A.3).
+
+    uv run python scripts/shortcut/sae/collect.py --model pi05lib --dry-run
+    uv run python scripts/shortcut/sae/collect.py --model pi05lib --shard 3/8 --gpus 0,1,2,3
+
+Every dataset frame goes through the policy preprocessor (the one lerobot-train uses: normalization, state
+discretized into the prompt, tokenizer) and `PI05Policy.predict_action_chunk` (prefix once + 10 denoising
+steps, the inference path) with noise seeded by (episode, frame). `hooks.ActivationRecorder` pools the
+residual stream: emb + PaliGemma layers 0-17 per token group (cam1, cam2, text; padding and the empty
+camera excluded; valid-token counts saved), action-expert layers 0-17 per denoising step (action-token
+mean). Layout and reader: `store.py`.
+
+Splitting: the selected episodes are cut into `--parts` contiguous ranges (default 64, independent of how
+the work is distributed). `--shard i/N` takes the i-th of N contiguous blocks of parts (one pod = one shard),
+`--gpus` spreads that shard's parts over local GPUs (one process each). A part is the resume unit: finished
+parts (done.json, same identity) are skipped, unfinished ones are redone.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess  # nosec B404
+import sys
+import time
+from contextlib import ExitStack
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # --gpus = nvidia-smi indices
+SHORTCUT = HERE.parent
+REPO = SHORTCUT.parents[1]
+for p in (str(HERE), str(SHORTCUT), str(SHORTCUT / "train")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+import store  # noqa: E402
+from hooks import GROUPS, layer_dim, layer_family, parse_layers  # noqa: E402
+
+N_DENOISE = 10  # pi05 num_inference_steps (checked against the loaded config)
+# timesteps/s per GPU at batch 32 (measured on GPU 0 by the T015 smoke; A100 = estimate, see README)
+THROUGHPUT = {"RTX 4090": 9.0, "A100": 18.0}
+
+
+def parse_shard(s: str) -> tuple[int, int]:
+    i, n = (int(x) for x in s.split("/"))
+    if not 0 <= i < n:
+        raise argparse.ArgumentTypeError(f"--shard {s}: need 0 <= i < N")
+    return i, n
+
+
+def parse_ae_steps(s: str) -> list[int]:
+    if s == "all":
+        return list(range(N_DENOISE))
+    if s == "none":
+        return []
+    named = {"first": 0, "last": N_DENOISE - 1}
+    out = [named[x.strip()] if x.strip() in named else int(x) for x in s.split(",")]
+    if any(not 0 <= x < N_DENOISE for x in out):
+        raise argparse.ArgumentTypeError(f"--ae-steps {s}: steps are 0-{N_DENOISE - 1}, first, last")
+    return sorted(set(out))
+
+
+def parse_episodes(s: str | None) -> list[int] | None:
+    if not s:
+        return None
+    out: list[int] = []
+    for part in s.split(","):
+        if "-" in part:
+            a, b = part.split("-")
+            out += range(int(a), int(b) + 1)
+        else:
+            out.append(int(part))
+    return sorted(set(out))
+
+
+# ---------------------------------------------------------------------------- model / data
+def resolve_model(name: str, out_root: Path) -> dict[str, Any]:
+    """pi05lib | pi05base | registry id | path | hub id → ckpt + LIBERO adapter (as sc-bench does)."""
+    from bench.core import registry
+
+    reg = registry.registry_path(out_root)
+    initial = {r["ckpt_id"]: r for r in registry.INITIAL_ROWS}
+    if name in initial and name not in registry.read_registry(reg):
+        row: dict[str, Any] = {
+            **initial[name],
+            "adapter": registry.parse_notes(initial[name]["notes"]).get("adapter"),
+        }
+    else:
+        row = registry.resolve(name, reg)
+    adapter = row.get("adapter")
+    if not adapter:
+        from common import POLICY_CKPT, needs_libero_adapter
+
+        adapter = POLICY_CKPT["pi05"] if needs_libero_adapter(row["path_or_hub"]) else None
+    return {"model": row["ckpt_id"], "ckpt": row["path_or_hub"], "adapter": adapter}
+
+
+def dataset_source(out_root: Path) -> tuple[str, Path | None, str]:
+    from sc_train import DATASET_REPO, DATASET_REV, local_dataset_root
+
+    return DATASET_REPO, local_dataset_root(out_root), DATASET_REV
+
+
+def episode_table(out_root: Path) -> pd.DataFrame:
+    from data_variants import suite_of
+
+    from lerobot.datasets import LeRobotDatasetMetadata
+
+    repo, root, rev = dataset_source(out_root)
+    meta = LeRobotDatasetMetadata(repo, root=root, revision=rev)
+    eps = meta.episodes.to_pandas()
+    tasks = meta.tasks.reset_index()
+    df = pd.DataFrame(
+        {
+            "episode_index": eps["episode_index"].astype(int),
+            "length": eps["length"].astype(int),
+            "task": eps["tasks"].map(lambda t: t[0]),
+        }
+    ).merge(tasks[["task", "task_index"]], on="task", how="left")
+    df["suite"] = df["task"].map(suite_of)
+    return df.sort_values("episode_index").reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------- plan
+def bytes_per_timestep(layers: list[str], n_steps: int, fp_bytes: int = 2) -> int:
+    b = 0
+    for name in layers:
+        b += (len(GROUPS) if layer_family(name) == "pg" else n_steps) * layer_dim(name) * fp_bytes
+    return b + len(GROUPS) * 4 + 300  # counts + meta row (approx.)
+
+
+def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
+    eps = episode_table(out_root)
+    want = parse_episodes(args.episodes)
+    if want is not None:
+        missing = sorted(set(want) - set(eps["episode_index"]))
+        if missing:
+            raise SystemExit(f"--episodes: unknown episodes {missing[:10]}")
+        eps = eps[eps["episode_index"].isin(want)]
+    m = resolve_model(args.model, out_root)
+    layers = parse_layers(args.layers)
+    ae_steps = parse_ae_steps(args.ae_steps)
+    repo, root, rev = dataset_source(out_root)
+    identity = {
+        "model": m["model"],
+        "ckpt": m["ckpt"],
+        "adapter": m["adapter"],
+        "dataset": repo,
+        "dataset_revision": rev,
+        "layers": layers,
+        "ae_steps": ae_steps,
+        "episodes": eps["episode_index"].tolist() if want is not None else "all",
+        "n_parts": args.parts,
+        "noise_seed": args.noise_seed,
+        "pooling": "group-mean cam1,cam2,text (pad + empty camera excluded); ae: action-token mean per step",
+    }
+    parts = store.split_parts(eps["episode_index"].tolist(), eps["length"].tolist(), args.parts)
+    lengths = dict(zip(eps["episode_index"], eps["length"], strict=True))
+    plan = {
+        "identity": identity,
+        "parts": [
+            {"part_id": store.part_id(p), "episodes": p, "n_frames": int(sum(lengths[e] for e in p))}
+            for p in parts
+        ],
+        "dataset_root": str(root) if root else None,
+        "groups": list(GROUPS),
+    }
+    return plan
+
+
+def write_or_check_plan(acts_dir: Path, plan: dict[str, Any]) -> None:
+    acts_dir.mkdir(parents=True, exist_ok=True)
+    path = acts_dir / "plan.json"
+    if path.exists():
+        old = json.loads(path.read_text())
+        if old["identity"] != plan["identity"]:
+            diff = {k for k in plan["identity"] if old["identity"].get(k) != plan["identity"][k]}
+            raise SystemExit(
+                f"{path} holds another configuration (differs in {sorted(diff)}); use another --out-root"
+            )
+        return
+    store.write_json_atomic(path, plan)
+
+
+def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespace, gpus: list[int]) -> None:
+    ident = plan["identity"]
+    parts = plan["parts"]
+    n_all = sum(p["n_frames"] for p in parts)
+    n_mine = sum(parts[j]["n_frames"] for j in mine)
+    bpt = bytes_per_timestep(ident["layers"], len(ident["ae_steps"]))
+    n_pg = sum(layer_family(x) == "pg" for x in ident["layers"])
+    print(f"[collect] model {ident['model']} = {ident['ckpt']} (adapter {ident['adapter']})")
+    print(
+        f"[collect] layers {len(ident['layers'])}: {n_pg} PaliGemma/emb × {len(GROUPS)} groups × 2048, "
+        f"{len(ident['layers']) - n_pg} action expert × {len(ident['ae_steps'])} steps × 1024"
+    )
+    print(
+        f"[collect] episodes {sum(len(p['episodes']) for p in parts)}, timesteps {n_all}, parts {len(parts)}"
+    )
+    print(f"[collect] shard {args.shard[0]}/{args.shard[1]}: parts {len(mine)}, timesteps {n_mine}")
+    print(
+        f"[collect] storage fp16: {bpt / 1024:.0f} KB/timestep → shard {n_mine * bpt / 1e9:.1f} GB, "
+        f"all {n_all * bpt / 1e9:.1f} GB"
+    )
+    for gpu, tps in THROUGHPUT.items():
+        print(
+            f"[collect] time on {len(gpus)}× {gpu} (~{tps} ts/s each): shard {n_mine / tps / len(gpus) / 3600:.2f} h, "
+            f"all on 1 GPU {n_all / tps / 3600:.1f} h"
+        )
+
+
+# ---------------------------------------------------------------------------- worker
+def noise_for(episodes: np.ndarray, frames: np.ndarray, shape: tuple[int, int], seed: int) -> Any:
+    import torch
+
+    out = []
+    for e, f in zip(episodes.tolist(), frames.tolist(), strict=True):
+        h = int.from_bytes(hashlib.sha256(f"{seed}:{e}:{f}".encode()).digest()[:8], "little") & (2**63 - 1)
+        out.append(torch.randn(*shape, generator=torch.Generator().manual_seed(h)))
+    return torch.stack(out)
+
+
+class PartWriter:
+    """Memmaps of one part in <part>.tmp/; fp16 unless a layer overflows (then that layer turns fp32)."""
+
+    def __init__(self, tmp: Path, layers: list[str], n_rows: int, n_steps: int):
+        self.tmp = tmp
+        self.n = n_rows
+        self.n_steps = n_steps
+        self.arrs: dict[str, Any] = {}  # np.memmap
+        self.overflow: list[str] = []
+        for name in layers:
+            self.arrs[name] = self._open(name, np.float16)
+        self.counts: Any = np.lib.format.open_memmap(
+            tmp / "counts.npy", "w+", np.int32, (n_rows, len(GROUPS))
+        )
+
+    def _shape(self, name: str) -> tuple[int, ...]:
+        mid = len(GROUPS) if layer_family(name) == "pg" else self.n_steps
+        return (self.n, mid, layer_dim(name))
+
+    def _open(self, name: str, dt: Any) -> Any:
+        return np.lib.format.open_memmap(self.tmp / f"{name}.npy", "w+", dt, self._shape(name))
+
+    def write(self, name: str, rows: slice, x: np.ndarray) -> None:
+        arr = self.arrs[name]
+        if arr.dtype == np.float16 and (not np.isfinite(x).all() or np.abs(x).max() > store.FP16_MAX):
+            print(
+                f"[collect] WARNING {name}: |x| > fp16 max ({np.abs(x).max():.3g}); this layer is stored fp32",
+                flush=True,
+            )
+            old = np.asarray(arr[: rows.start])
+            arr.flush()
+            del self.arrs[name], arr
+            (self.tmp / f"{name}.npy").unlink()
+            arr = self._open(name, np.float32)
+            arr[: rows.start] = old
+            self.arrs[name] = arr
+            self.overflow.append(name)
+        arr[rows] = x
+
+    def close(self) -> dict[str, str]:
+        for a in self.arrs.values():
+            a.flush()
+        self.counts.flush()
+        return {k: str(v.dtype) for k, v in self.arrs.items()}
+
+
+def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, part_idx: list[int]) -> None:
+    import torch
+    from common import load_policy
+    from hooks import ActivationRecorder
+    from torch.utils.data import DataLoader, Subset
+
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+    ident = plan["identity"]
+    want = store.identity_hash(ident)
+    todo = []
+    for j in part_idx:
+        p = plan["parts"][j]
+        d = acts_dir / "parts" / p["part_id"]
+        done = d / "done.json"
+        if done.exists() and json.loads(done.read_text()).get("identity") == want:
+            print(f"[collect] {p['part_id']} done, skip", flush=True)
+            continue
+        todo.append(p)
+    if not todo:
+        return
+    device = "cuda"
+    policy, pre, post, *_, inf_meta = load_policy(
+        "pi05",
+        ident["ckpt"],
+        "libero_spatial",
+        n_action_steps=10,
+        device=device,
+        libero_adapter=ident["adapter"],
+    )
+    cfg = policy.config
+    if cfg.num_inference_steps != N_DENOISE:
+        raise SystemExit(f"num_inference_steps {cfg.num_inference_steps} != {N_DENOISE}")
+    repo, root, rev = dataset_source(Path(args.out_root))
+    my_eps = sorted(e for p in todo for e in p["episodes"])
+    ds = LeRobotDataset(repo, root=root, revision=rev, episodes=my_eps)
+    cols = ds.hf_dataset.select_columns(["index", "episode_index", "frame_index", "task_index"]).to_pandas()
+    cols["rel"] = np.arange(len(cols))
+    from data_variants import suite_of
+
+    gpu_name = torch.cuda.get_device_name(0)
+    for p in todo:
+        t0 = time.time()
+        d = acts_dir / "parts" / p["part_id"]
+        tmp = d.with_name(d.name + ".tmp")
+        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(d, ignore_errors=True)
+        tmp.mkdir(parents=True)
+        rows = cols[cols["episode_index"].isin(p["episodes"])].sort_values(["episode_index", "frame_index"])
+        if len(rows) != p["n_frames"]:
+            raise SystemExit(f"{p['part_id']}: {len(rows)} frames in the data, plan says {p['n_frames']}")
+        writer = PartWriter(tmp, ident["layers"], len(rows), len(ident["ae_steps"]))
+        loader = DataLoader(
+            Subset(ds, rows["rel"].tolist()), batch_size=args.batch, num_workers=args.workers, shuffle=False
+        )
+        meta_rows: list[dict[str, Any]] = []
+        pos = 0
+        n_seen_steps = None
+        rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
+        for batch in loader:
+            bsz = len(batch["task"])
+            ep = batch["episode_index"].numpy()
+            fr = batch["frame_index"].numpy()
+            exp = rows.iloc[pos : pos + bsz]
+            if not (np.array_equal(ep, exp["episode_index"]) and np.array_equal(fr, exp["frame_index"])):
+                raise SystemExit(f"{p['part_id']}: loader order != plan order at row {pos}")
+            raw_action = batch["action"].numpy().copy()
+            obs = pre(batch)
+            noise = noise_for(ep, fr, (cfg.chunk_size, cfg.max_action_dim), ident["noise_seed"])
+            with torch.inference_mode(), rec:
+                chunk = policy.predict_action_chunk(obs, noise=noise.to(device))
+            n_seen_steps = rec.n_steps
+            a0 = post(chunk[:, 0]).float().cpu().numpy()
+            sl = slice(pos, pos + bsz)
+            for name, x in rec.pg.items():
+                writer.write(name, sl, x.cpu().numpy())
+            for name, x in rec.ae.items():
+                writer.write(name, sl, x.cpu().numpy())
+            assert rec.counts is not None
+            writer.counts[sl] = rec.counts.cpu().numpy().astype(np.int32)
+            for i in range(bsz):
+                task = str(batch["task"][i])
+                meta_rows.append(
+                    {
+                        "row": pos + i,
+                        "index": int(batch["index"][i]),
+                        "episode_index": int(ep[i]),
+                        "frame_index": int(fr[i]),
+                        "task_index": int(batch["task_index"][i]),
+                        "suite": suite_of(task),
+                        "instruction": task,
+                        "action": raw_action[i].tolist(),
+                        "policy_action0": a0[i].tolist(),
+                    }
+                )
+            pos += bsz
+            if args.max_batches and pos >= args.max_batches * args.batch:
+                break
+        if n_seen_steps != N_DENOISE:
+            raise SystemExit(f"recorder saw {n_seen_steps} denoising steps, expected {N_DENOISE}")
+        if pos != len(rows):
+            raise SystemExit(
+                f"{p['part_id']}: wrote {pos} rows of {len(rows)} (--max-batches is for debugging)"
+            )
+        dtypes = writer.close()
+        pd.DataFrame(meta_rows).to_parquet(tmp / "meta.parquet", index=False)
+        secs = time.time() - t0
+        store.write_json_atomic(
+            tmp / "done.json",
+            {
+                "identity": want,
+                "part_id": p["part_id"],
+                "episodes": p["episodes"],
+                "rows": pos,
+                "dtypes": dtypes,
+                "overflow_fp32": writer.overflow,
+                "seconds": round(secs, 1),
+                "timesteps_per_s": round(pos / secs, 2),
+                "gpu": gpu_name,
+                "batch": args.batch,
+                "tasks_seen": sorted({int(r["task_index"]) for r in meta_rows}),
+                "inference": {
+                    k: inf_meta[k] for k in ("num_inference_steps", "chunk_size", "dtype") if k in inf_meta
+                },
+            },
+        )
+        tmp.rename(d)
+        print(
+            f"[collect] {p['part_id']}: {pos} timesteps in {secs:.0f}s ({pos / secs:.1f}/s) on {gpu_name}",
+            flush=True,
+        )
+
+
+# ---------------------------------------------------------------------------- main
+def gpu_lock(stack: ExitStack, gpus: list[int], allow_any: bool) -> None:
+    from sc_train import LOCK_DIR, acquire_gpu_locks, gpu_inventory
+
+    if LOCK_DIR.is_dir() and not allow_any and any(g != 0 for g in gpus):
+        raise SystemExit(f"{LOCK_DIR} exists (shared container): only GPU 0 unless --allow-any-gpu")
+    acquire_gpu_locks(stack, gpus, gpu_inventory())
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument(
+        "--model", default="pi05lib", help="pi05lib | pi05base | ckpt_registry id | path | hub id"
+    )
+    ap.add_argument("--out-root", default=os.environ.get("SC_OUT_ROOT", "/outputs/VLA-shortcut-exps"))
+    ap.add_argument("--acts-dir", default=None, help="default <out-root>/sae/<model>/acts")
+    ap.add_argument("--layers", default="all", help="all | emb,pg:0-17,ae:0-17 (default all 37)")
+    ap.add_argument("--ae-steps", default="all", help="all | first,last | 0,5,9")
+    ap.add_argument("--episodes", default=None, help="subset, e.g. 0,500,1000 or 0-9 (smoke)")
+    ap.add_argument("--parts", type=int, default=64, help="episode ranges the data is cut into (resume unit)")
+    ap.add_argument("--shard", type=parse_shard, default=(0, 1), help="i/N: this pod's block of parts")
+    ap.add_argument("--gpus", default="0", help="local GPUs, one worker process each")
+    ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--workers", type=int, default=6, help="dataloader workers per GPU (PNG decoding)")
+    ap.add_argument("--noise-seed", type=int, default=0)
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--allow-any-gpu", action="store_true")
+    ap.add_argument("--max-batches", type=int, default=0, help=argparse.SUPPRESS)
+    ap.add_argument("--worker-parts", default=None, help=argparse.SUPPRESS)
+    args = ap.parse_args(argv)
+    out_root = Path(args.out_root)
+    gpus = [int(g) for g in str(args.gpus).split(",") if g != ""]
+
+    plan = make_plan(args, out_root)
+    acts_dir = Path(args.acts_dir) if args.acts_dir else out_root / "sae" / plan["identity"]["model"] / "acts"
+    if (
+        args.worker_parts is not None
+    ):  # child process: CUDA_VISIBLE_DEVICES and the lock are set by the parent
+        run_parts(args, plan, acts_dir, [int(x) for x in args.worker_parts.split(",")])
+        return
+    mine = store.shard_parts(len(plan["parts"]), *args.shard)
+    print_dry_run(plan, mine, args, gpus)
+    print(f"[collect] out {acts_dir}", flush=True)
+    if args.dry_run:
+        return
+    write_or_check_plan(acts_dir, plan)
+    with ExitStack() as stack:
+        gpu_lock(stack, gpus, args.allow_any_gpu)
+        if len(gpus) == 1:
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpus[0])
+            run_parts(args, plan, acts_dir, mine)
+        else:
+            # greedy: biggest part to the least-loaded GPU
+            load = dict.fromkeys(gpus, 0)
+            assign: dict[int, list[int]] = {g: [] for g in gpus}
+            for j in sorted(mine, key=lambda j: -plan["parts"][j]["n_frames"]):
+                g = min(load, key=load.__getitem__)
+                assign[g].append(j)
+                load[g] += plan["parts"][j]["n_frames"]
+            procs = []
+            base = list(argv if argv is not None else sys.argv[1:])
+            for g, js in assign.items():
+                if not js:
+                    continue
+                env = {**os.environ, "CUDA_VISIBLE_DEVICES": str(g)}
+                cmd = [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    *base,
+                    "--worker-parts",
+                    ",".join(map(str, sorted(js))),
+                ]
+                procs.append((g, subprocess.Popen(cmd, env=env)))  # nosec B603
+            bad = [g for g, pr in procs if pr.wait() != 0]
+            if bad:
+                raise SystemExit(f"[collect] workers on GPUs {bad} failed; re-run the same command to resume")
+    n_done = len(store.done_parts(acts_dir))
+    print(f"[collect] parts done: {n_done}/{len(plan['parts'])} in {acts_dir}", flush=True)
+
+
+if __name__ == "__main__":
+    main()
