@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import store
 import torch
 
 HERE = Path(__file__).resolve().parent
@@ -170,7 +171,7 @@ def run_stats(
         "median_ep_coverage": float(feats_df["ep_coverage"].median()),
         "median_mean_onsets": float(feats_df["mean_onsets"].median()),
     }
-    log(f"[stats] {job_dir}: {json.dumps(summary)}")
+    log(f"[stats] {job_dir}: {store.dumps(summary)}")
     return summary
 
 

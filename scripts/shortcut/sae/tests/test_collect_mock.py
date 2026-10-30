@@ -36,6 +36,12 @@ pytestmark = pytest.mark.skipif(
 )
 EPS = "379,807,1261"  # goal, object, spatial (365 frames)
 IMG_TOK, TXT_LEN = 4, 12
+GPU_INF_META = {
+    "num_inference_steps": 10,
+    "chunk_size": 5,
+    "dtype": torch.bfloat16,
+    "device": torch.device("cpu"),
+}
 D_PG, D_AE = 2048, 1024
 
 
@@ -142,7 +148,8 @@ def mock_loader(monkeypatch):
     monkeypatch.setattr(
         collect,
         "load_for_collect",
-        lambda ident, device, src: (pol, mock_pre, lambda a: a, {"num_inference_steps": 10}),
+        # GPU-path inference meta: common.load_policy puts the config's torch.dtype object here
+        lambda ident, device, src: (pol, mock_pre, lambda a: a, GPU_INF_META),
     )
     return pol
 

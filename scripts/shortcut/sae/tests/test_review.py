@@ -23,6 +23,7 @@ import smoke  # noqa: E402
 import store  # noqa: E402
 from model import SAEConfig, TopKSAE  # noqa: E402
 from stats import encode_all, episode_metrics  # noqa: E402
+from test_collect_mock import mock_loader  # noqa: E402,F401  (fixture)
 
 
 # ---------------------------------------------------------------------------- 1. plan.json race, PID 1 pods
@@ -502,3 +503,55 @@ def test_worker_child_uses_parent_plan_and_lease_loss_drops_part(tmp_path, monke
     assert not (pdir / "ep00379-00379").exists()
     assert json.loads((pdir / "ep00379-00379.lease").read_text())["token"] == "other-pod"
     assert not list(pdir.glob(".ep00379-00379.tmp-*"))
+
+
+# ---------------------------------------------------------------------------- server smoke 2026-10-31
+@needs_data
+def test_collect_done_json_with_torch_dtype_meta(tmp_path, mock_loader):  # noqa: F811 (fixture)
+    """GPU path: load_policy's meta has dtype=torch.bfloat16 (an object, not a str) → done.json must still be
+    written (it raised TypeError: Object of type dtype is not JSON serializable)."""
+    argv = ["--model", "pi05lib", "--out-root", str(tmp_path), "--episodes", "379", "--parts", "1"]
+    argv += ["--gpus", "cpu", "--workers", "0", "--batch", "32", "--layers", "pg:5"]
+    collect.main(argv)
+    (part,) = store.done_parts(tmp_path / "sae" / "pi05lib" / "acts")
+    assert part["inference"] == {"num_inference_steps": 10, "chunk_size": 5, "dtype": "torch.bfloat16"}
+
+
+def test_json_default_handles_torch_numpy_path(tmp_path):
+    obj = {
+        "dtype": torch.bfloat16,
+        "dev": torch.device("cpu"),
+        "p": tmp_path,
+        "n": np.float32(0.5),
+        "i": np.int64(3),
+        "a": np.arange(3),
+        "t": torch.tensor([1.0, 2.0]),
+    }
+    back = json.loads(store.dumps(obj))
+    assert back == {
+        "dtype": "torch.bfloat16",
+        "dev": "cpu",
+        "p": str(tmp_path),
+        "n": 0.5,
+        "i": 3,
+        "a": [0, 1, 2],
+        "t": [1.0, 2.0],
+    }
+    store.write_json_atomic(tmp_path / "x.json", obj)
+    assert json.loads((tmp_path / "x.json").read_text())["dtype"] == "torch.bfloat16"
+    sae = TopKSAE(SAEConfig(d=4, n_latents=4, k=1), seed=0)
+    sae.save(tmp_path / "sae", extra={"dtype": torch.bfloat16, "acts_dir": tmp_path})
+    assert json.loads((tmp_path / "sae" / "config.json").read_text())["dtype"] == "torch.bfloat16"
+
+
+def test_fingerprint_offline_reads_cache_refs(tmp_path, monkeypatch):
+    from huggingface_hub import constants
+
+    monkeypatch.setattr(constants, "HF_HUB_OFFLINE", True)
+    monkeypatch.setattr(constants, "HF_HUB_CACHE", str(tmp_path))
+    ref = tmp_path / "models--org--model" / "refs" / "main"
+    ref.parent.mkdir(parents=True)
+    ref.write_text("c" * 40 + "\n")
+    assert collect.checkpoint_fingerprint.__wrapped__("org/model") == "hub:" + "c" * 40
+    with pytest.raises(SystemExit, match="HF_HUB_OFFLINE=1 and no cached revision for org/other"):
+        collect.checkpoint_fingerprint.__wrapped__("org/other")

@@ -28,6 +28,7 @@ for p in (str(HERE), str(HERE.parent), str(HERE.parent / "train")):
         sys.path.insert(0, p)
 
 import numpy as np  # noqa: E402
+import store  # noqa: E402
 import torch  # noqa: E402
 from collect import dataset_source, gpu_lock, noise_for, resolve_model  # noqa: E402
 from hooks import ActivationRecorder, add, ae_layers, all_layers, pg_layers, project_out  # noqa: E402
@@ -65,8 +66,8 @@ def bench_sae(out: Path, steps: int = 200) -> dict:
         total_steps = 100 * -(-n_samples // 4096)
         res[fam] = {"sec_per_step": sec, "steps_100_epochs": total_steps, "hours": sec * total_steps / 3600}
     res["gpu"] = torch.cuda.get_device_name(0)
-    print(json.dumps(res, indent=1))
-    (out / "sae_bench.json").write_text(json.dumps(res, indent=1) + "\n")
+    print(store.dumps(res, indent=1))
+    (out / "sae_bench.json").write_text(store.dumps(res, indent=1) + "\n")
     return res
 
 
@@ -101,7 +102,6 @@ def hook_checks(res: dict) -> dict[str, bool]:
 def summarize(out: Path, model: str) -> bool:
     """PASS/FAIL of every smoke.sh step + full-scale estimates from the measured numbers → summary.json."""
     import pandas as pd
-    import store
     from collect import bytes_per_timestep
 
     checks: dict[str, bool] = {}
@@ -174,12 +174,12 @@ def summarize(out: Path, model: str) -> bool:
             "all_37_layers_1gpu": round(19 * bench["pg"]["hours"] + 18 * bench["ae"]["hours"], 1),
         }
     ok = all(checks.values())
-    print(json.dumps({"checks": checks, "estimates": est}, indent=1))
+    print(store.dumps({"checks": checks, "estimates": est}, indent=1))
     for k, v in checks.items():
         print(f"  {'PASS' if v else 'FAIL'}  {k}")
     print("T015 SMOKE", "PASS" if ok else "FAIL")
     (out / "summary.json").write_text(
-        json.dumps({"pass": ok, "checks": checks, "estimates": est}, indent=1) + "\n"
+        store.dumps({"pass": ok, "checks": checks, "estimates": est}, indent=1) + "\n"
     )
     return ok
 
@@ -362,11 +362,11 @@ def main() -> None:
         res["post_action0_vs_dataset_l1"] = float(
             (post(a_plain[:, 0]).float().cpu() - batch["action"].float()).abs().mean()
         )
-    print(json.dumps(res, indent=1))
-    (out / "hook_check.json").write_text(json.dumps(res, indent=1) + "\n")
+    print(store.dumps(res, indent=1))
+    (out / "hook_check.json").write_text(store.dumps(res, indent=1) + "\n")
     res["checks"] = hook_checks(res)
     res["pass"] = ok = all(res["checks"].values())
-    (out / "hook_check.json").write_text(json.dumps(res, indent=1) + "\n")
+    (out / "hook_check.json").write_text(store.dumps(res, indent=1) + "\n")
     for k, v in res["checks"].items():
         print(f"  {'PASS' if v else 'FAIL'}  {k}")
     print("HOOK CHECK", "PASS" if ok else "FAIL")

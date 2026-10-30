@@ -42,8 +42,28 @@ PG_INPUTS = ("pooled_all", "img", "text", "cam1", "cam2")
 FP16_MAX = 65504.0
 
 
+def json_default(o: Any) -> Any:
+    """JSON for objects the policy / numpy / torch hand us: torch.dtype ('torch.bfloat16' on GPU paths, where
+    configs hold dtype objects), torch.device, Path, numpy scalars / arrays, small tensors. Anything else: str."""
+    import torch
+
+    if isinstance(o, np.generic):
+        return o.item()
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    if isinstance(o, torch.Tensor):
+        return o.tolist() if o.numel() <= 64 else f"<tensor {tuple(o.shape)} {o.dtype}>"
+    if isinstance(o, (set, frozenset)):
+        return sorted(o, key=str)
+    return str(o)  # torch.dtype, torch.device, Path, enums, ...
+
+
+def dumps(obj: Any, **kw: Any) -> str:
+    return json.dumps(obj, default=json_default, **kw)
+
+
 def identity_hash(identity: dict[str, Any]) -> str:
-    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
+    return hashlib.sha256(dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
 
 
 def part_id(episodes: Sequence[int]) -> str:
@@ -81,7 +101,7 @@ def unique_tag() -> str:
 
 def write_json_atomic(path: Path, obj: Any) -> None:
     tmp = path.with_name(f".{path.name}.tmp-{unique_tag()}")
-    tmp.write_text(json.dumps(obj, indent=1) + "\n")
+    tmp.write_text(dumps(obj, indent=1) + "\n")
     tmp.replace(path)
 
 
@@ -104,7 +124,7 @@ def create_or_check_plan(path: Path, plan: dict[str, Any]) -> bool:
     its identity must equal ours. True if this call created it."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.tmp-{unique_tag()}")
-    tmp.write_text(json.dumps(plan, indent=1) + "\n")
+    tmp.write_text(dumps(plan, indent=1) + "\n")
     try:
         link_exclusive(tmp, path)
         created = True
@@ -176,7 +196,7 @@ class Lease:
     def acquire(self) -> bool:
         self.parts_dir.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(f".{self.path.name}.tmp-{unique_tag()}")
-        tmp.write_text(json.dumps(self._info()))
+        tmp.write_text(dumps(self._info()))
         try:
             for _ in range(3):
                 try:

@@ -62,6 +62,18 @@ uv run python scripts/shortcut/sae/collect.py --model pi05lib --shard $I/8 --gpu
 uv run python scripts/shortcut/sae/train.py --model pi05lib --layers all --shard $I/4 --gpus 0,1,2,3
 ```
 
+Server notes (from the first server smoke, 2026-10-31):
+
+- `HF_HUB_OFFLINE=1` works once the checkpoints are in the HF cache: the checkpoint revision is then read from
+  `<HF cache>/models--<org>--<name>/refs/main` (no Hub call); if it is not cached, collection stops and says so.
+- `uv sync` on a host with CMake 4 fails building `egl-probe` (LIBERO dependency); run it as
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5 uv sync ...` (or export it before `setup_server.sh`).
+- torchcodec's warning that FFmpeg libraries cannot be loaded is harmless here: the LIBERO frames are PNG in parquet
+  and video decoding falls back to pyav.
+- JSON outputs (`done.json`, `config.json`, `metrics.json`, ...) go through `store.dumps`, which writes torch dtypes /
+  devices, paths and numpy scalars as strings or numbers (on the GPU path the policy config's `dtype` is a
+  `torch.dtype` object; the first smoke failed on it).
+
 The shared dev container does not run GPU work for T015 (smoke.sh refuses where `/queue/locks` exists). If the
 scripts are run there anyway, they flock the GPU and accept only GPU 0 unless `--allow-any-gpu`; `--gpus cpu`
 runs collection / training on the CPU (tests). Without `/queue` nothing is locked.
@@ -201,7 +213,7 @@ GPU work for T015, so the times below come from FLOP counts; `smoke.sh` prints t
   group mean vs all-token mean rel. error 1e-9; policy first action vs dataset action L1 0.029.
 - This run found that lerobot calls `gemma_expert.model.forward()` directly, so a hook on the expert model never
   fires; denoising steps are counted on action-expert layer 0 instead (the mock test now calls `.forward()` too).
-- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 38): layer specs, part / shard split, fp16 overflow →
+- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 41): layer specs, part / shard split, fp16 overflow →
   fp32, SAE init / constraints / loss decrease / AuxK / save-load, C.1 hysteresis, interventions on a toy layout
   (`project_out` leaves no v component, `add`, `replace_with` matches the SAE metrics), and a mock π0.5 on the
   real 3-episode LIBERO data through collect (shard 0/2 + 1/2, resume, config clash), reader, train (stop + resume),
