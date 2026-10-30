@@ -46,6 +46,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - C9 (vision-only 학습) 는 선택, 보류
 
 ## GPU 예산
+- **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
   (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
 - P2 범위 결정 대기 (2026-10-26, 사람에게 질문). T001 smoke 실측 (RTX 4090, GPU 0): ≈45 ms/step, 모델 로드 60–90 s/run.
