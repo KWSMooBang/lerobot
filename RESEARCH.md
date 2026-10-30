@@ -54,6 +54,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- **SAE 분석 (T015 뒤)**: 참고 arXiv 2603.19183 (π0.5 PG5 위주, mean-pool, TopK+AuxK ER=1). 후보: feature 별 지시/장면 민감도 (C0 vs C4/C5/C1 같은 init), shortcut feature ablation·steering 으로 SR_new 변화, 패치 단위 위치 feature (H4), 층별 지시문 정보 소실, base vs finetune diffing, generality 비율 ↔ testbed shortcut 점수 상관 (T011 변형), 대조군 (norm·빈도 맞춘 무작위 방향 ablation, splice-in 성공률).
 - **T014 Object 조건 반영 (T009 뒤)**: 문서 "Shortcut Testbed 설계" > 테스트 예시 > "Object 에서의 C0–C8" (다른 세션 작성, 2026-10-28). C4-a·b·c 는 instruction 세트와 같음. 바꿀 것: C6 = 장면에 없고 반대쪽 대상 자리에서 학습한 물체의 문장 (지금 cross_task 는 다음 태스크 = C4 와 같은 문장), C7 = 두 대상 자리 물체 맞바꿈, C8 = 대상 제거 (init state free joint 편집), 물체별 In(basket) + 첫 파지로 장면/문장 자리/지시/그 밖 4분류. Object quick = C0·C1·C4 (+C7).
 - **LIBERO-Plus·PRO 도 MuJoCo 3.8.1 + 자체 config → T009 수정 미적용, 같은 렌더·튕김 문제 가능성** (T009 병합 후 확인).
 - ~~평가 환경 ≠ 학습 데이터~~ → T009 병합으로 해결 (아래 결정 로그). Object·LIBERO-10 평가 가능. 이후 run 은 run_meta.libero_env 로 raw/fix 구분: LIBERO-10 t0·t1·t7 (LIVING_ROOM_SCENE1/2) 은 평가 렌더에서 milk·orange juice·ketchup 이 테이블 위에 없음 (sim z≈0.9–1.05 m), Object 는 바닥 텍스처·조명이 다름. Spatial·Goal 은 일치. 원인(자산·BDDL 버전) 조사 후 Object·LIBERO-10 평가.
@@ -93,3 +94,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-28 T012 병합 (e086ef9f), T013 병합 (a621c4c2). testbed = ours + LIBERO-Plus + LIBERO-PRO. 벤치마크 venv 는 아직 L2 worktree 안에 있음 (Plus 12 GB, PRO 2.4 GB) → quick 을 돌리는 checkout 에서 setup 필요.
 - 2026-10-29 T009 [DONE]: 원인은 MuJoCo 버전 (lerobot 3.8.1 vs 학습 데이터 ≤3.3.2; ≥3.3.3 sRGB → Object 바닥·salad dressing 어두움, ≥3.4 box-box 침투 → L10 t0·t1·t7 물체 튕김). 자산·init mirror 로 40 task 일치 27→40/40, Spatial·Goal 바이트 동일 (P1 비교 유지). P1 은 raw env 결과. codex 수정 요청 중.
 - 2026-10-29 T009 병합 (7bc7a64f, exp/sc-env-fix fbfb6553; T008 시각화 코드 함께 병합). 기본 = fix env, SC_LIBERO_RAW=1 = P1 env. run_meta·resume identity·ours bench_version 에 libero_env 기록 (없으면 raw), raw↔fix resume 양방향 거부. codex 리뷰 3회 (blocking 3건 수정). mypy 는 기존 파일(p1_videos·train_overlap·train_data_*) 에러로 실패 상태.
+- 2026-10-30 사람 지시: π0.5 모든 층 SAE. 이 컨테이너에서는 구현 + GPU 0 smoke 만 (T015, exp/sc-sae), 병합 뒤 전체 activation 수집·SAE 학습은 baccus-VLA-shortcut-exps 세션이 kubectl 서버에서. 기본: PaliGemma 0–17 + embedding (카메라·텍스트 그룹별 평균 저장) + action expert 0–17 (denoising step 별), 논문 B.1 설정.
