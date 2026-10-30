@@ -149,11 +149,13 @@ class ActivationRecorder:
                 images, img_masks, tokens, masks, states, state_masks
             )
             self._layout = self._build_layout(pad_masks, int(tokens.shape[1]))
+            self.counts = self._layout.counts
             self._step = -1
             self.pg, self._ae = {}, {}
             return embs, pad_masks, att_masks
 
-        self._orig = {"_embed_images": orig_embed_images, "embed_prefix": orig_embed_prefix}
+        # instance attributes that were there before (another wrapper), restored on detach
+        self._orig = {k: model.__dict__.get(k) for k in ("_embed_images", "embed_prefix")}
         model._embed_images = embed_images
         model.embed_prefix = embed_prefix
 
@@ -182,7 +184,6 @@ class ActivationRecorder:
             raise RuntimeError("PaliGemma hook fired before embed_prefix")
         sums = torch.einsum("bgl,bld->bgd", lay.group_masks, h.float())
         self.pg[name] = sums / lay.counts.clamp_min(1).unsqueeze(-1)
-        self.counts = lay.counts
 
     def attach(self) -> ActivationRecorder:
         self._wrap_prefix()
@@ -211,16 +212,20 @@ class ActivationRecorder:
         def count_step(_m, _a, _k):
             self._step += 1
 
-        expert = self.model.paligemma_with_expert.gemma_expert.model
-        self.handles.append(expert.register_forward_pre_hook(count_step, with_kwargs=True))
+        # one denoising step = one pass through the expert's layers. lerobot calls
+        # `gemma_expert.model.forward(...)` directly (module hooks on the model would not fire), so count on layer 0
+        self.handles.append(ae_layers(self.policy)[0].register_forward_pre_hook(count_step, with_kwargs=True))
         return self
 
     def detach(self) -> None:
         for h in self.handles:
             h.remove()
         self.handles = []
-        for k, _v in self._orig.items():
-            self.model.__dict__.pop(k, None)  # back to the class methods
+        for k, prev in self._orig.items():
+            if prev is None:
+                self.model.__dict__.pop(k, None)  # back to the class method
+            else:
+                self.model.__dict__[k] = prev
         self._orig = {}
 
     def __enter__(self) -> ActivationRecorder:

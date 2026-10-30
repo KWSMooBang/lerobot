@@ -5,16 +5,17 @@ Features in VLA Models" (arXiv 2603.19183): App. A.3 (activation collection), B.
 C.1 (feature metrics), F.2 (steering). This version covers **every layer** (emb + PaliGemma 0–17 + action
 expert 0–17 = 37 SAEs) and keeps the token groups apart.
 
-| file          | what                                                                                                       |
-| ------------- | ---------------------------------------------------------------------------------------------------------- |
-| `hooks.py`    | layer names, `ActivationRecorder` (pooled recording), interventions `add`, `project_out`, `replace_with`   |
-| `collect.py`  | dataset frames → policy preprocessor → `predict_action_chunk` with the recorder → fp16 memmap parts        |
-| `store.py`    | on-disk layout, part splitting, `load_layer()` reader (pooled inputs)                                      |
-| `model.py`    | `TopKSAE` (TopK + AuxK, pre-bias, per-sample normalization, unit-norm decoder, tangent-plane grads)        |
-| `train.py`    | one SAE per (layer, seed), GPUs / pods split the jobs, resume, W&B offline + `log.jsonl`, then `stats.py`  |
-| `stats.py`    | sparse codes of every timestep, C.1 metrics per feature, firing rate per suite / task                      |
-| `smoke.py`    | GPU checks of the hook location on the real model (`hook_check.json`)                                      |
-| `tests/`      | CPU tests: `uv run pytest scripts/shortcut/sae/tests -q`                                                   |
+| file         | what                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `hooks.py`   | layer names, `ActivationRecorder` (pooled recording), interventions `add`, `project_out`, `replace_with`      |
+| `collect.py` | dataset frames → policy preprocessor → `predict_action_chunk` with the recorder → fp16 memmap parts           |
+| `store.py`   | on-disk layout, part splitting, `load_layer()` reader (pooled inputs)                                         |
+| `model.py`   | `TopKSAE` (TopK + AuxK, pre-bias, per-sample normalization, unit-norm decoder, tangent-plane grads)           |
+| `train.py`   | one SAE per (layer, seed), GPUs / pods split the jobs, resume, W&B offline + `log.jsonl`, then `stats.py`     |
+| `stats.py`   | sparse codes of every timestep, C.1 metrics per feature, firing rate per suite / task                         |
+| `smoke.sh`   | server GPU smoke in one command: hook checks, 3-episode collection, 2 SAEs, timing → PASS/FAIL + estimates    |
+| `smoke.py`   | hook checks on the real model (`hook_check.json`), SAE step timing, `--summarize`                             |
+| `tests/`     | CPU tests (`test_sae.py`: SAE, stats, interventions; `test_collect_mock.py`: mock π0.5 on real LIBERO frames) |
 
 ## Hook location
 
@@ -28,11 +29,11 @@ is bit-identical to layer L+1's input and layer 17's output to the final norm's 
 per timestep) and the action expert (10 calls); `emb` (pre-hook on PaliGemma layer 0) is the `embed_prefix`
 output in bf16; the action with every hook attached is bit-identical to the one without.
 
-| name   | where                                                      | d    | stored per timestep                       |
-| ------ | ---------------------------------------------------------- | ---- | ----------------------------------------- |
-| `emb`  | input of PaliGemma layer 0 (image + text embeddings)       | 2048 | 3 group means (cam1, cam2, text) + counts |
-| `pgNN` | output of PaliGemma layer NN, 0–17                         | 2048 | same                                      |
-| `aeNN` | output of action-expert layer NN, 0–17, each denoising step | 1024 | mean of the 50 action tokens, per step   |
+| name   | where                                                       | d    | stored per timestep                       |
+| ------ | ----------------------------------------------------------- | ---- | ----------------------------------------- |
+| `emb`  | input of PaliGemma layer 0 (image + text embeddings)        | 2048 | 3 group means (cam1, cam2, text) + counts |
+| `pgNN` | output of PaliGemma layer NN, 0–17                          | 2048 | same                                      |
+| `aeNN` | output of action-expert layer NN, 0–17, each denoising step | 1024 | mean of the 50 action tokens, per step    |
 
 Token groups (prefix = 3 × 256 image tokens + 200 text tokens): cam1 = `observation.images.image`
 (agentview), cam2 = `observation.images.image2` (wrist), text = instruction + discretized state + `Action:`
@@ -47,7 +48,10 @@ mean over all tokens is the count-weighted mean of the three groups (`store.pool
 SC_OUT_ROOT=/data/sc scripts/shortcut/setup_server.sh --gpus 0,1,2,3
 export SC_OUT_ROOT=/data/sc          # outputs go to $SC_OUT_ROOT/sae/<model>/
 
-# 2. plan: timesteps, storage, time
+# 2. smoke (one GPU, ~10 min): PASS/FAIL per check + measured timesteps/s → full-run hours and GB
+scripts/shortcut/sae/smoke.sh --out-root $SC_OUT_ROOT/smoke/T015 --gpu 0
+
+# 2b. plan: timesteps, storage, time (time uses the THROUGHPUT table in collect.py; update it from step 2)
 uv run python scripts/shortcut/sae/collect.py --model pi05lib --dry-run
 
 # 3. collect: one pod per shard (N=8 here), all GPUs of the pod; re-run the same command to resume
@@ -57,14 +61,17 @@ uv run python scripts/shortcut/sae/collect.py --model pi05lib --shard $I/8 --gpu
 uv run python scripts/shortcut/sae/train.py --model pi05lib --layers all --shard $I/4 --gpus 0,1,2,3
 ```
 
-In this container `/queue/locks` exists: both scripts flock the GPU and accept only GPU 0 unless
-`--allow-any-gpu`. Without `/queue` nothing is locked.
+The shared dev container does not run GPU work for T015 (smoke.sh refuses where `/queue/locks` exists). If the
+scripts are run there anyway, they flock the GPU and accept only GPU 0 unless `--allow-any-gpu`; `--gpus cpu`
+runs collection / training on the CPU (tests). Without `/queue` nothing is locked.
 
 Collection options: `--layers` (default all 37), `--ae-steps all|first,last|0,5,9` (default all 10),
 `--episodes 0-9` (smoke), `--parts 64` (resume unit; same for every pod count), `--batch 32`,
 `--workers 6` (PNG decoding), `--model pi05lib|pi05base|<ckpt_registry id>|<path>` (pi05base gets the LIBERO
 adapter as in sc-bench). Noise for the denoising loop is seeded by (episode, frame), so a timestep gives the
-same activations in any shard / batch layout (up to bf16 batch-size effects).
+same activations in any shard / batch layout (up to bf16 batch-size effects). Each worker opens the dataset
+filtered to its episodes; `datasets` writes an Arrow copy of those rows into `$HF_DATASETS_CACHE` (in total
+about the size of the parquet data, ~35 GB, once per node).
 
 Training options: `--layers all|emb|pg:0-17|ae:0-17`, `--input pooled_all|img|text|cam1|cam2`
 (PaliGemma/emb), `--ae-steps all|0,9` (action expert: which recorded steps are samples; all together by
@@ -130,12 +137,33 @@ with replace_with(policy, "pg05", sae):
 Applied to every token of every call: PaliGemma layers run once per query and reach every denoising step through
 the KV cache; action-expert layers are hit at each of the 10 steps. Rollouts with steering are not part of T015.
 
-## Estimates
+## Estimates (computed, not measured: confirm with `smoke.sh` on the server)
 
-Full LIBERO (1,693 episodes, 273,465 timesteps), all 37 layers, all 10 denoising steps:
+Full LIBERO (1,693 episodes, 273,465 timesteps), all 37 layers, all 10 denoising steps. The dev container ran no
+GPU work for T015, so the times below come from FLOP counts; `smoke.sh` prints the measured values
+(`summary.json → estimates`), and the `THROUGHPUT` table in `collect.py` (used by `--dry-run`) should be updated from them.
 
 - storage: 588 KB/timestep fp16 → **~165 GB** (PaliGemma+emb 19 × 3 × 2048 × 2 B = 233 KB, action expert
-  18 × 10 × 1024 × 2 B = 369 KB). `--ae-steps first,last` → ~74 GB; trained SAE codes + stats add ~2 GB per input.
-- collection time: see the T015 smoke numbers below.
+  18 × 10 × 1024 × 2 B = 369 KB). `--ae-steps first,last` → ~74 GB. Per SAE, codes + stats: PaliGemma ~0.1 GB,
+  action expert (2.7 M samples) ~0.7 GB.
+- collection: ~4.8 TFLOP per timestep (Gemma-2B prefix of 968 tokens ≈ 3.9, SigLIP on 3 images ≈ 0.6, 10 expert
+  steps ≈ 0.3). At ~40 % of the bf16 peak: **A100 ~25 timesteps/s → ~3 h on one GPU**, 8 pods × 4 A100 → ~6 min
+  of compute per pod plus model load. RTX 4090 ~7/s → ~11 h on one GPU.
+- SAE training (100 epochs, batch 4096, fp32): PaliGemma/emb ≈ 6.7 k steps of ~0.3 TFLOP → ~5 min per layer on an
+  A100 (with stats); action expert ≈ 67 k steps of ~0.08 TFLOP → ~15 min per layer. All 37 layers ≈ 6 h on one
+  A100, ~1.5 h on 4. Training needs the layer in GPU memory: 2.2 GB (PaliGemma, fp32) or 5.6 GB (action expert, fp16).
 
-T015_SMOKE_NUMBERS
+## Checks done for T015 (no GPU in the dev container)
+
+- `smoke.py --device cpu --frames 2` on the real pi05lib (`/outputs/VLA-shortcut-exps/smoke/T015/cpu/hook_check.json`):
+  actions bit-identical with and without the hooks; PaliGemma layer L output = layer L+1 input (bitwise) and layer 17
+  = final-norm input, same for the action expert over the 10 denoising steps; emb = embed_prefix output; group counts
+  256 / 256 / 46 (text valid tokens = attention mask), empty camera masked, group-mean error 6e-8, weighted
+  group mean vs all-token mean rel. error 1e-9; policy first action vs dataset action L1 0.029.
+- This run found that lerobot calls `gemma_expert.model.forward()` directly, so a hook on the expert model never
+  fires; denoising steps are counted on action-expert layer 0 instead (the mock test now calls `.forward()` too).
+- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 18): layer specs, part / shard split, fp16 overflow →
+  fp32, SAE init / constraints / loss decrease / AuxK / save-load, C.1 hysteresis, interventions on a toy layout
+  (`project_out` leaves no v component, `add`, `replace_with` matches the SAE metrics), and a mock π0.5 on the
+  real 3-episode LIBERO data through collect (shard 0/2 + 1/2, resume, config clash), reader, train (stop + resume),
+  stats, `--ae-steps` subset and the `smoke.py --summarize` PASS/FAIL logic.

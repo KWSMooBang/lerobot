@@ -1,6 +1,7 @@
-"""GPU checks of the hook location on the real π0.5 (T015 smoke). Writes `<out>/hook_check.json`.
+"""Checks of the hook location on the real π0.5 (T015 smoke). Writes `<out>/hook_check.json`.
 
-    uv run python scripts/shortcut/sae/smoke.py --out /outputs/VLA-shortcut-exps/smoke/T015 --episodes 379,807,1261
+    uv run python scripts/shortcut/sae/smoke.py --out <dir> --episodes 379,807,1261           # GPU (server)
+    CUDA_VISIBLE_DEVICES= uv run python scripts/shortcut/sae/smoke.py --out <dir> --device cpu --frames 2
 
 (a) recording does not change the action (same noise, bitwise)
 (b) the hooked output of PaliGemma layer L is the input of layer L+1 (and layer 17's output is what the final
@@ -22,7 +23,6 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # GPU 0 only (its lock is taken below)
 for p in (str(HERE), str(HERE.parent), str(HERE.parent / "train")):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -70,38 +70,135 @@ def bench_sae(out: Path, steps: int = 200) -> dict:
     return res
 
 
+N_TIMESTEPS = 273_465  # HuggingFaceVLA/libero, 1,693 episodes
+
+
+def summarize(out: Path, model: str) -> bool:
+    """PASS/FAIL of every smoke.sh step + full-scale estimates from the measured numbers → summary.json."""
+    import pandas as pd
+    import store
+    from collect import bytes_per_timestep
+
+    checks: dict[str, bool] = {}
+    est: dict[str, object] = {}
+
+    def read(p: Path) -> str:
+        return p.read_text() if p.exists() else ""
+
+    hc = json.loads(read(out / "hook_check.json") or "{}")
+    checks["a_action_unchanged_with_hooks"] = bool(hc.get("a_actions_equal_with_hooks"))
+    checks["b_layer_out_eq_next_in"] = bool(hc.get("b_layer_out_equals_next_in")) and bool(
+        hc.get("b_emb_is_embed_prefix_output")
+    )
+    checks["b_ae_10_denoising_steps_counted"] = hc.get("ae_steps_seen") == 10
+    checks["c_pad_and_empty_camera_excluded"] = bool(hc.get("c_empty_camera_tokens_masked")) and (
+        hc.get("c_group_mean_max_abs_err", 1) < 1e-2
+    )
+    checks["d_group_weighted_mean_eq_all_tokens"] = hc.get("d_weighted_mean_rel_err", 1) < 1e-4
+    checks["e_steering_hooks"] = all(
+        hc.get(f"e_{la}_project_out_max_component", 1e9) <= hc.get(f"e_{la}_bf16_component_scale", 0) * 4
+        for la in ("pg05", "ae05")
+    )
+    acts = out / "sae" / model / "acts"
+    parts = store.done_parts(acts) if (acts / "plan.json").exists() else []
+    rows = sum(p["rows"] for p in parts)
+    checks["collect_3_episodes_365_timesteps"] = len(parts) == 3 and rows == 365
+    checks["collect_resume_skips_done_parts"] = read(out / "collect_resume.log").count("done, skip") == 3
+    if parts:
+        plan = store.read_plan(acts)
+        secs = sum(p["seconds"] for p in parts)
+        tps_all = rows / secs
+        tps_best = max(p["timesteps_per_s"] for p in parts)
+        bpt = bytes_per_timestep(plan["identity"]["layers"], len(plan["identity"]["ae_steps"]))
+        est["gpu"] = parts[0]["gpu"]
+        est["collect_timesteps_per_s"] = {"overall_incl_warmup": round(tps_all, 2), "best_part": tps_best}
+        est["collect_full_hours_1gpu"] = round(N_TIMESTEPS / tps_best / 3600, 2)
+        est["collect_full_storage_gb"] = round(N_TIMESTEPS * bpt / 1e9, 1)
+        est["fp16_overflow_layers"] = sorted({x for p in parts for x in p.get("overflow_fp32", [])})
+        meta = pd.concat([pd.read_parquet(Path(p["dir"]) / "meta.parquet") for p in parts])
+        a = np.stack(meta["action"].to_numpy())
+        a0 = np.stack(meta["policy_action0"].to_numpy())
+        est["policy_action0_vs_dataset_mae"] = float(np.abs(a - a0).mean())
+        est["dataset_action_abs_mean"] = float(np.abs(a).mean())
+    for lay, tag in (("pg05", "pooled_all"), ("ae05", "ae-steps-all")):
+        jd = out / "sae" / model / "sae" / tag / lay / "seed0"
+        log = [json.loads(x) for x in read(jd / "log.jsonl").splitlines() if x]
+        steps = [r["step"] for r in log]
+        checks[f"sae_{lay}_loss_decreases"] = len(log) > 2 and log[-1]["nmse"] < log[0]["nmse"]
+        checks[f"sae_{lay}_resumed_at_200"] = (
+            f"{lay} seed0: resume at step 200" in read(out / "train_resume.log")
+            and steps == sorted(steps)
+            and steps[-1:] == [600]
+        )
+        checks[f"sae_{lay}_stats_parquet"] = all(
+            (jd / f).exists() for f in ("features.parquet", "fire_by_group.parquet", "codes_idx.npy")
+        )
+        if (jd / "metrics.json").exists():
+            est[f"sae_{lay}_smoke_metrics"] = {
+                k: v for k, v in json.loads((jd / "metrics.json").read_text()).items() if k != "stats"
+            }
+    bench = json.loads(read(out / "sae_bench.json") or "{}")
+    if bench:
+        est["sae_hours_per_layer_100_epochs"] = {
+            "pg_or_emb": round(bench["pg"]["hours"], 2),
+            "ae_all_10_steps": round(bench["ae"]["hours"], 2),
+            "all_37_layers_1gpu": round(19 * bench["pg"]["hours"] + 18 * bench["ae"]["hours"], 1),
+        }
+    ok = all(checks.values())
+    print(json.dumps({"checks": checks, "estimates": est}, indent=1))
+    for k, v in checks.items():
+        print(f"  {'PASS' if v else 'FAIL'}  {k}")
+    print("T015 SMOKE", "PASS" if ok else "FAIL")
+    (out / "summary.json").write_text(
+        json.dumps({"pass": ok, "checks": checks, "estimates": est}, indent=1) + "\n"
+    )
+    return ok
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="pi05lib")
     ap.add_argument("--episodes", default="379,807,1261")
     ap.add_argument("--out-root", default="/outputs/VLA-shortcut-exps")
-    ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument(
+        "--frames", type=int, default=8, help="frames in the test batch (0 and 60 of each episode)"
+    )
+    ap.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
+    ap.add_argument("--gpu", type=int, default=0, help="nvidia-smi index (locked in this container)")
     ap.add_argument("--bench-sae", action="store_true", help="only time SAE training steps")
+    ap.add_argument("--summarize", action="store_true", help="summary of a smoke.sh output dir (no GPU)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    if args.summarize:
+        sys.exit(0 if summarize(out, args.model) else 1)
+    if args.device == "cuda":
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(args.gpu))
     if args.bench_sae:
         with ExitStack() as stack:
-            gpu_lock(stack, [0], False)
+            gpu_lock(stack, [args.gpu], False)
             bench_sae(out)
         return
     eps = [int(x) for x in args.episodes.split(",")]
 
+    dev = args.device
     with ExitStack() as stack:
-        gpu_lock(stack, [0], False)
+        if dev == "cuda":
+            gpu_lock(stack, [args.gpu], False)
         from common import load_policy
         from torch.utils.data import DataLoader, Subset
 
         from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
         m = resolve_model(args.model, Path(args.out_root))
-        policy, pre, post, *_ = load_policy("pi05", m["ckpt"], "libero_spatial", 10, "cuda", m["adapter"])
+        policy, pre, post, *_ = load_policy("pi05", m["ckpt"], "libero_spatial", 10, dev, m["adapter"])
         repo, root, rev = dataset_source(Path(args.out_root))
         ds = LeRobotDataset(repo, root=root, revision=rev, episodes=eps)
-        # frames 0 and 60 of each episode, so the batch mixes suites and instruction lengths
+        # frame 0 of each episode, then frame 60: the batch mixes suites and instruction lengths
         cols = ds.hf_dataset.select_columns(["episode_index", "frame_index"]).to_pandas()
-        pick = cols.index[cols["frame_index"].isin([0, 60])].tolist()[: args.batch * 2]
+        sel = cols[cols["frame_index"].isin([0, 60])].sort_values(["frame_index", "episode_index"])
+        pick = sel.index.tolist()[: args.frames]
         batch = next(iter(DataLoader(Subset(ds, pick), batch_size=len(pick))))
         obs = pre(batch)
         cfg = policy.config
@@ -110,7 +207,7 @@ def main() -> None:
             batch["frame_index"].numpy(),
             (cfg.chunk_size, cfg.max_action_dim),
             0,
-        ).cuda()
+        ).to(dev)
         res: dict = {"model": m, "frames": len(pick), "episodes": eps}
 
         with torch.inference_mode():
@@ -214,7 +311,7 @@ def main() -> None:
             torch.manual_seed(0)
             for layer in ("pg05", "ae05"):
                 d = 2048 if layer.startswith("pg") else 1024
-                v = torch.randn(d, device="cuda")
+                v = torch.randn(d, device=dev)
                 v = v / v.norm()
                 got: list = []
                 mod = pg_layers(policy)[5] if layer.startswith("pg") else ae_layers(policy)[5]
@@ -247,6 +344,7 @@ def main() -> None:
         and res["c_group_mean_max_abs_err"] < 1e-2
         and res["d_weighted_mean_rel_err"] < 1e-4
         and res["b_ae_recorder_max_abs_err"] < 1e-2
+        and res["ae_steps_seen"] == 10
     )
     print("HOOK CHECK", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)

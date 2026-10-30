@@ -44,8 +44,10 @@ import store  # noqa: E402
 from hooks import GROUPS, layer_dim, layer_family, parse_layers  # noqa: E402
 
 N_DENOISE = 10  # pi05 num_inference_steps (checked against the loaded config)
-# timesteps/s per GPU at batch 32 (measured on GPU 0 by the T015 smoke; A100 = estimate, see README)
-THROUGHPUT = {"RTX 4090": 9.0, "A100": 18.0}
+# timesteps/s per GPU, ESTIMATES to be replaced by the server smoke (smoke.sh prints the measured value):
+# ~4.8 TFLOP per timestep (Gemma-2B prefix 968 tok ≈ 3.9, SigLIP 3 × 256 tok ≈ 0.6, 10 expert steps ≈ 0.3)
+# at ~40 % of the dense bf16 peak with fp32 accumulation (RTX 4090 ≈ 83, A100 ≈ 312 TFLOPS).
+THROUGHPUT = {"RTX 4090": 7.0, "A100": 25.0}
 
 
 def parse_shard(s: str) -> tuple[int, int]:
@@ -210,8 +212,9 @@ def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespac
         f"all {n_all * bpt / 1e9:.1f} GB"
     )
     for gpu, tps in THROUGHPUT.items():
+        n_g = max(len(gpus), 1)
         print(
-            f"[collect] time on {len(gpus)}× {gpu} (~{tps} ts/s each): shard {n_mine / tps / len(gpus) / 3600:.2f} h, "
+            f"[collect] time on {n_g}× {gpu} (~{tps} ts/s each): shard {n_mine / tps / n_g / 3600:.2f} h, "
             f"all on 1 GPU {n_all / tps / 3600:.1f} h"
         )
 
@@ -273,9 +276,23 @@ class PartWriter:
         return {k: str(v.dtype) for k, v in self.arrs.items()}
 
 
+def load_for_collect(ident: dict[str, Any], device: str) -> tuple[Any, Any, Any, dict[str, Any]]:
+    """(policy, preprocessor, postprocessor, inference meta), loaded like lerobot-eval / sc-bench."""
+    from common import load_policy
+
+    policy, pre, post, *_, inf_meta = load_policy(
+        "pi05",
+        ident["ckpt"],
+        "libero_spatial",
+        n_action_steps=10,
+        device=device,
+        libero_adapter=ident["adapter"],
+    )
+    return policy, pre, post, inf_meta
+
+
 def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, part_idx: list[int]) -> None:
     import torch
-    from common import load_policy
     from hooks import ActivationRecorder
     from torch.utils.data import DataLoader, Subset
 
@@ -294,15 +311,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
         todo.append(p)
     if not todo:
         return
-    device = "cuda"
-    policy, pre, post, *_, inf_meta = load_policy(
-        "pi05",
-        ident["ckpt"],
-        "libero_spatial",
-        n_action_steps=10,
-        device=device,
-        libero_adapter=ident["adapter"],
-    )
+    device = "cpu" if args.gpus == "cpu" else "cuda"
+    policy, pre, post, inf_meta = load_for_collect(ident, device)
     cfg = policy.config
     if cfg.num_inference_steps != N_DENOISE:
         raise SystemExit(f"num_inference_steps {cfg.num_inference_steps} != {N_DENOISE}")
@@ -313,7 +323,7 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     cols["rel"] = np.arange(len(cols))
     from data_variants import suite_of
 
-    gpu_name = torch.cuda.get_device_name(0)
+    gpu_name = torch.cuda.get_device_name(0) if device == "cuda" else "cpu"
     for p in todo:
         t0 = time.time()
         d = acts_dir / "parts" / p["part_id"]
@@ -427,7 +437,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--episodes", default=None, help="subset, e.g. 0,500,1000 or 0-9 (smoke)")
     ap.add_argument("--parts", type=int, default=64, help="episode ranges the data is cut into (resume unit)")
     ap.add_argument("--shard", type=parse_shard, default=(0, 1), help="i/N: this pod's block of parts")
-    ap.add_argument("--gpus", default="0", help="local GPUs, one worker process each")
+    ap.add_argument("--gpus", default="0", help="local GPUs, one worker process each; cpu = no GPU (tests)")
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--workers", type=int, default=6, help="dataloader workers per GPU (PNG decoding)")
     ap.add_argument("--noise-seed", type=int, default=0)
@@ -437,7 +447,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--worker-parts", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     out_root = Path(args.out_root)
-    gpus = [int(g) for g in str(args.gpus).split(",") if g != ""]
+    gpus = [] if args.gpus == "cpu" else [int(g) for g in str(args.gpus).split(",") if g != ""]
 
     plan = make_plan(args, out_root)
     acts_dir = Path(args.acts_dir) if args.acts_dir else out_root / "sae" / plan["identity"]["model"] / "acts"
@@ -452,6 +462,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.dry_run:
         return
     write_or_check_plan(acts_dir, plan)
+    if not gpus:
+        run_parts(args, plan, acts_dir, mine)
+        print(f"[collect] parts done: {len(store.done_parts(acts_dir))}/{len(plan['parts'])} in {acts_dir}")
+        return
     with ExitStack() as stack:
         gpu_lock(stack, gpus, args.allow_any_gpu)
         if len(gpus) == 1:
