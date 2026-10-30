@@ -124,12 +124,35 @@ def checkpoint_fingerprint(ckpt: str) -> str:
     p = Path(ckpt)
     if p.exists():
         return _hash_local(p)
+    if hub_offline():
+        return "hub:" + cached_commit(ckpt)
     from huggingface_hub import HfApi
 
     sha = HfApi().model_info(ckpt).sha
     if not sha:
         raise SystemExit(f"{ckpt}: no commit sha from the Hub")
     return "hub:" + sha
+
+
+def hub_offline() -> bool:
+    from huggingface_hub import constants
+
+    return bool(constants.HF_HUB_OFFLINE)
+
+
+def cached_commit(repo: str, revision: str = "main") -> str:
+    """Commit sha that `revision` points to in the local HF cache (`<cache>/models--org--name/refs/<revision>`),
+    for HF_HUB_OFFLINE=1 where the Hub cannot be asked."""
+    from huggingface_hub import constants
+
+    ref = Path(constants.HF_HUB_CACHE) / f"models--{repo.replace('/', '--')}" / "refs" / revision
+    sha = ref.read_text().strip() if ref.exists() else ""
+    if len(sha) != 40:
+        raise SystemExit(
+            f"HF_HUB_OFFLINE=1 and no cached revision for {repo} ({ref} missing or invalid): download it once "
+            f"online (scripts/shortcut/setup_server.sh) or unset HF_HUB_OFFLINE"
+        )
+    return sha
 
 
 def pinned_path(locator: str, revision: str, config_only: bool = False) -> str:
@@ -502,8 +525,9 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                     "writer": store.unique_tag(),
                     "batch": args.batch,
                     "tasks_seen": sorted({int(r["task_index"]) for r in meta_rows}),
+                    # inference meta from common.load_policy: dtype is a torch.dtype on GPU paths
                     "inference": {
-                        k: inf_meta[k]
+                        k: inf_meta[k] if isinstance(inf_meta[k], int | float | None) else str(inf_meta[k])
                         for k in ("num_inference_steps", "chunk_size", "dtype")
                         if k in inf_meta
                     },

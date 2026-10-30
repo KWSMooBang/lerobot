@@ -138,7 +138,7 @@ class Logger:
                 print(f"[train] wandb disabled: {e!r}", flush=True)
 
     def log(self, rec: dict[str, Any]) -> None:
-        self.f.write(json.dumps(rec) + "\n")
+        self.f.write(store.dumps(rec) + "\n")
         self.f.flush()
         if self.run is not None:
             self.run.log(rec, step=rec["step"])
@@ -320,7 +320,7 @@ def train_job(args: argparse.Namespace, layer: str, seed: int, x: Any, meta: Any
         t1 = time.time()
         metrics["stats"] = run_stats(jdir, sae, x, meta)
         metrics["stats_seconds"] = round(time.time() - t1, 1)
-    (jdir / "metrics.json").write_text(json.dumps(metrics, indent=1) + "\n")
+    (jdir / "metrics.json").write_text(store.dumps(metrics, indent=1) + "\n")
     store.write_json_atomic(
         jdir / "done.json", {"config": cfg, "metrics": metrics, "acts_dir": str(args.acts_dir)}
     )

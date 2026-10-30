@@ -163,7 +163,10 @@ class TopKSAE(nn.Module):
         save_file(
             {k: v.detach().cpu().contiguous() for k, v in self.state_dict().items()}, out / "sae.safetensors"
         )
-        (out / "config.json").write_text(json.dumps({**asdict(self.cfg), **(extra or {})}, indent=1) + "\n")
+        from store import json_default
+
+        cfg = {**asdict(self.cfg), **(extra or {})}
+        (out / "config.json").write_text(json.dumps(cfg, indent=1, default=json_default) + "\n")
 
     @classmethod
     def load(cls, out_dir: str | Path, device: str = "cpu") -> TopKSAE:
