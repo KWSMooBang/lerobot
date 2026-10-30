@@ -143,6 +143,10 @@ class Lease:
     is in the file owns it. refresh / release act only while the file holds our token; a writer that finds
     another token (it was too slow and the part was taken over) has lost the part and must drop its work.
     A heartbeat thread refreshes it during long stretches (data loading, flushes) without the main loop.
+
+    Best-effort only: POSIX filesystems have no compare-and-swap, so two writers can both believe they hold a
+    lease (stale takeover, check-then-touch). The only consequence is duplicate work. Correctness rests on the
+    fixed identity and on publish_part's atomic rename (if the final part already exists, our copy is dropped).
     """
 
     def __init__(self, parts_dir: Path, pid: str, ttl: float = LEASE_TTL_S):
@@ -212,9 +216,21 @@ class Lease:
         every = every or max(1.0, min(60.0, self.ttl / 4))
 
         def beat() -> None:
+            last_ok = time.time()
             while not self._stop.wait(every):
-                if not self.refresh():
-                    return
+                try:
+                    if not self.refresh():
+                        return  # taken over: lost is set, the main loop drops the part
+                    last_ok = time.time()
+                except Exception as e:  # e.g. a transient filesystem error: warn and retry next beat
+                    print(f"[lease] WARNING {self.path.name}: heartbeat failed ({e!r}); retrying", flush=True)
+                    if time.time() - last_ok > self.ttl:
+                        print(
+                            f"[lease] {self.path.name}: no heartbeat for > TTL; marking the lease lost",
+                            flush=True,
+                        )
+                        self.lost.set()
+                        return
 
         self._thread = threading.Thread(target=beat, daemon=True, name=f"lease-{self.path.name}")
         self._thread.start()
@@ -229,7 +245,9 @@ class Lease:
 
 def publish_part(tmp: Path, final: Path) -> bool:
     """Rename a complete private work dir to the final part dir. If the final dir already exists (another
-    writer finished first), our copy is dropped. True if ours was published."""
+    writer finished first), our copy is dropped. True if ours was published.
+
+    This rename is what makes concurrent writers correct (first one wins); the leases only reduce duplicate work."""
     import shutil
 
     try:

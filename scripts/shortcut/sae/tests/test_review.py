@@ -220,6 +220,37 @@ def test_lease_owner_token(tmp_path):
     assert not c.refresh()
 
 
+def test_lease_heartbeat_survives_errors_then_marks_lost(tmp_path, monkeypatch, capsys):
+    a = store.Lease(tmp_path, "ep1-2", ttl=0.4)
+    assert a.acquire()
+    fails = {"n": 2}
+    real = store.Lease.refresh
+
+    def flaky(self):
+        if fails["n"] > 0:  # two transient errors, then fine again
+            fails["n"] -= 1
+            raise OSError("ESTALE")
+        return real(self)
+
+    monkeypatch.setattr(store.Lease, "refresh", flaky)
+    a.start_heartbeat(every=0.05)
+    time.sleep(0.6)
+    assert a._thread is not None and a._thread.is_alive() and not a.lost.is_set()  # recovered
+    assert "heartbeat failed" in capsys.readouterr().out
+    a.release()
+
+    b = store.Lease(tmp_path, "ep3-4", ttl=0.3)
+    assert b.acquire()
+    monkeypatch.setattr(store.Lease, "refresh", lambda self: (_ for _ in ()).throw(OSError("EIO")))
+    b.start_heartbeat(every=0.05)
+    time.sleep(0.8)  # failing for longer than the TTL
+    assert b.lost.is_set() and not b._thread.is_alive()
+    monkeypatch.setattr(store.Lease, "refresh", real)
+    with pytest.raises(store.LeaseLostError):
+        b.check()
+    b.release()
+
+
 def test_lease_heartbeat_keeps_it_fresh(tmp_path):
     a = store.Lease(tmp_path, "ep1-2", ttl=0.5)
     assert a.acquire()
