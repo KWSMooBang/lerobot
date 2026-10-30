@@ -73,6 +73,31 @@ def bench_sae(out: Path, steps: int = 200) -> dict:
 N_TIMESTEPS = 273_465  # HuggingFaceVLA/libero, 1,693 episodes
 
 
+def hook_checks(res: dict) -> dict[str, bool]:
+    """Every sub-check of the hook test. bf16 tolerance: `e_*_bf16_component_scale` = max|y|·2⁻⁸ (one bf16 ulp
+    at the largest value of the layer output); edits are computed in fp32 and cast back to bf16."""
+    out = {
+        "a_actions_equal_with_hooks": res.get("a_actions_equal_with_hooks") is True,
+        "a_actions_equal_with_full_capture": res.get("a_actions_equal_with_full_capture") is True,
+        "b_layer_out_equals_next_in": res.get("b_layer_out_equals_next_in") is True,
+        "b_emb_is_embed_prefix_output": res.get("b_emb_is_embed_prefix_output") is True,
+        "b_ae_recorder_matches_capture": res.get("b_ae_recorder_max_abs_err", 1.0) < 1e-2,
+        "b_ae_10_denoising_steps_counted": res.get("ae_steps_seen") == 10,
+        "c_empty_camera_tokens_masked": res.get("c_empty_camera_tokens_masked") is True,
+        "c_group_means_match_masked_means": res.get("c_group_mean_max_abs_err", 1.0) < 1e-2,
+        "d_weighted_group_mean_eq_all_tokens": res.get("d_weighted_mean_rel_err", 1.0) < 1e-4,
+    }
+    for la in ("pg05", "ae05"):
+        raw = res.get(f"e_{la}_bf16_component_scale")
+        scale = float(raw) if isinstance(raw, float | int) and raw > 0 else 0.0
+        ok = scale > 0
+        out[f"e_{la}_project_out_no_v_component"] = (
+            ok and res.get(f"e_{la}_project_out_max_component", 1e9) <= 4 * scale
+        )
+        out[f"e_{la}_add_shifts_by_alpha_v"] = ok and res.get(f"e_{la}_add_shift_err", 1e9) <= 2 * scale
+    return out
+
+
 def summarize(out: Path, model: str) -> bool:
     """PASS/FAIL of every smoke.sh step + full-scale estimates from the measured numbers → summary.json."""
     import pandas as pd
@@ -85,20 +110,16 @@ def summarize(out: Path, model: str) -> bool:
     def read(p: Path) -> str:
         return p.read_text() if p.exists() else ""
 
+    # every smoke.sh step must have exited 0 (steps.tsv: name, exit code)
+    step_codes = [ln.split("\t") for ln in read(out / "steps.tsv").splitlines() if ln.strip()]
+    checks["steps_recorded"] = len(step_codes) >= 6
+    for name, rc in step_codes:
+        checks[f"step_{name}_exit0"] = rc.strip() == "0"
     hc = json.loads(read(out / "hook_check.json") or "{}")
-    checks["a_action_unchanged_with_hooks"] = bool(hc.get("a_actions_equal_with_hooks"))
-    checks["b_layer_out_eq_next_in"] = bool(hc.get("b_layer_out_equals_next_in")) and bool(
-        hc.get("b_emb_is_embed_prefix_output")
-    )
-    checks["b_ae_10_denoising_steps_counted"] = hc.get("ae_steps_seen") == 10
-    checks["c_pad_and_empty_camera_excluded"] = bool(hc.get("c_empty_camera_tokens_masked")) and (
-        hc.get("c_group_mean_max_abs_err", 1) < 1e-2
-    )
-    checks["d_group_weighted_mean_eq_all_tokens"] = hc.get("d_weighted_mean_rel_err", 1) < 1e-4
-    checks["e_steering_hooks"] = all(
-        hc.get(f"e_{la}_project_out_max_component", 1e9) <= hc.get(f"e_{la}_bf16_component_scale", 0) * 4
-        for la in ("pg05", "ae05")
-    )
+    checks["hook_check_pass"] = hc.get("pass") is True
+    recomputed = hook_checks(hc)
+    for k, v in recomputed.items():
+        checks[f"hook_{k}"] = v and (hc.get("checks") or {}).get(k) is True
     acts = out / "sae" / model / "acts"
     parts = store.done_parts(acts) if (acts / "plan.json").exists() else []
     rows = sum(p["rows"] for p in parts)
@@ -133,12 +154,20 @@ def summarize(out: Path, model: str) -> bool:
         checks[f"sae_{lay}_stats_parquet"] = all(
             (jd / f).exists() for f in ("features.parquet", "fire_by_group.parquet", "codes_idx.npy")
         )
+        m = json.loads(read(jd / "done.json") or "{}").get("metrics", {})
+        checks[f"sae_{lay}_done_metrics_finite"] = all(
+            isinstance(m.get(k), float) and np.isfinite(m[k]) for k in ("nmse", "var_explained")
+        )
         if (jd / "metrics.json").exists():
             est[f"sae_{lay}_smoke_metrics"] = {
                 k: v for k, v in json.loads((jd / "metrics.json").read_text()).items() if k != "stats"
             }
     bench = json.loads(read(out / "sae_bench.json") or "{}")
-    if bench:
+    checks["sae_bench_ok"] = all(
+        isinstance(bench.get(f, {}).get("hours"), float | int) and 0 < bench[f]["hours"] < 1e4
+        for f in ("pg", "ae")
+    )
+    if checks["sae_bench_ok"]:
         est["sae_hours_per_layer_100_epochs"] = {
             "pg_or_emb": round(bench["pg"]["hours"], 2),
             "ae_all_10_steps": round(bench["ae"]["hours"], 2),
@@ -335,17 +364,11 @@ def main() -> None:
         )
     print(json.dumps(res, indent=1))
     (out / "hook_check.json").write_text(json.dumps(res, indent=1) + "\n")
-    ok = (
-        res["a_actions_equal_with_hooks"]
-        and res["a_actions_equal_with_full_capture"]
-        and res["b_layer_out_equals_next_in"]
-        and res["b_emb_is_embed_prefix_output"]
-        and res["c_empty_camera_tokens_masked"]
-        and res["c_group_mean_max_abs_err"] < 1e-2
-        and res["d_weighted_mean_rel_err"] < 1e-4
-        and res["b_ae_recorder_max_abs_err"] < 1e-2
-        and res["ae_steps_seen"] == 10
-    )
+    res["checks"] = hook_checks(res)
+    res["pass"] = ok = all(res["checks"].values())
+    (out / "hook_check.json").write_text(json.dumps(res, indent=1) + "\n")
+    for k, v in res["checks"].items():
+        print(f"  {'PASS' if v else 'FAIL'}  {k}")
     print("HOOK CHECK", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

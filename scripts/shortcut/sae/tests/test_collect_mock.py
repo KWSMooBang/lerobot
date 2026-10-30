@@ -9,7 +9,10 @@ without a GPU. The real-model checks are `smoke.py` (server GPU, or `--device cp
 """
 
 import json
+import os
+import shutil
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,6 +24,7 @@ from torch import nn
 
 SAE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SAE_DIR))
+sys.path.insert(0, str(SAE_DIR / "tests"))
 
 import collect  # noqa: E402
 import store  # noqa: E402
@@ -93,7 +97,9 @@ class MockModel(nn.Module):
 class MockPolicy:
     def __init__(self):
         self.model = MockModel()
-        self.config = SimpleNamespace(chunk_size=5, max_action_dim=32, num_inference_steps=10)
+        self.config = SimpleNamespace(
+            chunk_size=5, max_action_dim=32, num_inference_steps=10, dtype=torch.bfloat16
+        )
 
     @torch.no_grad()
     def predict_action_chunk(self, obs, noise):
@@ -169,15 +175,29 @@ def test_collect_shards_resume_train(tmp_path, mock_loader, capsys):
     collect.main([*base, "--shard", "1/2"])
     parts = store.done_parts(acts)
     assert len(parts) == 3 and sum(p["rows"] for p in parts) == 365
-    # resume: finished parts are skipped, a part without done.json (interrupted) is redone
-    d1 = Path(parts[1]["dir"])
-    (d1 / "done.json").unlink()
+    # resume after a killed pod (PID 1 like k8s): its private tmp dir and a stale lease are left on part 1;
+    # part 2 has a fresh lease from a live pod. Part 0 is skipped (done), part 1 is redone, part 2 left alone.
+    pdir = acts / "parts"
+    shutil.rmtree(pdir / "ep00807-00807")
+    shutil.rmtree(pdir / "ep01261-01261")
+    dead_tmp = pdir / ".ep00807-00807.tmp-podA.1.deadbeef"
+    dead_tmp.mkdir()
+    (dead_tmp / "ae00.npy").write_bytes(b"partial")
+    (pdir / "ep00807-00807.lease").write_text('{"host": "podA", "pid": 1}')
+    old = time.time() - 2 * store.LEASE_TTL_S
+    os.utime(pdir / "ep00807-00807.lease", (old, old))
+    (pdir / "ep01261-01261.lease").write_text('{"host": "podB", "pid": 1}')
     keep = (Path(parts[0]["dir"]) / "done.json").stat().st_mtime
     capsys.readouterr()
     collect.main(base)
     log = capsys.readouterr().out
     assert "ep00379-00379 done, skip" in log and "ep00807-00807: 143 timesteps" in log
+    assert "ep01261-01261 is being written by another writer" in log
     assert (Path(parts[0]["dir"]) / "done.json").stat().st_mtime == keep
+    assert not (pdir / "ep00807-00807.lease").exists() and not (pdir / "ep01261-01261").exists()
+    assert [p.name for p in pdir.glob(".ep00807-00807.tmp-*")] == [dead_tmp.name]  # ours was published
+    (pdir / "ep01261-01261.lease").unlink()  # the live pod "finishes" (here: gives up)
+    collect.main(base)
     # another configuration in the same dir is refused
     with pytest.raises(SystemExit, match="another configuration"):
         collect.main([*base[:-1], "emb,pg:0"])
@@ -294,27 +314,22 @@ def test_smoke_summary_on_mock(tmp_path, mock_loader, capsys):
     common += ["--log-every", "20", "--ckpt-every", "100", "--wandb", "off", "--layers", "pg:5,ae:5"]
     logged(train.main, [*common, "--stop-after", "200"], "train_part1.log")
     logged(train.main, common, "train_resume.log")
-    hook = {
-        "a_actions_equal_with_hooks": True,
-        "b_layer_out_equals_next_in": True,
-        "b_emb_is_embed_prefix_output": True,
-        "c_empty_camera_tokens_masked": True,
-        "c_group_mean_max_abs_err": 0.0,
-        "d_weighted_mean_rel_err": 0.0,
-        "e_pg05_project_out_max_component": 0.0,
-        "e_pg05_bf16_component_scale": 1.0,
-        "e_ae05_project_out_max_component": 0.0,
-        "e_ae05_bf16_component_scale": 1.0,
-        "ae_steps_seen": 10,
-    }
+    from test_review import GOOD_HOOK
+
+    hook = {**GOOD_HOOK, "checks": smoke.hook_checks(GOOD_HOOK), "pass": True}
     (out / "hook_check.json").write_text(json.dumps(hook))
+    names = ["hook_check", "collect", "collect_resume", "train_part1", "train_resume", "sae_bench"]
+    (out / "steps.tsv").write_text("".join(f"{n}\t0\n" for n in names))
     (out / "sae_bench.json").write_text(json.dumps({"pg": {"hours": 0.1}, "ae": {"hours": 1.0}}))
     capsys.readouterr()
     assert smoke.summarize(out, "pi05lib")
     res = json.loads((out / "summary.json").read_text())
     assert res["pass"] and res["estimates"]["collect_full_storage_gb"] == pytest.approx(164.7, abs=0.5)
     assert res["estimates"]["sae_hours_per_layer_100_epochs"]["all_37_layers_1gpu"] == pytest.approx(19.9)
-    (out / "hook_check.json").write_text(json.dumps({**hook, "a_actions_equal_with_hooks": False}))
+    (out / "hook_check.json").write_text(json.dumps({**hook, "pass": False}))
+    assert not smoke.summarize(out, "pi05lib")
+    (out / "hook_check.json").write_text(json.dumps(hook))
+    (out / "steps.tsv").write_text("".join(f"{n}\t{2 if n == 'collect' else 0}\n" for n in names))
     assert not smoke.summarize(out, "pi05lib")
 
 

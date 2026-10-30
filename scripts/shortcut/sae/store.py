@@ -10,8 +10,14 @@
     counts.npy                  (T, 3) int32 valid tokens per group (padding / empty camera excluded)
     meta.parquet                one row per timestep: row, index, episode_index, frame_index, task_index,
                                 suite, instruction, action (dataset), policy_action0 (first action of the chunk)
-    done.json                   written last: identity hash, rows, dtypes, overflow layers, seconds
-A part directory without done.json is incomplete and is redone on resume.
+    done.json                   identity hash, rows, dtypes, overflow layers, seconds
+  parts/.<part_id>.tmp-<host>.<pid>.<rand>/   a writer's private work dir; renamed to parts/<part_id>/ when
+                                complete (done.json inside), so a final part dir is always complete
+  parts/<part_id>.lease         {host, pid, started, ...}: a writer is on this part (mtime refreshed every batch)
+
+Several pods may share acts_dir (k8s pods often all have PID 1): temp names carry host + pid + random,
+plan.json is created exclusively (hard link of a complete temp file), a part is claimed with an O_EXCL lease
+and published with a single rename; a writer that finds the final part already there drops its own copy.
 """
 
 from __future__ import annotations
@@ -19,6 +25,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import socket
+import time
+import uuid
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -60,10 +69,104 @@ def shard_parts(n_parts: int, shard: int, n_shards: int) -> list[int]:
     return [j for j in range(n_parts) if j * n_shards // n_parts == shard]
 
 
+LEASE_TTL_S = float(os.environ.get("SC_SAE_LEASE_TTL", 3600))  # a lease not refreshed for this long is stale
+
+
+def unique_tag() -> str:
+    """host.pid.random: unique across pods even when every pod is PID 1."""
+    return f"{socket.gethostname()}.{os.getpid()}.{uuid.uuid4().hex[:8]}"
+
+
 def write_json_atomic(path: Path, obj: Any) -> None:
-    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp = path.with_name(f".{path.name}.tmp-{unique_tag()}")
     tmp.write_text(json.dumps(obj, indent=1) + "\n")
     tmp.replace(path)
+
+
+def create_or_check_plan(path: Path, plan: dict[str, Any]) -> bool:
+    """Create plan.json exclusively (complete file hard-linked into place: fails if it exists). If it exists,
+    its identity must equal ours. True if this call created it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp-{unique_tag()}")
+    tmp.write_text(json.dumps(plan, indent=1) + "\n")
+    try:
+        os.link(tmp, path)
+        created = True
+    except FileExistsError:
+        created = False
+    finally:
+        tmp.unlink()
+    if not created:
+        old = json.loads(path.read_text())
+        if old["identity"] != plan["identity"]:
+            diff = sorted(
+                k
+                for k in set(old["identity"]) | set(plan["identity"])
+                if old["identity"].get(k) != plan["identity"].get(k)
+            )
+            raise SystemExit(
+                f"{path} holds another configuration (differs in {diff}); use another --out-root"
+            )
+    return created
+
+
+# ---------------------------------------------------------------------------- part leases
+def lease_path(parts_dir: Path, pid: str) -> Path:
+    return parts_dir / f"{pid}.lease"
+
+
+def try_lease(parts_dir: Path, pid: str, ttl: float = LEASE_TTL_S) -> bool:
+    """Claim a part. False if another writer holds a fresh lease. A stale lease (not refreshed for `ttl` s,
+    e.g. a killed pod) is taken over."""
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    lp = lease_path(parts_dir, pid)
+    info = {"host": socket.gethostname(), "pid": os.getpid(), "tag": unique_tag(), "started": time.time()}
+    for _ in range(2):
+        try:
+            fd = os.open(lp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            try:
+                age = time.time() - lp.stat().st_mtime
+            except FileNotFoundError:
+                continue  # released meanwhile: retry the exclusive create
+            if age < ttl:
+                return False
+            # stale: take over by atomic replace; if two writers do this at once, both run and the
+            # part's single rename keeps exactly one result
+            write_json_atomic(lp, {**info, "took_over_after_s": round(age)})
+            return True
+        with os.fdopen(fd, "w") as f:
+            json.dump(info, f)
+        return True
+    return False
+
+
+def refresh_lease(parts_dir: Path, pid: str) -> None:
+    lp = lease_path(parts_dir, pid)
+    if lp.exists():
+        os.utime(lp)
+
+
+def release_lease(parts_dir: Path, pid: str) -> None:
+    lease_path(parts_dir, pid).unlink(missing_ok=True)
+
+
+def publish_part(tmp: Path, final: Path) -> bool:
+    """Rename a complete private work dir to the final part dir. If the final dir already exists (another
+    writer finished first), our copy is dropped. True if ours was published."""
+    import shutil
+
+    for _ in range(2):
+        try:
+            os.rename(tmp, final)  # fails on an existing non-empty dir
+            return True
+        except OSError:
+            if (final / "done.json").exists():
+                shutil.rmtree(tmp, ignore_errors=True)
+                return False
+            # a final dir without done.json is not made by this code (old layout / manual copy): set it aside
+            final.rename(final.with_name(f".{final.name}.stale-{unique_tag()}"))
+    raise RuntimeError(f"could not publish {tmp} as {final}")
 
 
 def read_plan(acts_dir: Path) -> dict[str, Any]:
@@ -81,7 +184,7 @@ def done_parts(acts_dir: Path) -> list[dict[str, Any]]:
         if d.exists():
             done = json.loads(d.read_text())
             if done.get("identity") == want:
-                out.append({**done, "dir": str(d.parent)})
+                out.append({**done, "part_id": p["part_id"], "dir": str(d.parent)})
     return out
 
 

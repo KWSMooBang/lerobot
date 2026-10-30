@@ -45,7 +45,7 @@ for p in (str(HERE), str(HERE.parent), str(HERE.parent / "train")):
 
 import numpy as np  # noqa: E402
 import store  # noqa: E402
-from hooks import layer_family, parse_layers  # noqa: E402
+from hooks import layer_dim, layer_family, parse_layers  # noqa: E402
 
 DEFAULT_OUT_ROOT = os.environ.get("SC_OUT_ROOT", "/outputs/VLA-shortcut-exps")
 WANDB_PROJECT = os.environ.get("SC_WANDB_PROJECT", "VLA-shortcut-exps") + "-sae"
@@ -72,16 +72,26 @@ def job_dir(args: argparse.Namespace, layer: str, seed: int) -> Path:
     return Path(args.sae_dir) / input_tag(layer, args) / layer / f"seed{seed}"
 
 
-def job_config(args: argparse.Namespace, layer: str, seed: int, n_samples: int, d: int) -> dict[str, Any]:
-    k = args.k_ae if layer_family(layer) == "ae" else args.k_pg
+def job_config(args: argparse.Namespace, layer: str, seed: int) -> dict[str, Any]:
+    """Everything a finished job depends on (no data loading): SAE hyperparameters, input, ae steps, the
+    collection identity and the exact list of collected parts. done.json / ckpt.pt must match it."""
+    plan = store.read_plan(Path(args.acts_dir))
+    parts = store.done_parts(Path(args.acts_dir))
+    n_t = sum(p["rows"] for p in parts)
+    ae = layer_family(layer) == "ae"
+    steps = ae_steps_list(args) or plan["identity"]["ae_steps"]
+    d = layer_dim(layer)
+    k = args.k_ae if ae else args.k_pg
     return {
         "layer": layer,
-        "input": args.input if layer_family(layer) == "pg" else "action_tokens_mean",
-        "ae_steps": ae_steps_list(args) if layer_family(layer) == "ae" else None,
+        "input": "action_tokens_mean" if ae else args.input,
+        "ae_steps": ae_steps_list(args) if ae else None,
         "seed": seed,
         "acts_dir": str(args.acts_dir),
-        "acts_identity": store.identity_hash(store.read_plan(Path(args.acts_dir))["identity"]),
-        "n_samples": n_samples,
+        "acts_identity": store.identity_hash(plan["identity"]),
+        "collection_identity": plan["identity"],
+        "parts": [p["part_id"] for p in parts],
+        "n_samples": n_t * (len(steps) if ae else 1),
         "d": d,
         "n_latents": int(round(d * args.expansion)),
         "k": k,
@@ -95,6 +105,14 @@ def job_config(args: argparse.Namespace, layer: str, seed: int, n_samples: int, 
         "grad_clip": args.grad_clip,
         "gm_samples": args.gm_samples,
     }
+
+
+def job_is_done(args: argparse.Namespace, layer: str, seed: int, cfg: dict[str, Any] | None = None) -> bool:
+    """done.json exists and was written for exactly this config (not under --force)."""
+    done = job_dir(args, layer, seed) / "done.json"
+    if args.force or not done.exists():
+        return False
+    return json.loads(done.read_text()).get("config") == (cfg or job_config(args, layer, seed))
 
 
 # ---------------------------------------------------------------------------- one job
@@ -148,12 +166,25 @@ def train_job(args: argparse.Namespace, layer: str, seed: int, x: Any, meta: Any
     jdir = job_dir(args, layer, seed)
     jdir.mkdir(parents=True, exist_ok=True)
     n_samples, d = x.shape
-    cfg = job_config(args, layer, seed, n_samples, d)
-    if (jdir / "done.json").exists():
-        done = json.loads((jdir / "done.json").read_text())
-        if done.get("config") == cfg and not args.force:
-            print(f"[train] {layer} seed{seed}: done, skip", flush=True)
-            return done["metrics"]
+    cfg = job_config(args, layer, seed)
+    if (cfg["n_samples"], cfg["d"]) != (n_samples, d):
+        raise SystemExit(f"{layer}: loaded {tuple(x.shape)}, config expects ({cfg['n_samples']}, {cfg['d']})")
+    if job_is_done(args, layer, seed, cfg):
+        print(f"[train] {layer} seed{seed}: done, skip", flush=True)
+        return json.loads((jdir / "done.json").read_text())["metrics"]
+    if (jdir / "done.json").exists() and not args.force:
+        old = json.loads((jdir / "done.json").read_text()).get("config", {})
+        diff = sorted(k for k in set(old) | set(cfg) if old.get(k) != cfg.get(k))
+        raise SystemExit(
+            f"{jdir} holds a finished SAE of another config (differs in {diff}); "
+            "--force to retrain it, or another --sae-dir"
+        )
+    # from here on the job is not finished: an old done.json (--force) must not survive a crash
+    for f in ("done.json", "metrics.json"):
+        (jdir / f).unlink(missing_ok=True)
+    if args.force:
+        (jdir / "ckpt.pt").unlink(missing_ok=True)
+        (jdir / "log.jsonl").unlink(missing_ok=True)
     device = x.device
     bsz = min(args.batch, n_samples)
     spe = math.ceil(n_samples / bsz)
@@ -174,7 +205,7 @@ def train_job(args: argparse.Namespace, layer: str, seed: int, x: Any, meta: Any
     last_fired = torch.zeros(cfg["n_latents"], dtype=torch.long, device=device)
     step = 0
     ckpt = jdir / "ckpt.pt"
-    if ckpt.exists() and not args.force:
+    if ckpt.exists():
         st = torch.load(ckpt, map_location=device, weights_only=True)
         if st["config"] != cfg:
             raise SystemExit(f"{ckpt} was made with another config; --force to start over")
@@ -305,7 +336,7 @@ def run_jobs(args: argparse.Namespace, jobs: list[tuple[str, int]]) -> None:
     for layer, seed in jobs:
         by_layer.setdefault(layer, []).append(seed)
     for layer, seeds in by_layer.items():
-        if all((job_dir(args, layer, s) / "done.json").exists() for s in seeds) and not args.force:
+        if all(job_is_done(args, layer, s) for s in seeds):
             print(f"[train] {layer}: all seeds done, skip", flush=True)
             continue
         t0 = time.time()

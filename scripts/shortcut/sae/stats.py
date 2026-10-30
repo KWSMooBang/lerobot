@@ -1,7 +1,8 @@
 """Feature records of one trained SAE (run at the end of train.py, or alone: `stats.py <job_dir>`).
 
 Writes into the SAE's job dir:
-  codes_idx.npy, codes_val.npy   (N, k) int16 / fp16: the k active latents of every sample (values ≥ 0)
+  codes_idx.npy, codes_val.npy   (N, k) int16 / fp16: the k active latents of every sample (values ≥ 0;
+                                 the metrics are computed from the fp32 values before this rounding)
   codes_meta.parquet             row-aligned: index, episode_index, frame_index, task_index, suite[, ae_step]
   features.parquet               one row per feature (per denoising step for the action expert):
                                  Swann et al. 2026 App. C.1 metrics + firing frequency
@@ -41,7 +42,7 @@ def encode_all(sae, x: torch.Tensor, batch: int = 8192) -> tuple[np.ndarray, np.
     for i in range(0, x.shape[0], batch):
         vals, idx = sae.encode(x[i : i + batch].float())
         idx_out.append(idx.to(torch.int16).cpu())
-        val_out.append(vals.to(torch.float16).cpu())
+        val_out.append(vals.float().cpu())  # fp32: the metrics use these; fp16 only on disk
     return torch.cat(idx_out).numpy(), torch.cat(val_out).numpy()
 
 
@@ -123,7 +124,7 @@ def run_stats(
     device = str(x.device)
     idx, val = encode_all(sae, x)
     np.save(job_dir / "codes_idx.npy", idx)
-    np.save(job_dir / "codes_val.npy", val)
+    np.save(job_dir / "codes_val.npy", val.astype(np.float16))  # metrics below use the fp32 values
     cols = META_COLS + (["ae_step"] if "ae_step" in meta.columns else [])
     meta = meta[cols].reset_index(drop=True)
     meta.to_parquet(job_dir / "codes_meta.parquet", index=False)

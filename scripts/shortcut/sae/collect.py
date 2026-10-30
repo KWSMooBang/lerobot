@@ -19,6 +19,7 @@ parts (done.json, same identity) are skipped, unfinished ones are redone.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import json
 import os
@@ -104,6 +105,33 @@ def resolve_model(name: str, out_root: Path) -> dict[str, Any]:
     return {"model": row["ckpt_id"], "ckpt": row["path_or_hub"], "adapter": adapter}
 
 
+@functools.cache
+def checkpoint_fingerprint(ckpt: str) -> str:
+    """Unique id of the weights: `sha256:<hash>` of a local checkpoint dir's *.safetensors + *.json, or
+    `hub:<commit sha>` of the Hub snapshot the policy loader resolves (config.json's snapshot dir)."""
+    p = Path(ckpt)
+    if p.exists():
+        h = hashlib.sha256()
+        files = sorted(p.glob("*.safetensors")) + sorted(p.glob("*.json")) if p.is_dir() else [p]
+        for f in files:
+            h.update(f.name.encode())
+            with open(f, "rb") as fh:
+                while block := fh.read(1 << 24):
+                    h.update(block)
+        return "sha256:" + h.hexdigest()[:20]
+    from huggingface_hub import hf_hub_download
+
+    return "hub:" + Path(hf_hub_download(ckpt, "config.json")).parent.name
+
+
+def policy_dtype(ckpt: str, adapter: str | None) -> str:
+    """Inference dtype: the config the loader uses (the adapter's when there is one)."""
+    import lerobot.policies  # noqa: F401  (registers config types)
+    from lerobot.configs.policies import PreTrainedConfig
+
+    return str(getattr(PreTrainedConfig.from_pretrained(adapter or ckpt), "dtype", None))
+
+
 def dataset_source(out_root: Path) -> tuple[str, Path | None, str]:
     from sc_train import DATASET_REPO, DATASET_REV, local_dataset_root
 
@@ -153,7 +181,10 @@ def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
     identity = {
         "model": m["model"],
         "ckpt": m["ckpt"],
+        "ckpt_revision": checkpoint_fingerprint(m["ckpt"]),
         "adapter": m["adapter"],
+        "adapter_revision": checkpoint_fingerprint(m["adapter"]) if m["adapter"] else None,
+        "dtype": policy_dtype(m["ckpt"], m["adapter"]),
         "dataset": repo,
         "dataset_revision": rev,
         "layers": layers,
@@ -175,20 +206,6 @@ def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
         "groups": list(GROUPS),
     }
     return plan
-
-
-def write_or_check_plan(acts_dir: Path, plan: dict[str, Any]) -> None:
-    acts_dir.mkdir(parents=True, exist_ok=True)
-    path = acts_dir / "plan.json"
-    if path.exists():
-        old = json.loads(path.read_text())
-        if old["identity"] != plan["identity"]:
-            diff = {k for k in plan["identity"] if old["identity"].get(k) != plan["identity"][k]}
-            raise SystemExit(
-                f"{path} holds another configuration (differs in {sorted(diff)}); use another --out-root"
-            )
-        return
-    store.write_json_atomic(path, plan)
 
 
 def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespace, gpus: list[int]) -> None:
@@ -230,6 +247,10 @@ def noise_for(episodes: np.ndarray, frames: np.ndarray, shape: tuple[int, int], 
     return torch.stack(out)
 
 
+class NonFiniteActivationError(RuntimeError):
+    pass
+
+
 class PartWriter:
     """Memmaps of one part in <part>.tmp/; fp16 unless a layer overflows (then that layer turns fp32)."""
 
@@ -254,7 +275,12 @@ class PartWriter:
 
     def write(self, name: str, rows: slice, x: np.ndarray) -> None:
         arr = self.arrs[name]
-        if arr.dtype == np.float16 and (not np.isfinite(x).all() or np.abs(x).max() > store.FP16_MAX):
+        if not np.isfinite(x).all():
+            bad = int((~np.isfinite(x)).sum())
+            raise NonFiniteActivationError(
+                f"{name}: {bad} NaN/inf values from the model; this part fails (no done.json)"
+            )
+        if arr.dtype == np.float16 and np.abs(x).max() > store.FP16_MAX:
             print(
                 f"[collect] WARNING {name}: |x| > fp16 max ({np.abs(x).max():.3g}); this layer is stored fp32",
                 flush=True,
@@ -300,15 +326,23 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
 
     ident = plan["identity"]
     want = store.identity_hash(ident)
+    parts_dir = acts_dir / "parts"
+
+    def is_done(p: dict[str, Any]) -> bool:
+        done = parts_dir / p["part_id"] / "done.json"
+        if not done.exists():
+            return False
+        if json.loads(done.read_text()).get("identity") != want:
+            raise SystemExit(f"{done.parent} was written with another identity than {acts_dir}/plan.json")
+        return True
+
     todo = []
     for j in part_idx:
         p = plan["parts"][j]
-        d = acts_dir / "parts" / p["part_id"]
-        done = d / "done.json"
-        if done.exists() and json.loads(done.read_text()).get("identity") == want:
+        if is_done(p):
             print(f"[collect] {p['part_id']} done, skip", flush=True)
-            continue
-        todo.append(p)
+        else:
+            todo.append(p)
     if not todo:
         return
     device = "cpu" if args.gpus == "cpu" else "cuda"
@@ -316,6 +350,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     cfg = policy.config
     if cfg.num_inference_steps != N_DENOISE:
         raise SystemExit(f"num_inference_steps {cfg.num_inference_steps} != {N_DENOISE}")
+    if str(getattr(cfg, "dtype", None)) != ident["dtype"]:
+        raise SystemExit(f"loaded policy dtype {getattr(cfg, 'dtype', None)} != plan dtype {ident['dtype']}")
     repo, root, rev = dataset_source(Path(args.out_root))
     my_eps = sorted(e for p in todo for e in p["episodes"])
     ds = LeRobotDataset(repo, root=root, revision=rev, episodes=my_eps)
@@ -324,94 +360,121 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     from data_variants import suite_of
 
     gpu_name = torch.cuda.get_device_name(0) if device == "cuda" else "cpu"
+    elsewhere = []
     for p in todo:
-        t0 = time.time()
-        d = acts_dir / "parts" / p["part_id"]
-        tmp = d.with_name(d.name + ".tmp")
-        shutil.rmtree(tmp, ignore_errors=True)
-        shutil.rmtree(d, ignore_errors=True)
-        tmp.mkdir(parents=True)
-        rows = cols[cols["episode_index"].isin(p["episodes"])].sort_values(["episode_index", "frame_index"])
-        if len(rows) != p["n_frames"]:
-            raise SystemExit(f"{p['part_id']}: {len(rows)} frames in the data, plan says {p['n_frames']}")
-        writer = PartWriter(tmp, ident["layers"], len(rows), len(ident["ae_steps"]))
-        loader = DataLoader(
-            Subset(ds, rows["rel"].tolist()), batch_size=args.batch, num_workers=args.workers, shuffle=False
-        )
-        meta_rows: list[dict[str, Any]] = []
-        pos = 0
-        n_seen_steps = None
-        rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
-        for batch in loader:
-            bsz = len(batch["task"])
-            ep = batch["episode_index"].numpy()
-            fr = batch["frame_index"].numpy()
-            exp = rows.iloc[pos : pos + bsz]
-            if not (np.array_equal(ep, exp["episode_index"]) and np.array_equal(fr, exp["frame_index"])):
-                raise SystemExit(f"{p['part_id']}: loader order != plan order at row {pos}")
-            raw_action = batch["action"].numpy().copy()
-            obs = pre(batch)
-            noise = noise_for(ep, fr, (cfg.chunk_size, cfg.max_action_dim), ident["noise_seed"])
-            with torch.inference_mode(), rec:
-                chunk = policy.predict_action_chunk(obs, noise=noise.to(device))
-            n_seen_steps = rec.n_steps
-            a0 = post(chunk[:, 0]).float().cpu().numpy()
-            sl = slice(pos, pos + bsz)
-            for name, x in rec.pg.items():
-                writer.write(name, sl, x.cpu().numpy())
-            for name, x in rec.ae.items():
-                writer.write(name, sl, x.cpu().numpy())
-            assert rec.counts is not None
-            writer.counts[sl] = rec.counts.cpu().numpy().astype(np.int32)
-            for i in range(bsz):
-                task = str(batch["task"][i])
-                meta_rows.append(
-                    {
-                        "row": pos + i,
-                        "index": int(batch["index"][i]),
-                        "episode_index": int(ep[i]),
-                        "frame_index": int(fr[i]),
-                        "task_index": int(batch["task_index"][i]),
-                        "suite": suite_of(task),
-                        "instruction": task,
-                        "action": raw_action[i].tolist(),
-                        "policy_action0": a0[i].tolist(),
-                    }
-                )
-            pos += bsz
-            if args.max_batches and pos >= args.max_batches * args.batch:
-                break
-        if n_seen_steps != N_DENOISE:
-            raise SystemExit(f"recorder saw {n_seen_steps} denoising steps, expected {N_DENOISE}")
-        if pos != len(rows):
-            raise SystemExit(
-                f"{p['part_id']}: wrote {pos} rows of {len(rows)} (--max-batches is for debugging)"
+        pid = p["part_id"]
+        if is_done(p):
+            print(f"[collect] {pid} finished by another writer, skip", flush=True)
+            continue
+        if not store.try_lease(parts_dir, pid):
+            print(f"[collect] {pid} is being written by another writer (fresh lease), skip", flush=True)
+            elsewhere.append(pid)
+            continue
+        tmp = parts_dir / f".{pid}.tmp-{store.unique_tag()}"
+        try:
+            if is_done(p):  # finished between our check and the lease
+                continue
+            tmp.mkdir(parents=True)
+            t0 = time.time()
+            rows = cols[cols["episode_index"].isin(p["episodes"])].sort_values(
+                ["episode_index", "frame_index"]
             )
-        dtypes = writer.close()
-        pd.DataFrame(meta_rows).to_parquet(tmp / "meta.parquet", index=False)
-        secs = time.time() - t0
-        store.write_json_atomic(
-            tmp / "done.json",
-            {
-                "identity": want,
-                "part_id": p["part_id"],
-                "episodes": p["episodes"],
-                "rows": pos,
-                "dtypes": dtypes,
-                "overflow_fp32": writer.overflow,
-                "seconds": round(secs, 1),
-                "timesteps_per_s": round(pos / secs, 2),
-                "gpu": gpu_name,
-                "batch": args.batch,
-                "tasks_seen": sorted({int(r["task_index"]) for r in meta_rows}),
-                "inference": {
-                    k: inf_meta[k] for k in ("num_inference_steps", "chunk_size", "dtype") if k in inf_meta
+            if len(rows) != p["n_frames"]:
+                raise SystemExit(f"{pid}: {len(rows)} frames in the data, plan says {p['n_frames']}")
+            writer = PartWriter(tmp, ident["layers"], len(rows), len(ident["ae_steps"]))
+            loader = DataLoader(
+                Subset(ds, rows["rel"].tolist()),
+                batch_size=args.batch,
+                num_workers=args.workers,
+                shuffle=False,
+            )
+            meta_rows: list[dict[str, Any]] = []
+            pos = 0
+            n_seen_steps = None
+            rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
+            for batch in loader:
+                store.refresh_lease(parts_dir, pid)
+                bsz = len(batch["task"])
+                ep = batch["episode_index"].numpy()
+                fr = batch["frame_index"].numpy()
+                exp = rows.iloc[pos : pos + bsz]
+                if not (np.array_equal(ep, exp["episode_index"]) and np.array_equal(fr, exp["frame_index"])):
+                    raise SystemExit(f"{pid}: loader order != plan order at row {pos}")
+                raw_action = batch["action"].numpy().copy()
+                obs = pre(batch)
+                noise = noise_for(ep, fr, (cfg.chunk_size, cfg.max_action_dim), ident["noise_seed"])
+                with torch.inference_mode(), rec:
+                    chunk = policy.predict_action_chunk(obs, noise=noise.to(device))
+                n_seen_steps = rec.n_steps
+                a0 = post(chunk[:, 0]).float().cpu().numpy()
+                sl = slice(pos, pos + bsz)
+                for name, x in rec.pg.items():
+                    writer.write(name, sl, x.cpu().numpy())
+                for name, x in rec.ae.items():
+                    writer.write(name, sl, x.cpu().numpy())
+                assert rec.counts is not None
+                writer.counts[sl] = rec.counts.cpu().numpy().astype(np.int32)
+                for i in range(bsz):
+                    task = str(batch["task"][i])
+                    meta_rows.append(
+                        {
+                            "row": pos + i,
+                            "index": int(batch["index"][i]),
+                            "episode_index": int(ep[i]),
+                            "frame_index": int(fr[i]),
+                            "task_index": int(batch["task_index"][i]),
+                            "suite": suite_of(task),
+                            "instruction": task,
+                            "action": raw_action[i].tolist(),
+                            "policy_action0": a0[i].tolist(),
+                        }
+                    )
+                pos += bsz
+                if args.max_batches and pos >= args.max_batches * args.batch:
+                    break
+            if n_seen_steps != N_DENOISE:
+                raise SystemExit(f"recorder saw {n_seen_steps} denoising steps, expected {N_DENOISE}")
+            if pos != len(rows):
+                raise SystemExit(f"{pid}: wrote {pos} rows of {len(rows)} (--max-batches is for debugging)")
+            dtypes = writer.close()
+            pd.DataFrame(meta_rows).to_parquet(tmp / "meta.parquet", index=False)
+            secs = time.time() - t0
+            store.write_json_atomic(
+                tmp / "done.json",
+                {
+                    "identity": want,
+                    "part_id": pid,
+                    "episodes": p["episodes"],
+                    "rows": pos,
+                    "dtypes": dtypes,
+                    "overflow_fp32": writer.overflow,
+                    "seconds": round(secs, 1),
+                    "timesteps_per_s": round(pos / secs, 2),
+                    "gpu": gpu_name,
+                    "writer": store.unique_tag(),
+                    "batch": args.batch,
+                    "tasks_seen": sorted({int(r["task_index"]) for r in meta_rows}),
+                    "inference": {
+                        k: inf_meta[k]
+                        for k in ("num_inference_steps", "chunk_size", "dtype")
+                        if k in inf_meta
+                    },
                 },
-            },
-        )
-        tmp.rename(d)
+            )
+            if store.publish_part(tmp, parts_dir / pid):
+                print(
+                    f"[collect] {pid}: {pos} timesteps in {secs:.0f}s ({pos / secs:.1f}/s) on {gpu_name}",
+                    flush=True,
+                )
+            else:
+                print(f"[collect] {pid}: another writer published it first; dropped this copy", flush=True)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+            store.release_lease(parts_dir, pid)
+    if elsewhere:
         print(
-            f"[collect] {p['part_id']}: {pos} timesteps in {secs:.0f}s ({pos / secs:.1f}/s) on {gpu_name}",
+            f"[collect] {len(elsewhere)} parts left to other writers: {elsewhere}; re-run later to pick up "
+            f"any whose writer died (lease older than {store.LEASE_TTL_S:.0f}s)",
             flush=True,
         )
 
@@ -461,7 +524,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"[collect] out {acts_dir}", flush=True)
     if args.dry_run:
         return
-    write_or_check_plan(acts_dir, plan)
+    store.create_or_check_plan(acts_dir / "plan.json", plan)
     if not gpus:
         run_parts(args, plan, acts_dir, mine)
         print(f"[collect] parts done: {len(store.done_parts(acts_dir))}/{len(plan['parts'])} in {acts_dir}")

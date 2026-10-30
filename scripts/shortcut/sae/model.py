@@ -60,7 +60,8 @@ class TopKSAE(nn.Module):
         w_dec = torch.randn(cfg.d, cfg.n_latents, generator=g)
         w_dec = w_dec / w_dec.norm(dim=0, keepdim=True)
         self.W_dec = nn.Parameter(w_dec)  # (d, n), columns = feature directions
-        self.W_enc = nn.Parameter(w_dec.T.clone() * math.sqrt(cfg.k / cfg.d))  # (n, d)
+        # W_enc = W_decᵀ·√(k/n), n = residual-stream dimension d (Swann et al. 2026 App. B.1, as written there)
+        self.W_enc = nn.Parameter(w_dec.T.clone() * math.sqrt(cfg.k / cfg.d))  # (n_latents, d)
         self.b_pre = nn.Parameter(torch.zeros(cfg.d))
 
     # ---------------------------------------------------------------- core

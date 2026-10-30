@@ -48,7 +48,8 @@ mean over all tokens is the count-weighted mean of the three groups (`store.pool
 SC_OUT_ROOT=/data/sc scripts/shortcut/setup_server.sh --gpus 0,1,2,3
 export SC_OUT_ROOT=/data/sc          # outputs go to $SC_OUT_ROOT/sae/<model>/
 
-# 2. smoke (one GPU, ~10 min): PASS/FAIL per check + measured timesteps/s → full-run hours and GB
+# 2. smoke (one GPU, ~10 min): new run dir <out-root>/run-<time>-<host>-<rand>/ per call; every step's exit
+#    code (steps.tsv) and every sub-check → PASS/FAIL (exit 0 only on PASS), measured timesteps/s → hours and GB
 scripts/shortcut/sae/smoke.sh --out-root $SC_OUT_ROOT/smoke/T015 --gpu 0
 
 # 2b. plan: timesteps, storage, time (time uses the THROUGHPUT table in collect.py; update it from step 2)
@@ -80,6 +81,28 @@ default, the step stays in the records), `--seeds 0,1,2` (stability), `--expansi
 `--wandb offline|off`. Jobs = layers × seeds; `--shard i/N` takes every N-th job, `--gpus` runs the shard's
 jobs biggest-first on the least loaded GPU. W&B logs offline into each job dir (`wandb sync <dir>/wandb/offline-run-*`
 where a key works).
+
+### Running many pods on one shared acts dir
+
+Pods may overlap (a replacement pod starting before the old one is gone, or two shard specs covering the same
+parts); every pod is often PID 1. Collection is safe under that:
+
+- `plan.json` is created exclusively (a complete temp file hard-linked into place); a pod that finds it compares
+  the identity and stops if it differs. The identity has the checkpoint id (`hub:<commit sha>` or `sha256:` of a
+  local checkpoint's files), the adapter's, and the inference dtype, besides layers, steps, episodes, parts, seed.
+- a part is claimed with an O_EXCL lease `parts/<part>.lease` (host, pid, time; touched every batch). A fresh
+  lease of another writer → the part is skipped (re-run later to pick it up); a lease not touched for
+  `SC_SAE_LEASE_TTL` s (default 3600) is stale and taken over.
+- each writer works in its own `parts/.<part>.tmp-<host>.<pid>.<rand>/` and publishes with one rename; if the
+  final part already exists (another writer was first), its own copy is dropped. Its tmp dir and lease are
+  removed when it finishes or fails; a killed pod's tmp dir stays behind (safe to delete once its lease is stale).
+- NaN/inf in any activation fails the part (no done.json, the run exits non-zero); only finite values beyond the
+  fp16 range switch a layer to fp32.
+
+Training: a job is skipped only if its `done.json` was written for the same config — SAE hyperparameters, input,
+ae steps, the collection identity and the exact list of collected parts. A finished job of another config stops
+the run (`--force` retrains it, or use another `--sae-dir`); an unfinished job deletes any old `done.json` before
+training, so a crash never leaves a stale "done".
 
 Pod split examples: collection N=8 pods × 4 GPUs = 32 workers over 64 parts (2 parts each). Training: 37 jobs; the
 18 action-expert jobs are 10× bigger (2.7 M samples) than the PaliGemma/emb ones, so `--shard i/2 --gpus 0,1,2,3`
@@ -162,8 +185,13 @@ GPU work for T015, so the times below come from FLOP counts; `smoke.sh` prints t
   group mean vs all-token mean rel. error 1e-9; policy first action vs dataset action L1 0.029.
 - This run found that lerobot calls `gemma_expert.model.forward()` directly, so a hook on the expert model never
   fires; denoising steps are counted on action-expert layer 0 instead (the mock test now calls `.forward()` too).
-- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 18): layer specs, part / shard split, fp16 overflow →
+- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 30): layer specs, part / shard split, fp16 overflow →
   fp32, SAE init / constraints / loss decrease / AuxK / save-load, C.1 hysteresis, interventions on a toy layout
   (`project_out` leaves no v component, `add`, `replace_with` matches the SAE metrics), and a mock π0.5 on the
   real 3-episode LIBERO data through collect (shard 0/2 + 1/2, resume, config clash), reader, train (stop + resume),
-  stats, `--ae-steps` subset and the `smoke.py --summarize` PASS/FAIL logic.
+  stats, `--ae-steps` subset and the `smoke.py --summarize` PASS/FAIL logic. `test_review.py` reproduces the
+  review cases: concurrent plan creation with PID 1 everywhere, checkpoint fingerprint + dtype in the identity,
+  lease (fresh skip / stale takeover) and first-writer-wins publish (also a killed pod's tmp + stale lease in the
+  mock run), NaN/inf failing a part with nothing left behind, train skip only on an identical config (another
+  config is refused), `--force` crash leaving no done.json, smoke FAIL on any step exit code / hook sub-check /
+  missing bench, stats from fp32 codes near τ_on.
