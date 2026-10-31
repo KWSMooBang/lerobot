@@ -20,6 +20,7 @@ import os
 import sys
 from contextlib import ExitStack
 from pathlib import Path
+from typing import Any
 
 HERE = Path(__file__).resolve().parent
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -139,7 +140,9 @@ def summarize(out: Path, model: str) -> bool:
         meta = pd.concat([pd.read_parquet(Path(p["dir"]) / "meta.parquet") for p in parts])
         a = np.stack(meta["action"].to_numpy())
         a0 = np.stack(meta["policy_action0"].to_numpy())
-        est["policy_action0_vs_dataset_mae"] = float(np.abs(a - a0).mean())
+        est["policy_action0_vs_dataset_mae"] = float(
+            np.nanmean(np.abs(a - a0))
+        )  # prefix-only parts: first batch only
         est["dataset_action_abs_mean"] = float(np.abs(a).mean())
     for lay, tag in (("pg05", "pooled_all"), ("ae05", "ae-steps-all")):
         jd = out / "sae" / model / "sae" / tag / lay / "seed0"
@@ -184,6 +187,75 @@ def summarize(out: Path, model: str) -> bool:
     return ok
 
 
+PREFIX_CONFIGS = {  # the VLM collection batches + all of them at once
+    "a: emb,pg:0-5": "emb,pg:0-5",
+    "b: pg:6-11": "pg:6-11",
+    "c: pg:12-17": "pg:12-17",
+    "all: emb,pg:0-17": "emb,pg:0-17",
+}
+
+
+def prefix_check(policy: Any, obs: dict, noise: Any, reps: int = 2) -> dict:
+    """Prefix-only (cut after the deepest requested PaliGemma layer) vs full forward: recorded emb/PaliGemma
+    activations must be bit-identical, nothing may stay attached afterwards; wall time of each."""
+    import time
+
+    from hooks import PrefixDone, parse_layers
+
+    def run(layers: list[str], stop: bool) -> tuple[dict, float]:
+        rec = ActivationRecorder(policy, layers, stop_after_prefix=stop)
+        t0 = time.perf_counter()
+        try:
+            with torch.inference_mode(), rec:
+                policy.predict_action_chunk(obs, noise=noise)
+            done = True
+        except PrefixDone:
+            done = False
+        dt = time.perf_counter() - t0
+        if done == stop:
+            raise RuntimeError(f"stop={stop} but the forward {'completed' if done else 'was cut'}")
+        assert rec.counts is not None
+        return {k: v.clone() for k, v in rec.pg.items()} | {"counts": rec.counts.clone()}, dt
+
+    all_pg = parse_layers("emb,pg:0-17")
+    with torch.inference_mode():
+        a_before = policy.predict_action_chunk(obs, noise=noise)
+    run(all_pg, False)  # warm-up
+    t_full = []
+    for _ in range(reps):
+        ref, dt = run(all_pg, False)
+        t_full.append(dt)
+    res: dict = {"full_s": min(t_full), "configs": {}}
+    for name, spec in PREFIX_CONFIGS.items():
+        layers = parse_layers(spec)
+        ts: list[float] = []
+        got: dict[str, Any] = {}
+        for _ in range(reps):
+            got, dt = run(layers, True)
+            ts.append(dt)
+        equal = {k: bool(torch.equal(got[k], ref[k])) for k in got}
+        res["configs"][name] = {
+            "prefix_s": min(ts),
+            "full_over_prefix": min(t_full) / min(ts),
+            "bit_identical": all(equal.values()),
+            "layers_compared": len(equal) - 1,
+        }
+    # nothing left behind by the interrupted calls: hooks, wrappers, next forward
+    mods = list(pg_layers(policy)) + list(ae_layers(policy))
+    res["no_hooks_left"] = all(not m._forward_hooks and not m._forward_pre_hooks for m in mods)
+    res["no_wrappers_left"] = not {"embed_prefix", "_embed_images"} & set(policy.model.__dict__)
+    with torch.inference_mode():
+        a_after = policy.predict_action_chunk(obs, noise=noise)
+    res["action_after_interrupts_bit_identical"] = bool(torch.equal(a_before, a_after))
+    res["pass"] = (
+        all(c["bit_identical"] for c in res["configs"].values())
+        and res["no_hooks_left"]
+        and res["no_wrappers_left"]
+        and res["action_after_interrupts_bit_identical"]
+    )
+    return res
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -197,6 +269,9 @@ def main() -> None:
     ap.add_argument("--gpu", type=int, default=0, help="nvidia-smi index (locked in this container)")
     ap.add_argument("--bench-sae", action="store_true", help="only time SAE training steps")
     ap.add_argument("--summarize", action="store_true", help="summary of a smoke.sh output dir (no GPU)")
+    ap.add_argument(
+        "--prefix-check", action="store_true", help="prefix-only vs full forward: identical values + timing"
+    )
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -238,6 +313,13 @@ def main() -> None:
             0,
         ).to(dev)
         res: dict = {"model": m, "frames": len(pick), "episodes": eps}
+        if args.prefix_check:
+            res |= prefix_check(policy, obs, noise)
+            res["device"] = dev
+            print(json.dumps(res, indent=1))
+            (out / "prefix_check.json").write_text(json.dumps(res, indent=1) + "\n")
+            print("PREFIX CHECK", "PASS" if res["pass"] else "FAIL")
+            sys.exit(0 if res["pass"] else 1)
 
         with torch.inference_mode():
             a_plain = policy.predict_action_chunk(obs, noise=noise)

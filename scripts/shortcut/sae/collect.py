@@ -10,6 +10,12 @@ residual stream: emb + PaliGemma layers 0-17 per token group (cam1, cam2, text; 
 camera excluded; valid-token counts saved), action-expert layers 0-17 per denoising step (action-token
 mean). Layout and reader: `store.py`.
 
+Prefix-only (default when `--layers` has no action-expert layer; `--full-forward` turns it off): the same
+`sample_actions` path is cut right after the deepest requested PaliGemma layer is recorded (`hooks.PrefixDone`),
+so the 10 denoising steps and the later PaliGemma layers are skipped and the recorded values are bit-identical.
+The first batch of each part still runs in full for the `policy_action0` sanity column (NaN on the other rows).
+How a part ran is in done.json (`forward`, `full_forward_batches`), not in the identity.
+
 Splitting: the selected episodes are cut into `--parts` contiguous ranges (default 64, independent of how
 the work is distributed). `--shard i/N` takes the i-th of N contiguous blocks of parts (one pod = one shard),
 `--gpus` spreads that shard's parts over local GPUs (one process each). A part is the resume unit: finished
@@ -42,13 +48,27 @@ for p in (str(HERE), str(SHORTCUT), str(SHORTCUT / "train")):
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import store  # noqa: E402
-from hooks import GROUPS, layer_dim, layer_family, parse_layers  # noqa: E402
+from hooks import GROUPS, PrefixDone, layer_dim, layer_family, parse_layers, prefix_stop_layer  # noqa: E402
 
 N_DENOISE = 10  # pi05 num_inference_steps (checked against the loaded config)
 # timesteps/s per GPU, ESTIMATES to be replaced by the server smoke (smoke.sh prints the measured value):
 # ~4.8 TFLOP per timestep (Gemma-2B prefix 968 tok ≈ 3.9, SigLIP 3 × 256 tok ≈ 0.6, 10 expert steps ≈ 0.3)
 # at ~40 % of the dense bf16 peak with fp32 accumulation (RTX 4090 ≈ 83, A100 ≈ 312 TFLOPS).
-THROUGHPUT = {"RTX 4090": 7.0, "A100": 25.0}
+# A100: measured 17 ts/s by the server smoke (5df0e208, full forward, all 37 layers); RTX 4090: FLOP estimate.
+THROUGHPUT = {"RTX 4090": 7.0, "A100": 17.0}
+# Share of a full forward's wall time (CPU, real pi05lib, 2 frames; smoke.py --prefix-check): vision + embeddings,
+# the 18 PaliGemma layers, the 10 denoising steps. A prefix-only forward that stops after PaliGemma layer L costs
+# about VISION + PG_LAYERS·(L+1)/18. Measured full/prefix-only: emb,pg:0-5 3.2×, pg:6-11 2.3×, pg:12-17 1.8×.
+TIME_SHARE = {"vision": 0.23, "pg_layers": 0.50, "denoise": 0.27}
+
+
+def forward_time_fraction(layers: list[str], full_forward: bool) -> float:
+    """Estimated wall time per timestep relative to a full forward (1.0)."""
+    stop = prefix_stop_layer(layers)
+    if full_forward or stop is None:
+        return 1.0
+    n = 0 if stop == "emb" else int(stop[2:]) + 1
+    return TIME_SHARE["vision"] + TIME_SHARE["pg_layers"] * n / 18
 
 
 def parse_shard(s: str) -> tuple[int, int]:
@@ -291,10 +311,19 @@ def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespac
         f"[collect] storage fp16: {bpt / 1024:.0f} KB/timestep → shard {n_mine * bpt / 1e9:.1f} GB, "
         f"all {n_all * bpt / 1e9:.1f} GB"
     )
-    for gpu, tps in THROUGHPUT.items():
+    frac = forward_time_fraction(ident["layers"], getattr(args, "full_forward", False))
+    stop = prefix_stop_layer(ident["layers"])
+    mode = (
+        f"prefix-only, stops after {stop}: ~{frac:.2f}× the full-forward time per timestep"
+        if frac < 1
+        else "full forward (prefix + 10 denoising steps)"
+    )
+    print(f"[collect] forward: {mode}")
+    for gpu, full_tps in THROUGHPUT.items():
+        tps = full_tps / frac
         n_g = max(len(gpus), 1)
         print(
-            f"[collect] time on {n_g}× {gpu} (~{tps} ts/s each): shard {n_mine / tps / n_g / 3600:.2f} h, "
+            f"[collect] time on {n_g}× {gpu} (~{tps:.0f} ts/s each): shard {n_mine / tps / n_g / 3600:.2f} h, "
             f"all on 1 GPU {n_all / tps / 3600:.1f} h"
         )
 
@@ -429,6 +458,15 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     from data_variants import suite_of
 
     gpu_name = torch.cuda.get_device_name(0) if device == "cuda" else "cpu"
+    stop_layer = prefix_stop_layer(ident["layers"])
+    prefix_only = not args.full_forward and stop_layer is not None
+    # not part of the identity: prefix-only records the same values; only done.json says how it ran
+    forward_desc = (
+        f"prefix-only (stopped after {stop_layer}; full forward on the first batch of the part for policy_action0)"
+        if prefix_only
+        else "full (prefix + 10 denoising steps)"
+    )
+    print(f"[collect] forward: {forward_desc}", flush=True)
     elsewhere = []
     for p in todo:
         pid = p["part_id"]
@@ -461,7 +499,7 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
             )
             meta_rows: list[dict[str, Any]] = []
             pos = 0
-            n_seen_steps = None
+            n_full = 0
             rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
             for batch in loader:
                 lease.check()  # raises LeaseLostError if the part was taken over
@@ -474,10 +512,24 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                 raw_action = batch["action"].numpy().copy()
                 obs = pre(batch)
                 noise = noise_for(ep, fr, (cfg.chunk_size, cfg.max_action_dim), ident["noise_seed"])
-                with torch.inference_mode(), rec:
-                    chunk = policy.predict_action_chunk(obs, noise=noise.to(device))
-                n_seen_steps = rec.n_steps
-                a0 = post(chunk[:, 0]).float().cpu().numpy()
+                # prefix-only: same sample_actions path, cut after the deepest requested PaliGemma layer;
+                # the first batch of a part still runs in full for the policy_action0 sanity check
+                full = not prefix_only or pos == 0
+                rec.stop_after_prefix = not full
+                try:
+                    with torch.inference_mode(), rec:
+                        chunk = policy.predict_action_chunk(obs, noise=noise.to(device))
+                except PrefixDone:
+                    chunk = None
+                if full:
+                    if chunk is None or rec.n_steps != N_DENOISE:
+                        raise SystemExit(f"recorder saw {rec.n_steps} denoising steps, expected {N_DENOISE}")
+                    n_full += 1
+                    a0 = post(chunk[:, 0]).float().cpu().numpy()
+                else:
+                    if chunk is not None:
+                        raise SystemExit(f"{pid}: prefix-only forward was not cut at {stop_layer}")
+                    a0 = np.full(raw_action.shape, np.nan, np.float32)
                 sl = slice(pos, pos + bsz)
                 for name, x in rec.pg.items():
                     writer.write(name, sl, x.cpu().numpy())
@@ -503,8 +555,6 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                 pos += bsz
                 if args.max_batches and pos >= args.max_batches * args.batch:
                     break
-            if n_seen_steps != N_DENOISE:
-                raise SystemExit(f"recorder saw {n_seen_steps} denoising steps, expected {N_DENOISE}")
             if pos != len(rows):
                 raise SystemExit(f"{pid}: wrote {pos} rows of {len(rows)} (--max-batches is for debugging)")
             dtypes = writer.close()
@@ -517,6 +567,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                     "part_id": pid,
                     "episodes": p["episodes"],
                     "rows": pos,
+                    "forward": forward_desc,
+                    "full_forward_batches": n_full,
                     "dtypes": dtypes,
                     "overflow_fp32": writer.overflow,
                     "seconds": round(secs, 1),
@@ -580,6 +632,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--workers", type=int, default=6, help="dataloader workers per GPU (PNG decoding)")
     ap.add_argument("--noise-seed", type=int, default=0)
+    ap.add_argument(
+        "--full-forward",
+        action="store_true",
+        help="with only emb/PaliGemma layers, still run the 10 denoising steps on every batch (default: stop "
+        "after the deepest requested PaliGemma layer; same activations, not part of the identity)",
+    )
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--allow-any-gpu", action="store_true")
     ap.add_argument("--max-batches", type=int, default=0, help=argparse.SUPPRESS)
