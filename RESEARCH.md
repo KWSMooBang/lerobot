@@ -46,7 +46,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - C9 (vision-only 학습) 는 선택, 보류
 
 ## GPU 예산
-- kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 (2026-10-31).
+- kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함).
 - **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
   (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
@@ -101,3 +101,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-31 사람 지시: 용량 때문에 VLM (emb + PG 0–17, ≈64 GB) SAE 부터. AE 는 그 뒤. 서버 용량이 부족하면 끝난 산출물을 로컬로 받고 서버에서 지운 뒤 계속. 실행은 baccus-VLA-shortcut-exps (kubectl).
 - 2026-10-31 서버 smoke PASS (exp/sc-sae 5df0e208 병합, A100×1): 수집 실측 17 ts/s. VLM 3분할로 ≈14 GPU-h — 사람 승인. a 배치 23:15 UTC 시작. VLM 만 요청하면 denoising 을 건너뛰는 옵션 (T015 후속, CPU) 을 b·c 에 적용 예정.
 - 2026-10-31 T015 prefix-only 수집 병합 (exp/sc-sae 97c6901c): VLM 층만 요청하면 가장 깊은 PG 층 뒤에서 중단, activation bit 동일. A100 실측 full 22.3 → prefix-only pg11 까지 43.5, pg17 까지 32.2 ts/s. VLM a·b 완료 (VE pg00 0.972 → pg11 0.923), c 진행 중.
+- 2026-10-31 T015 VLM SAE 완료 (19층, ≈11.2 GPU-h). emb·pg00–16 keep, pg17 보류 (dead 27.6%, action expert 가 읽지 않는 마지막 residual 이라는 가설). 데이터는 Mac mini (baccus). 다음: pg17 유효 rank 확인, SAE 분석 (지시/장면 민감도 등) 명세, action expert SAE 는 용량 확보 뒤.
