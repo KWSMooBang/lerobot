@@ -365,3 +365,102 @@ def test_ae_step_subset(tmp_path, mock_loader):
     assert full.shape[1] == 10 and sub.shape[1] == 2
     assert np.array_equal(sub, full[:, [0, 9]])
     assert not np.array_equal(full[:, 0], full[:, 9])
+
+
+# ---------------------------------------------------------------------------- prefix-only collection
+def _count_calls(pol):
+    """Count expert passes and calls of PaliGemma layer 6 (instance-level forward wrappers, no hooks)."""
+    calls = {"expert": 0, "pg06": 0}
+    expert, layer6 = pol.model.expert, pol.model.lm.layers[6]
+    orig_e, orig_6 = expert.forward, layer6.forward
+
+    def e_fwd(*a, **k):
+        calls["expert"] += 1
+        return orig_e(*a, **k)
+
+    def l6_fwd(*a, **k):
+        calls["pg06"] += 1
+        return orig_6(*a, **k)
+
+    expert.forward, layer6.forward = e_fwd, l6_fwd
+    return calls
+
+
+def _collect(out, extra, layers):
+    argv = [
+        "--model",
+        "pi05lib",
+        "--out-root",
+        str(out),
+        "--episodes",
+        "379",
+        "--parts",
+        "1",
+        "--gpus",
+        "cpu",
+    ]
+    collect.main([*argv, "--workers", "0", "--batch", "16", "--layers", layers, *extra])
+    return next((out / "sae" / "pi05lib" / "acts" / "parts").glob("ep*"))
+
+
+def test_prefix_only_same_values_and_skips_denoising(tmp_path, mock_loader):
+    pol = mock_loader
+    plain = pol.predict_action_chunk(_obs(), torch.zeros(1, 5, 32))
+    calls = _count_calls(pol)
+    d_pfx = _collect(tmp_path / "pfx", [], "emb,pg:0-5")
+    pfx_calls = dict(calls)
+    calls.update(expert=0, pg06=0)
+    d_full = _collect(tmp_path / "full", ["--full-forward"], "emb,pg:0-5")
+    # 112 frames / 16 = 7 batches: prefix-only runs the expert (10 passes) and layers > pg05 on batch 1 only
+    assert pfx_calls == {"expert": 10, "pg06": 1}
+    assert calls == {"expert": 70, "pg06": 7}
+    for name in ["emb"] + [f"pg{i:02d}" for i in range(6)] + ["counts"]:
+        assert np.array_equal(np.load(d_pfx / f"{name}.npy"), np.load(d_full / f"{name}.npy")), name
+    dp, df = (json.loads((d / "done.json").read_text()) for d in (d_pfx, d_full))
+    assert dp["forward"].startswith("prefix-only (stopped after pg05") and dp["full_forward_batches"] == 1
+    assert df["forward"].startswith("full") and df["full_forward_batches"] == 7
+    assert dp["identity"] == df["identity"]  # not part of the identity
+    a0p = np.stack(pd.read_parquet(d_pfx / "meta.parquet")["policy_action0"].to_numpy())
+    a0f = np.stack(pd.read_parquet(d_full / "meta.parquet")["policy_action0"].to_numpy())
+    assert np.isfinite(a0p[:16]).all() and np.isnan(a0p[16:]).all()  # sanity action from the first batch
+    assert np.array_equal(a0p[:16], a0f[:16])
+    # after 6 interrupted batches nothing is left attached and the policy behaves as before
+    mods = list(pol.model.lm.layers) + list(pol.model.expert.layers)
+    assert all(not m._forward_hooks and not m._forward_pre_hooks for m in mods)
+    assert not {"embed_prefix", "_embed_images"} & set(pol.model.__dict__)
+    assert torch.equal(pol.predict_action_chunk(_obs(), torch.zeros(1, 5, 32)), plain)
+
+
+def test_action_expert_layers_force_full_forward(tmp_path, mock_loader):
+    calls = _count_calls(mock_loader)
+    d = _collect(tmp_path, [], "pg:5,ae:3")
+    done = json.loads((d / "done.json").read_text())
+    assert done["forward"].startswith("full") and done["full_forward_batches"] == 7
+    assert calls["expert"] == 70
+    assert np.isfinite(np.stack(pd.read_parquet(d / "meta.parquet")["policy_action0"].to_numpy())).all()
+
+
+def test_prefix_stop_layer_and_recorder_guard():
+    from hooks import PrefixDone, prefix_stop_layer
+
+    assert prefix_stop_layer(["emb", "pg00", "pg05"]) == "pg05"
+    assert prefix_stop_layer(["pg12", "pg17", "pg06"]) == "pg17"
+    assert prefix_stop_layer(["emb"]) == "emb"
+    assert prefix_stop_layer(["emb", "ae00"]) is None
+    pol = MockPolicy()
+    with pytest.raises(ValueError, match="PaliGemma/emb layers only"):
+        ActivationRecorder(pol, ["pg05", "ae00"], stop_after_prefix=True).attach()
+    # emb-only stops before layer 0 runs; the recorded value is still there
+    rec = ActivationRecorder(pol, ["emb"], stop_after_prefix=True)
+    with pytest.raises(PrefixDone), rec:
+        pol.predict_action_chunk(_obs(), torch.zeros(1, 5, 32))
+    assert rec.pg["emb"].shape == (1, 3, D_PG)
+    assert not pol.model.lm.layers[0]._forward_pre_hooks
+
+
+def _obs():
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+    repo, root, rev = collect.dataset_source(Path("/outputs/VLA-shortcut-exps"))
+    ds = LeRobotDataset(repo, root=root, revision=rev, episodes=[379])
+    return mock_pre(torch.utils.data.default_collate([ds[5]]))

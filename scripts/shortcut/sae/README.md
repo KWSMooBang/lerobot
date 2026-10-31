@@ -80,7 +80,7 @@ runs collection / training on the CPU (tests). Without `/queue` nothing is locke
 
 Collection options: `--layers` (default all 37), `--ae-steps all|first,last|0,5,9` (default all 10),
 `--episodes 0-9` (smoke), `--parts 64` (resume unit; same for every pod count), `--batch 32`,
-`--workers 6` (PNG decoding), `--model pi05lib|pi05base|<ckpt_registry id>|<path>` (pi05base gets the LIBERO
+`--workers 6` (PNG decoding), `--full-forward` (by default a run with only emb/PaliGemma layers stops each forward after the deepest requested PaliGemma layer and skips the 10 denoising steps: same values bit for bit, `policy_action0` only from each part's first batch; CPU full/prefix-only time: emb,pg:0-5 3.2×, pg:6-11 2.3×, pg:12-17 1.8×), `--model pi05lib|pi05base|<ckpt_registry id>|<path>` (pi05base gets the LIBERO
 adapter as in sc-bench). Noise for the denoising loop is seeded by (episode, frame), so a timestep gives the
 same activations in any shard / batch layout (up to bf16 batch-size effects). Each worker opens the dataset
 filtered to its episodes; `datasets` writes an Arrow copy of those rows into `$HF_DATASETS_CACHE` (in total

@@ -105,6 +105,20 @@ def _hidden_from_args(args: tuple, kwargs: dict) -> Tensor:
 
 
 # ---------------------------------------------------------------------------- recorder
+class PrefixDone(Exception):  # noqa: N818  (a control-flow signal, not an error)
+    """Raised by a prefix-only recorder once the last requested PaliGemma layer is recorded."""
+
+
+def prefix_stop_layer(layers: Iterable[str]) -> str | None:
+    """Where a prefix-only forward can stop: the deepest requested PaliGemma layer (`emb` = layer 0's input).
+    None when an action-expert layer is requested (needs the denoising loop) or no PaliGemma layer is."""
+    names = list(layers)
+    if any(n.startswith("ae") for n in names):
+        return None
+    pg = sorted(n for n in names if n.startswith("pg"))
+    return pg[-1] if pg else ("emb" if "emb" in names else None)
+
+
 @dataclass
 class _PrefixLayout:
     group_masks: Tensor  # (B, G, L) float, 1 on valid tokens of the group
@@ -117,12 +131,25 @@ class ActivationRecorder:
     After one forward: `pg[name]` (B, G, d) fp32 group means, `counts` (B, G) int, `ae[name]` (B, S, d)
     fp32 action-token means for the recorded denoising steps `ae_steps` (None = all), in step order.
     Hooks return None (observe only), so the policy output is unchanged.
+
+    `stop_after_prefix=True` (only PaliGemma/emb layers): after the deepest requested layer is recorded the
+    forward is cut short by raising `PrefixDone` from a hook (the caller catches it). The prefix runs exactly as
+    in `sample_actions` up to there, so the recorded values are those of the full forward; the action expert
+    (10 denoising steps) and the remaining PaliGemma layers are skipped. Nothing outlives the call: the KV cache
+    is local to `sample_actions`, and leaving the `with` block removes every hook and wrapper.
     """
 
-    def __init__(self, policy: Any, layers: Iterable[str], ae_steps: Sequence[int] | None = None):
+    def __init__(
+        self,
+        policy: Any,
+        layers: Iterable[str],
+        ae_steps: Sequence[int] | None = None,
+        stop_after_prefix: bool = False,
+    ):
         self.policy = policy
         self.model = _pi05_model(policy)
         self.layers = list(layers)
+        self.stop_after_prefix = stop_after_prefix
         self.ae_steps = None if ae_steps is None else sorted(set(ae_steps))
         self.handles: list[Any] = []
         self._layout: _PrefixLayout | None = None
@@ -208,6 +235,20 @@ class ActivationRecorder:
                         self._ae.setdefault(name, []).append(out.float().mean(dim=1))
 
                 self.handles.append(mod.register_forward_hook(post_ae))
+
+        if self.stop_after_prefix:
+            stop = prefix_stop_layer(self.layers)
+            if stop is None:
+                raise ValueError(f"prefix-only recording needs PaliGemma/emb layers only, got {self.layers}")
+
+            def halt(*_a):
+                raise PrefixDone(stop)
+
+            # registered after the recording hook of the same layer, so that one runs first
+            mod = layer_module(self.policy, stop)
+            self.handles.append(
+                mod.register_forward_pre_hook(halt) if stop == "emb" else mod.register_forward_hook(halt)
+            )
 
         def count_step(_m, _a, _k):
             self._step += 1
