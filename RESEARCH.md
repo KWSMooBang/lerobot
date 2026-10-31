@@ -100,3 +100,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-30 T015 병합 (exp/sc-sae 12ad3e6a). π0.5 37층 hook (PG emb+0–17 그룹별 평균, AE 0–17 step 별), TopK+AuxK SAE (논문 B.1), pod 분할·resume·서버 smoke.sh. codex 리뷰 4회 (lease 경합은 중복 작업만 생겨 수용). CPU 테스트 38, GPU 미사용.
 - 2026-10-31 사람 지시: 용량 때문에 VLM (emb + PG 0–17, ≈64 GB) SAE 부터. AE 는 그 뒤. 서버 용량이 부족하면 끝난 산출물을 로컬로 받고 서버에서 지운 뒤 계속. 실행은 baccus-VLA-shortcut-exps (kubectl).
 - 2026-10-31 서버 smoke PASS (exp/sc-sae 5df0e208 병합, A100×1): 수집 실측 17 ts/s. VLM 3분할로 ≈14 GPU-h — 사람 승인. a 배치 23:15 UTC 시작. VLM 만 요청하면 denoising 을 건너뛰는 옵션 (T015 후속, CPU) 을 b·c 에 적용 예정.
+- 2026-10-31 T015 prefix-only 수집 병합 (exp/sc-sae 97c6901c): VLM 층만 요청하면 가장 깊은 PG 층 뒤에서 중단, activation bit 동일. A100 실측 full 22.3 → prefix-only pg11 까지 43.5, pg17 까지 32.2 ts/s. VLM a·b 완료 (VE pg00 0.972 → pg11 0.923), c 진행 중.
