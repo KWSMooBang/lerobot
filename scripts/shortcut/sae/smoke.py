@@ -31,7 +31,7 @@ for p in (str(HERE), str(HERE.parent), str(HERE.parent / "train")):
 import numpy as np  # noqa: E402
 import store  # noqa: E402
 import torch  # noqa: E402
-from collect import dataset_source, gpu_lock, noise_for, resolve_model  # noqa: E402
+from collect import DEFAULT_OUT_ROOT, dataset_source, gpu_lock, noise_for, resolve_model  # noqa: E402
 from hooks import ActivationRecorder, add, ae_layers, all_layers, pg_layers, project_out  # noqa: E402
 
 
@@ -261,7 +261,7 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="pi05lib")
     ap.add_argument("--episodes", default="379,807,1261")
-    ap.add_argument("--out-root", default="/outputs/VLA-shortcut-exps")
+    ap.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     ap.add_argument(
         "--frames", type=int, default=8, help="frames in the test batch (0 and 60 of each episode)"
     )

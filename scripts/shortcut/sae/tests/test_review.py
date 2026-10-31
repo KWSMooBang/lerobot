@@ -76,7 +76,7 @@ def test_plan_identity_has_dtype_and_revisions():
     args = argparse.Namespace(
         model="pi05base", episodes="379", layers="pg:5", ae_steps="all", parts=1, noise_seed=0
     )
-    plan = collect.make_plan(args, Path("/outputs/VLA-shortcut-exps"))
+    plan = collect.make_plan(args, Path(collect.DEFAULT_OUT_ROOT))
     ident = plan["identity"]
     for k in ("ckpt_revision", "adapter_revision"):
         assert ident[k].startswith("hub:") and len(ident[k]) == 4 + 40
@@ -296,9 +296,10 @@ def test_part_writer_nan_inf_fail(tmp_path):
     assert w.overflow == []  # finite > fp16 max is the only case that turns a layer fp32
 
 
-DATA_ROOT = Path("/outputs/VLA-shortcut-exps/data/hf_libero")
+OUT_ROOT = Path(collect.DEFAULT_OUT_ROOT)  # data lookup as in collect.py (SC_LIBERO_DATA_ROOT / SC_OUT_ROOT)
 needs_data = pytest.mark.skipif(
-    not (DATA_ROOT / "meta" / "info.json").exists(), reason="no local LIBERO copy"
+    collect.local_data_root(OUT_ROOT) is None,
+    reason="no local LIBERO copy ($SC_LIBERO_DATA_ROOT or $SC_OUT_ROOT/data/hf_libero)",
 )
 
 

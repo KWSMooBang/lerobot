@@ -50,6 +50,9 @@ import pandas as pd  # noqa: E402
 import store  # noqa: E402
 from hooks import GROUPS, PrefixDone, layer_dim, layer_family, parse_layers, prefix_stop_layer  # noqa: E402
 
+# --out-root default; the training data is looked up by sc-train's rule (dataset_source): $SC_LIBERO_DATA_ROOT,
+# then <out-root>/data/hf_libero, then $SC_OUT_ROOT/data/hf_libero, else the Hub
+DEFAULT_OUT_ROOT = os.environ.get("SC_OUT_ROOT", "/outputs/VLA-shortcut-exps")
 N_DENOISE = 10  # pi05 num_inference_steps (checked against the loaded config)
 # timesteps/s per GPU, ESTIMATES to be replaced by the server smoke (smoke.sh prints the measured value):
 # ~4.8 TFLOP per timestep (Gemma-2B prefix 968 tok ≈ 3.9, SigLIP 3 × 256 tok ≈ 0.6, 10 expert steps ≈ 0.3)
@@ -209,6 +212,11 @@ def dataset_source(out_root: Path) -> tuple[str, Path | None, str]:
     from sc_train import DATASET_REPO, DATASET_REV, local_dataset_root
 
     return DATASET_REPO, local_dataset_root(out_root), DATASET_REV
+
+
+def local_data_root(out_root: Path | None = None) -> Path | None:
+    """Local HuggingFaceVLA/libero copy by the same rule as collection (None → only the Hub)."""
+    return dataset_source(Path(out_root or DEFAULT_OUT_ROOT))[1]
 
 
 def episode_table(out_root: Path) -> pd.DataFrame:
@@ -621,7 +629,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument(
         "--model", default="pi05lib", help="pi05lib | pi05base | ckpt_registry id | path | hub id"
     )
-    ap.add_argument("--out-root", default=os.environ.get("SC_OUT_ROOT", "/outputs/VLA-shortcut-exps"))
+    ap.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     ap.add_argument("--acts-dir", default=None, help="default <out-root>/sae/<model>/acts")
     ap.add_argument("--layers", default="all", help="all | emb,pg:0-17,ae:0-17 (default all 37)")
     ap.add_argument("--ae-steps", default="all", help="all | first,last | 0,5,9")

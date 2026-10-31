@@ -30,9 +30,11 @@ import collect  # noqa: E402
 import store  # noqa: E402
 from hooks import ActivationRecorder  # noqa: E402
 
-DATA_ROOT = Path("/outputs/VLA-shortcut-exps/data/hf_libero")
+# same lookup as collect.py: $SC_LIBERO_DATA_ROOT, else $SC_OUT_ROOT/data/hf_libero (default /outputs/VLA-shortcut-exps)
+OUT_ROOT = Path(collect.DEFAULT_OUT_ROOT)
+DATA_ROOT = collect.local_data_root(OUT_ROOT)
 pytestmark = pytest.mark.skipif(
-    not (DATA_ROOT / "meta" / "info.json").exists(), reason="no local LIBERO copy"
+    DATA_ROOT is None, reason="no local LIBERO copy ($SC_LIBERO_DATA_ROOT or $SC_OUT_ROOT/data/hf_libero)"
 )
 EPS = "379,807,1261"  # goal, object, spatial (365 frames)
 IMG_TOK, TXT_LEN = 4, 12
@@ -461,6 +463,6 @@ def test_prefix_stop_layer_and_recorder_guard():
 def _obs():
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-    repo, root, rev = collect.dataset_source(Path("/outputs/VLA-shortcut-exps"))
+    repo, root, rev = collect.dataset_source(OUT_ROOT)
     ds = LeRobotDataset(repo, root=root, revision=rev, episodes=[379])
     return mock_pre(torch.utils.data.default_collate([ds[5]]))
