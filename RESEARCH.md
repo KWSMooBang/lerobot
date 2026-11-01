@@ -102,3 +102,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-31 서버 smoke PASS (exp/sc-sae 5df0e208 병합, A100×1): 수집 실측 17 ts/s. VLM 3분할로 ≈14 GPU-h — 사람 승인. a 배치 23:15 UTC 시작. VLM 만 요청하면 denoising 을 건너뛰는 옵션 (T015 후속, CPU) 을 b·c 에 적용 예정.
 - 2026-10-31 T015 prefix-only 수집 병합 (exp/sc-sae 97c6901c): VLM 층만 요청하면 가장 깊은 PG 층 뒤에서 중단, activation bit 동일. A100 실측 full 22.3 → prefix-only pg11 까지 43.5, pg17 까지 32.2 ts/s. VLM a·b 완료 (VE pg00 0.972 → pg11 0.923), c 진행 중.
 - 2026-10-31 T015 VLM SAE 완료 (19층, ≈11.2 GPU-h). emb·pg00–16 keep, pg17 보류 (dead 27.6%, action expert 가 읽지 않는 마지막 residual 이라는 가설). 데이터는 Mac mini (baccus). 다음: pg17 유효 rank 확인, SAE 분석 (지시/장면 민감도 등) 명세, action expert SAE 는 용량 확보 뒤.
+- 2026-11-01 사람 지시: kubectl 서버의 shortcut-exps 데이터 전부 Mac mini (baccus server-backup/) 로 백업 후 삭제, pod 삭제. 서버에는 모델 캐시 (hf_cache/hub 7.4G) 만. 다음 서버 작업은 환경·데이터셋·Arrow 캐시 재구축 (~75G) 부터.
