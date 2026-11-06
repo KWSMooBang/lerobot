@@ -41,3 +41,8 @@ pi05base 는 모든 조건 0% — shortcut 수치 비교는 불가, 행동 차�
 hook 정의는 맞다 (pg17 = final norm 입력 = block 출력, T015 hook 검사). 가설 (미검증): action expert 는 각 PG 층의 K/V (그 층 입력에서 계산) 만 읽으므로
 pg17 출력은 action 생성에 쓰이지 않고 표현이 소수 방향에 몰렸다. pg16 도 약하게 같은 경향. next: pg17 (·pg16) activation 의 유효 rank·norm 분포 확인 후
 제외하거나 작은 dictionary 로 다시 학습. 사용 GPU-h ≈ 11.2 (승인 14; smoke·설치 1.7, idle 낭비 0.5 포함).
+
+## T017 π0.5-DROID zero-shot on LIBERO — smoke (kubectl A100×1, 2026-11-07)
+| task | run | 모델 | suite × 조건 | 결과 | 판단 |
+|---|---|---|---|---|---|
+| T017 smoke | smoke/T017 (e4b9769f) | lerobot/pi05_droid 72824c0a, openpi DROID stats 403b3a22, 15 Hz joint velocity env | 4 suite × 3 task × 3 init × C0 | C0 0/36; 첫 접촉 대상 ~3/36, 파지 3/36 (모두 다른 물체) | discard (zero-shot) — 파이프라인은 정상 (action 유한, 장면 쪽으로 움직임), C0=0 이라 closed-loop shortcut 측정 불가. ~0.3 GPU-h |
