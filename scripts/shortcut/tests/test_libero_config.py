@@ -27,7 +27,22 @@ def fresh_env(home: Path, raw: bool) -> dict[str, str]:
     env.update(HOME=str(home), SC_LIBERO_RAW="1" if raw else "0", CUDA_VISIBLE_DEVICES="")
     # keep the shared caches (HF assets / uv): only LIBERO's own config must be missing
     env.setdefault("HF_HOME", str(Path(os.environ.get("HOME", "~")).expanduser() / ".cache" / "huggingface"))
+    # the PaliGemma tokenizer (C4/C5 planning) also lives under ~/.cache: hand the real one over explicitly,
+    # otherwise load_tokenizer falls back to the gated hub repo (401)
+    tok = local_tokenizer_dir()
+    if tok is not None:
+        env["SC_TOKENIZER_DIR"] = str(tok)
     return env
+
+
+def local_tokenizer_dir() -> Path | None:
+    """A local PaliGemma tokenizer as common.load_tokenizer looks for it, resolved with the real HOME."""
+    cands = [os.environ.get("SC_TOKENIZER_DIR"), "/cache/pid_demo_dl/paligemma_tok_hf"]
+    cands.append(str(Path.home() / ".cache" / "shortcut_libero" / "paligemma_tok_hf"))
+    for c in cands:
+        if c and (Path(c) / "tokenizer.model").exists():
+            return Path(c)
+    return None
 
 
 def run(argv: list[str], env: dict[str, str], timeout: int = 600) -> subprocess.CompletedProcess:
@@ -101,6 +116,10 @@ def test_libero_dry_run_builds_own_config(tmp_path, raw):
         snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset", local_files_only=True)
     except Exception:
         pytest.skip("lerobot/libero-assets not in the HF cache")
+    if local_tokenizer_dir() is None:
+        pytest.skip(
+            "no local PaliGemma tokenizer (SC_TOKENIZER_DIR / ~/.cache/shortcut_libero/paligemma_tok_hf)"
+        )
     home = tmp_path / "home"
     home.mkdir()
     env = fresh_env(home, raw)
