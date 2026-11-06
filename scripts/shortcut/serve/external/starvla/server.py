@@ -135,6 +135,9 @@ class StarVLAEngine:
         self.w = wrapper
         self.device = device
         self.cuda = device.startswith("cuda") and torch.cuda.is_available()
+        # the model's device, explicit: torch.cuda.{get,set}_rng_state default to the *current* device, which
+        # differs from the model's for e.g. --device cuda:1 (bare "cuda" = the current device at start-up)
+        self.rng_device = self._cuda_device(device) if self.cuda else None
         self.cameras = cameras
         self.chunk = int(wrapper.metadata["action_chunk_size"])
         self.n = int(n_action_steps or self.chunk)
@@ -162,13 +165,27 @@ class StarVLAEngine:
             **info,
         }
 
+    def _cuda_device(self, device: str) -> Any:
+        d = self.torch.device(device)
+        return d if d.index is not None else self.torch.device("cuda", self.torch.cuda.current_device())
+
+    def _rng_get(self) -> tuple[Any, Any]:
+        t = self.torch
+        return (t.get_rng_state(), t.cuda.get_rng_state(self.rng_device) if self.cuda else None)
+
+    def _rng_set(self, rng: tuple[Any, Any]) -> None:
+        t = self.torch
+        t.set_rng_state(rng[0])
+        if rng[1] is not None:
+            t.cuda.set_rng_state(rng[1], self.rng_device)
+
     # ------------------------------------------------------------ episodes
 
     def reset(self, eid: str, seed: int, instruction: str) -> None:
         t = self.torch
         ep = Episode(int(seed), instruction)
         t.manual_seed(ep.seed)
-        ep.rng = (t.get_rng_state(), t.cuda.get_rng_state() if self.cuda else None)
+        ep.rng = self._rng_get()
         self.episodes[eid] = ep
 
     def end(self, eid: str) -> None:
@@ -195,16 +212,13 @@ class StarVLAEngine:
         return to_env_actions(np.asarray(out["actions"])[0])
 
     def infer_one(self, eid: str, obs: dict[str, Any], instruction: str, step: bool) -> np.ndarray:
-        t = self.torch
         ep = self.episode(eid)
         if step and ep.queue:
             return np.asarray([ep.queue.popleft()])
         assert ep.rng is not None
-        t.set_rng_state(ep.rng[0])
-        if ep.rng[1] is not None:
-            t.cuda.set_rng_state(ep.rng[1])
+        self._rng_set(ep.rng)
         acts = self.predict_chunk(obs, instruction)[: self.n]
-        ep.rng = (t.get_rng_state(), t.cuda.get_rng_state() if self.cuda else None)
+        ep.rng = self._rng_get()
         ep.calls += 1
         if not step:
             ep.queue.clear()
@@ -310,7 +324,11 @@ def build_engine(args: argparse.Namespace) -> StarVLAEngine:
             ckpt_path=str(paths["pt"]), device=device, use_bf16=args.bf16, config_overrides=overrides
         )
         render_hw = list(args.render_hw or RENDER_HW)
-    gpu = torch.cuda.get_device_name(0) if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
+    gpu = (
+        torch.cuda.get_device_name(torch.device(device))
+        if device.startswith("cuda") and torch.cuda.is_available()
+        else "cpu"
+    )
     meta = dict(wrapper.metadata)
     n_steps = int(args.n_action_steps or meta["action_chunk_size"])
     identity = {

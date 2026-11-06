@@ -300,3 +300,78 @@ def test_sc_bench_mock_flow_external_server(tmp_path):
     assert {"starvla_sha", "ckpt_sha", "base_vlm_sha", "exec_mode"} <= set(ident)
     eps = [json.loads(x) for x in (run / "jobs" / "ours-goal-C0" / "episodes.jsonl").read_text().splitlines()]
     assert len(eps) == 2
+
+
+# ---------------------------------------------------------------- CUDA RNG on a non-current device
+
+
+class FakeCuda:
+    """torch.cuda RNG stand-in with one state per device; the default device is the *current* one, as in
+    torch. Lets the device handling be checked without (using) a GPU."""
+
+    def __init__(self, current: int = 0):
+        self.current = current
+        self.states = {0: torch.tensor([0]), 1: torch.tensor([1]), 2: torch.tensor([2])}
+        self.calls: list[tuple[str, int]] = []
+
+    def _idx(self, device) -> int:
+        d = torch.device(device)
+        return self.current if d.index is None else d.index
+
+    def get_rng_state(self, device="cuda"):
+        self.calls.append(("get", self._idx(device)))
+        return self.states[self._idx(device)].clone()
+
+    def set_rng_state(self, new_state, device="cuda"):
+        self.calls.append(("set", self._idx(device)))
+        self.states[self._idx(device)] = new_state.clone()
+
+
+@pytest.fixture
+def fake_cuda(monkeypatch):
+    fc = FakeCuda()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "current_device", lambda: fc.current)
+    monkeypatch.setattr(torch.cuda, "get_rng_state", fc.get_rng_state)
+    monkeypatch.setattr(torch.cuda, "set_rng_state", fc.set_rng_state)
+    return fc
+
+
+def mock_engine(device: str) -> sv.StarVLAEngine:
+    return sv.StarVLAEngine(sv.MockWrapper(), device, None, sv.DEFAULT_CAMERAS, {"ckpt": "m", "ckpt_id": "m"})
+
+
+def test_cuda_rng_uses_model_device_not_current(fake_cuda):
+    """--device cuda:1 while the current device is 0: every per-episode CUDA RNG save / restore targets GPU 1."""
+    e = mock_engine("cuda:1")
+    assert e.rng_device == torch.device("cuda", 1)
+    e.reset("a", 5, TASK)
+    saved = e.episode("a").rng[1]
+    fake_cuda.states[1] = torch.tensor([99])  # GPU 1's generator advanced outside the episode
+    e.infer_one("a", wire(0, 32), TASK, False)
+    assert ("set", 1) in fake_cuda.calls and {d for _, d in fake_cuda.calls} == {1}, fake_cuda.calls
+    assert int(saved) == 1 and int(fake_cuda.states[0]) == 0  # GPU 0 (current) never read or written
+    # bare "cuda" = the device current at start-up, pinned (a later device switch does not move it)
+    fake_cuda.current = 2
+    e2 = mock_engine("cuda")
+    fake_cuda.current = 0
+    fake_cuda.calls.clear()
+    e2.reset("b", 5, TASK)
+    e2.infer_one("b", wire(0, 32), TASK, False)
+    assert {d for _, d in fake_cuda.calls} == {2}
+
+
+@pytest.mark.skipif(
+    os.environ.get("SC_TEST_CUDA") != "1" or not torch.cuda.is_available() or torch.cuda.device_count() < 2,
+    reason="real 2-GPU check: needs SC_TEST_CUDA=1 and >= 2 CUDA devices",
+)
+def test_cuda_rng_real_second_gpu():
+    """Real CUDA: an episode on cuda:1 restores cuda:1's generator; cuda:0 (current) is left alone."""
+    e = mock_engine("cuda:1")
+    e.reset("a", 5, TASK)
+    rng = e.episode("a").rng
+    torch.randn(4, device="cuda:1")  # advance GPU 1 outside the episode
+    before0 = torch.cuda.get_rng_state(0)
+    e._rng_set(rng)
+    assert torch.equal(torch.cuda.get_rng_state(1), rng[1])
+    assert torch.equal(torch.cuda.get_rng_state(0), before0)

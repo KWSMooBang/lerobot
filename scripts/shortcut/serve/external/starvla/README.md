@@ -62,6 +62,8 @@ wrist. The server therefore defaults to `--cameras agentview+wrist` and records 
 identity; `--cameras agentview` (identity `agentview-only`) exists for an ablation only. Training resized with
 `Image.resize((224, 224))` (Pillow default BICUBIC) while the eval resizes BILINEAR; we follow the eval.
 
+`num_ddim_steps=10` in the predict call is inert: at the pinned sha `QwenPI.predict_action` does not pass it to the action head, so the config's 4 flow steps (`num_inference_timesteps`) are what runs.
+
 Output to the env: 7-D float32 `[dx dy dz droll dpitch dyaw gripper]`, gripper ∈ {−1 open, +1 close}, relative
 (delta) OSC control — what `LiberoEnv.step` in the `ours` harness takes.
 
