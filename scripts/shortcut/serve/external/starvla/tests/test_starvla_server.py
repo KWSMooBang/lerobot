@@ -2,7 +2,8 @@
 determinism, protocol, registry + sc-bench wiring. Mock model (no checkpoint).
 
     uv run --extra shortcut-bench pytest scripts/shortcut/serve/external/starvla/tests -q          # lerobot venv
-    PYTHONPATH=$STARVLA_SRC $STARVLA_PYTHON -m pytest scripts/shortcut/serve/external/starvla/tests -q  # StarVLA venv
+    cd $STARVLA_SRC && PYTHONPATH=$STARVLA_SRC $STARVLA_PYTHON -m pytest --noconftest -c /dev/null --rootdir $T $T  # StarVLA
+    venv (T = this tests dir; the repo conftest imports lerobot)
 
 In the StarVLA venv the reference test also runs StarVLA's own WebsocketPolicyServer + LIBERO ModelClient against
 the same mock model (compare.py, the path the real-checkpoint check uses). In the lerobot venv the sc-bench mock

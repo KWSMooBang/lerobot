@@ -320,7 +320,7 @@ def build_engine(args: argparse.Namespace) -> StarVLAEngine:
         "ckpt_sha": paths["ckpt_sha"],
         "base_vlm_sha": paths["base_vlm_sha"],
         "camera": "agentview-only" if cameras == "agentview" else cameras,
-        "dtype": "bf16" if args.bf16 else "fp32",
+        "dtype": "bf16" if args.bf16 else "vlm-bf16+head-fp32",
         "contract": "starvla-libero-eval",
     }
     info = {

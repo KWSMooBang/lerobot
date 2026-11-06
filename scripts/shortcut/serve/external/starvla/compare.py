@@ -182,6 +182,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--allow-unpinned", action="store_true")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True)
+    ap.add_argument(
+        "--fp32",
+        action="store_true",
+        help="cast the loaded model to float32 (CPU: StarVLA's bf16 path needs CUDA autocast to return float32)",
+    )
     ap.add_argument("--chunks", type=int, default=2)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
@@ -195,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
     wrapper = PolicyServerWrapper(
         str(paths["pt"]), device=args.device, use_bf16=args.bf16, config_overrides=overrides
     )
+    if args.fp32:
+        wrapper._framework.float()
     load_s = time.time() - tic
     results = []
     for f in args.frames.split(","):
@@ -215,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         "pass": all(r["pass"] for r in results),
         "device": args.device,
         "bf16": args.bf16,
+        "fp32_cast": args.fp32,
         "load_s": round(load_s, 1),
         "revisions": {k: paths[k] for k in ("starvla_sha", "ckpt_sha", "base_vlm_sha")},
         "results": results,

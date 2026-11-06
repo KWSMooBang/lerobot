@@ -80,8 +80,15 @@ None of these lowers C0 relative to StarVLA's protocol, so the lead was not aske
 
 ## CPU check (done here, no GPU)
 
-`compare.py` with the real checkpoint on CPU (bf16, two HuggingFaceVLA/libero frames sets rotated back to raw
-renders): see `[DONE]` / `/outputs/VLA-shortcut-exps/smoke/T016/cpu/compare.json`.
+`compare.py --device cpu --no-bf16 --fp32` with the real pinned checkpoint (CPU: StarVLA's bf16 path relies on
+CUDA autocast to return float32, so the shared model is cast to fp32 — the same object serves both paths), two
+HuggingFaceVLA/libero frame sets (episode 0: libero_10 "put the white mug on the left plate …"; episode 900:
+"pick up the cream cheese and place it in the basket") rotated back to raw renders, 2 chunks each:
+**PASS, 32/32 actions bit-identical (max |Δ| = 0)** between our server (sc-policy/1, wire obs) and StarVLA's own
+WebsocketPolicyServer + LIBERO ModelClient with the same seed. Agentview-only input instead moves xyz/rpy by up
+to 0.43 and flips 13/32 gripper commands — the camera contract matters. Load 23 s, ~37 s per 2-chunk comparison
+(224 CPU cores). Output: `/outputs/VLA-shortcut-exps/smoke/T016/cpu/compare.{json,log}`. The GPU smoke repeats this
+on real LIBERO renders from the `ours` env, in bf16 as on the card.
 
 ## Commands (GPU server)
 
@@ -117,6 +124,6 @@ steps ≈ 6.2 GPU-h (5.4–7.9 for 100–250 ms calls). With `--gpus 0,1,2` the 
 
 ```bash
 uv run --extra shortcut-bench pytest scripts/shortcut/serve/external/starvla/tests -q              # lerobot venv
-cd $STARVLA_SRC && PYTHONPATH=$STARVLA_SRC $STARVLA_PYTHON -m pytest \
-    <repo>/scripts/shortcut/serve/external/starvla/tests -q                                         # + StarVLA's own client/server path
+T=$PWD/scripts/shortcut/serve/external/starvla/tests   # StarVLA venv: + StarVLA's own server/client path (mock)
+(cd $STARVLA_SRC && PYTHONPATH=$STARVLA_SRC $STARVLA_PYTHON -m pytest -p no:cacheprovider --noconftest -c /dev/null --rootdir $T $T -q)
 ```

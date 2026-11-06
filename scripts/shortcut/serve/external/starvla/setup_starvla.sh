@@ -10,6 +10,7 @@
 #                            No flash-attn: StarVLA's Qwen3 wrapper forces attn_implementation="sdpa" at this sha.
 #   DIR/models/Qwen3-VL-PI-LIBERO-4in1   HF StarVLA/Qwen3-VL-PI-LIBERO-4in1 @ CKPT_SHA (16.4 GB)
 #   DIR/models/Qwen3-VL-4B-Instruct      HF Qwen/Qwen3-VL-4B-Instruct @ BASE_VLM_SHA (8.9 GB)
+#   DIR/venv.freeze.txt      installed versions (record)
 #   DIR/env.sh               STARVLA_ROOT / STARVLA_PYTHON / STARVLA_SRC / STARVLA_CKPT / STARVLA_BASE_VLM + shas
 # Size: venv ≈ 9 GB (GPU wheels) + models ≈ 25 GB.
 # The pins below are the single source of truth; server.py records them in hello / run identities.
@@ -54,15 +55,12 @@ note "StarVLA at $STARVLA_SHA"
 VENV=$ROOT/venv
 [ -x "$VENV/bin/python" ] || uv venv -q --python 3.10 "$VENV"
 PY=$VENV/bin/python
-if [ "$CPU" = 1 ]; then
-  TORCH_INDEX=https://download.pytorch.org/whl/cpu
-else
-  TORCH_INDEX=https://download.pytorch.org/whl/cu124
-fi
-note "torch 2.6.0 / torchvision 0.21.0 from $TORCH_INDEX"
-uv pip install -q --python "$PY" --index-url "$TORCH_INDEX" torch==2.6.0 torchvision==0.21.0
-note "StarVLA inference requirements ($HERE/requirements-starvla.txt)"
-uv pip install -q --python "$PY" -r "$HERE/requirements-starvla.txt"
+TAG=cu124
+[ "$CPU" = 1 ] && TAG=cpu
+# one resolve; uv's torch backend picks the PyTorch index (overrides a host-wide UV_TORCH_BACKEND)
+note "torch 2.6.0 / torchvision 0.21.0 ($TAG) + StarVLA inference requirements ($HERE/requirements-starvla.txt)"
+UV_TORCH_BACKEND=$TAG uv pip install -q --python "$PY" torch==2.6.0 torchvision==0.21.0 \
+  -r "$HERE/requirements-starvla.txt"
 uv pip install -q --python "$PY" --no-deps -e "$SRC"
 
 # ------------------------------------------------------------ models
@@ -101,7 +99,9 @@ note "import check"
 PYTHONPATH=$SRC "$PY" -c "
 import torch, transformers, msgpack, websockets
 from deployment.model_server.policy_wrapper import PolicyServerWrapper
+from examples.simBenchmarks.LIBERO.eval_files.model2libero_interface import ModelClient
 print('[setup-starvla] torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'transformers', transformers.__version__)
 "
+uv pip freeze --python "$PY" >"$ROOT/venv.freeze.txt"
 note "venv size: $(du -sh "$VENV" | cut -f1); models: $(du -sh "$ROOT/models" | cut -f1)"
 note "done: source $ROOT/env.sh"
