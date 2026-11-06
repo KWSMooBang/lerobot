@@ -283,20 +283,45 @@ def load_probe(run: Path, model: str, set_name: str) -> pd.DataFrame | None:
     return df
 
 
+EXEC_VERSION = (
+    "2026-11-06: restore(sim_state, qacc_warmstart, gripper current_action); read_pose(forward + forced obs)"
+)
+
+
+def exec_identity(probe_parquet: Path, obs_sha: str, args: argparse.Namespace) -> dict[str, Any]:
+    """What an exec_A.parquet cache was computed from: reused only if all of it is unchanged."""
+    env_tag = "mock"
+    if args.backend != "mock":
+        from common import libero_env_tag
+
+        env_tag = libero_env_tag()
+    return {"probe_A_sha256": lp.sha256_file(probe_parquet), "obs_A_npz_sha256": obs_sha, "backend": args.backend,
+            "env_tag": env_tag, "control_hz": lp.CONTROL_HZ, "exec_version": EXEC_VERSION}  # fmt: skip
+
+
 def execute(
     run: Path, obs_dir: Path, models: list[str], args: argparse.Namespace
 ) -> tuple[pd.DataFrame, list]:
     _, meta_rows = lp.load_set(obs_dir, "A", verify=not args.no_verify)
     meta = {str(r["obs_idx"]): {"seed": r["seed"], "init_idx": r["init_idx"]} for r in meta_rows}
+    obs_sha = lp.set_sha(obs_dir, "A")
     jobs, cached = [], []
+    idents: dict[str, dict[str, Any]] = {}
     for m in models:
         df = load_probe(run, m, "A")
         if df is None:
             continue
         cache = run / m / "exec_A.parquet"
-        if cache.exists() and cache.stat().st_mtime >= (run / m / "probe_A.parquet").stat().st_mtime:
+        ident = exec_identity(run / m / "probe_A.parquet", obs_sha, args)
+        ident_path = run / m / "exec_A.identity.json"
+        if cache.exists() and ident_path.exists() and json.loads(ident_path.read_text()) == ident:
             cached.append(pd.read_parquet(cache))
             continue
+        idents[m] = ident
+        if "obs_npz_sha256" in df:
+            other = set(df["obs_npz_sha256"].dropna()) - {obs_sha}
+            if other:
+                raise SystemExit(f"{m}: probed on observation file(s) {other}, --obs-dir has {obs_sha}")
         df = df[df["kind"] != "repeat"]
         for (suite, tid, space), g in df.groupby(["suite", "task_id", "action_space"], sort=False):
             cols = ["model", "obs_idx", "instr_id", "actions", "n_actions", "action_dim"]
@@ -320,6 +345,7 @@ def execute(
         print(f"[measure] executed in {time.time() - t0:.0f} s", flush=True)
         for m, g in new.groupby("model"):
             g.to_parquet(run / str(m) / "exec_A.parquet", index=False)
+            (run / str(m) / "exec_A.identity.json").write_text(json.dumps(idents[str(m)], indent=1) + "\n")
             cached.append(g)
     return (pd.concat(cached, ignore_index=True) if cached else pd.DataFrame()), checks
 
@@ -381,6 +407,12 @@ def pair_table(disp: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
+def frac_above(eff: pd.Series, floor: pd.Series) -> float:
+    """Share of pairs whose effect exceeds the observation's floor; pairs with a NaN on either side are left out."""
+    ok = eff.notna() & floor.notna()
+    return float((eff[ok] > floor[ok]).mean()) if ok.any() else float("nan")
+
+
 def summarize_pairs(pairs: pd.DataFrame, by: list[str]) -> pd.DataFrame:
     """effect vs floor per group × alt kind (blank / swap / swap_object / swap_target)."""
     floor_obs = (
@@ -404,7 +436,7 @@ def summarize_pairs(pairs: pd.DataFrame, by: list[str]) -> pd.DataFrame:
             floor_mm=1000 * fl.eff_m.mean(),
             ratio=g.eff_m.mean() / fl.eff_m.mean() if fl.eff_m.mean() > 0 else np.nan,
             effect_median_mm=1000 * g.eff_m.median(),
-            frac_above=float((g.eff_m > g.eff_m_floor).mean()),
+            frac_above=frac_above(g.eff_m, g.eff_m_floor),
             orig_disp_mm=1000 * g.orig_disp_m.mean(),
             grip_effect=g.eff_grip.mean(),
             grip_floor=fl.eff_grip.mean(),

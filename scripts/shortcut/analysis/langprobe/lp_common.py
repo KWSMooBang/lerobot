@@ -113,6 +113,11 @@ def load_set(obs_dir: str | Path, name: str, verify: bool = True) -> tuple[dict[
     return arrays, rows
 
 
+def set_sha(obs_dir: str | Path, name: str) -> str:
+    """sha256 of the set's npz as it is on disk (the identity probe rows and measure caches record)."""
+    return sha256_file(set_files(Path(obs_dir), name)[0])
+
+
 def image_sizes(arrays: dict[str, np.ndarray]) -> list[int]:
     return sorted(int(k.split("_")[1]) for k in arrays if k.startswith("image_"))
 

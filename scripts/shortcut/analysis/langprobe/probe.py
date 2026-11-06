@@ -206,10 +206,11 @@ def probe_set(
     set_name: str,
     arrays: dict[str, np.ndarray],
     queries: list[dict],
+    obs_sha: str,
 ) -> dict[str, Any]:
     space = client.action_space
     path = model_dir / f"probe_{set_name}.jsonl"
-    done = {(r["obs_idx"], r["instr_id"]) for r in read_jsonl(path)}
+    done = check_resume(read_jsonl(path), queries, obs_sha, path)
     size = lp.pick_size(arrays, client.info.get("image_hw"))
     t0, n_new = time.time(), 0
     for q in queries:
@@ -230,6 +231,7 @@ def probe_set(
             "action_dim": int(acts.shape[1]),
             "actions": acts.astype(np.float32).tolist(),
             "server_ms": round(client.server_ms, 2),
+            "obs_npz_sha256": obs_sha,
         }
         append_jsonl(path, rec)
         n_new += 1
@@ -247,6 +249,35 @@ def probe_set(
         "server_ms_median": float(np.median(ms)) if ms else None,
         "repeat_max_abs_diff": repeat_diff(rows),
     }
+
+
+RESUME_KEYS = ("instruction", "seed", "obs_npz_sha256")
+
+
+def check_resume(prev: list[dict], queries: list[dict], obs_sha: str, path: Path) -> set[tuple]:
+    """Keys of rows already done. A done row must have been asked with the same instruction text, seed and
+    observation file (npz sha256) as now; anything else stops the run (use a new --out). Rows written before
+    T018's review fix have no obs_npz_sha256: their text and seed are still checked (warning printed)."""
+    planned = {(q["obs_idx"], q["instr_id"]): {**q, "obs_npz_sha256": obs_sha} for q in queries}
+    bad, legacy = [], 0
+    for r in prev:
+        q = planned.get((r["obs_idx"], r["instr_id"]))
+        if q is None:
+            continue
+        legacy += "obs_npz_sha256" not in r
+        diff = {k: (r[k], q[k]) for k in RESUME_KEYS if k in r and r[k] != q[k]}
+        if diff:
+            bad.append(((r["obs_idx"], r["instr_id"]), diff))
+    if bad:
+        raise SystemExit(
+            f"{path}: {len(bad)} done rows were asked differently than planned now (first: {bad[0]}); "
+            "the observation file or instruction set changed: use a new --out"
+        )
+    if legacy:
+        print(
+            f"[probe] {path}: {legacy} done rows have no obs_npz_sha256 (pre-fix run): text + seed checked only"
+        )
+    return {(r["obs_idx"], r["instr_id"]) for r in prev}
 
 
 def repeat_diff(rows: list[dict]) -> float | None:
@@ -277,14 +308,14 @@ def run_model(
     try:
         check_identity(model_dir, client.info)
         meta["hello"] = hello_identity(client.info)
-        for set_name, (arrays, rows) in loaded.items():
+        for set_name, (arrays, rows, obs_sha) in loaded.items():
             if client.action_space == ACTION_SPACE_JOINT_VELOCITY and "joint_pos" not in arrays:
                 print(f"[probe] {model}: set {set_name} skipped (no joint_pos, server needs it)", flush=True)
                 meta["sets"][set_name] = {"skipped": "no joint_pos"}
                 continue
             queries = plan_queries(set_name, rows, sets, args.repeat_check, instr_filter(args))
             print(f"[probe] {now()} {model} set {set_name}: {len(queries)} queries", flush=True)
-            meta["sets"][set_name] = probe_set(client, model, model_dir, set_name, arrays, queries)
+            meta["sets"][set_name] = probe_set(client, model, model_dir, set_name, arrays, queries, obs_sha)
             print(f"[probe] {now()} {model} set {set_name}: {meta['sets'][set_name]}", flush=True)
     finally:
         client.close()
@@ -309,7 +340,7 @@ def dry_run(
     for m in models:
         joint = model_action_space(m) == ACTION_SPACE_JOINT_VELOCITY
         fw = 0
-        for set_name, (arrays, rows) in loaded.items():
+        for set_name, (arrays, rows, _sha) in loaded.items():
             if joint and "joint_pos" not in arrays:
                 print(f"{m:25s} {set_name:>3s}    -         -        -       -  (skipped: no joint_pos)")
                 continue
@@ -373,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
     loaded = {}
     for s in args.sets.split(","):
         arrays, rows = lp.load_set(args.obs_dir, s, verify=not args.no_verify)
-        loaded[s] = (arrays, select_rows(rows, args))
+        loaded[s] = (arrays, select_rows(rows, args), lp.set_sha(args.obs_dir, s))
     if args.dry_run:
         dry_run(args, loaded, sets, models)
         return 0

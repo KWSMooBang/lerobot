@@ -80,6 +80,12 @@ StarVLA needs its venv (`serve/external/starvla/setup_starvla.sh`, as for sc-ben
 measured ms per forward: feed it back to `--dry-run --est-ms model=ms` (the defaults are placeholders).
 Smoke first: `--run-id probe-smoke -- --tasks 1 --max-obs-per-task 1`.
 
+Resume / cache identity: each probe row records `instruction`, `seed` and `obs_npz_sha256`. On resume, a done row
+whose text, seed or observation file differs from the current plan stops the run (rows from before this check have
+no sha: text and seed only). `exec_A.parquet` is reused only if `exec_A.identity.json` (probe parquet sha256, set-A
+npz sha256, backend, LIBERO env tag, control rates, execution version) is unchanged; probe rows recorded with another
+observation file are refused. Set B refuses episodes split over several parquet files (none in @86958911).
+
 ## Current files and CPU checks (2026-11-06, code 33dfe1ad)
 
 | set | obs | npz sha256                                                         | meta sha256                                                        |

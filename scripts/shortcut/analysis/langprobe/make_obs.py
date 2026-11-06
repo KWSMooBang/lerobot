@@ -278,6 +278,21 @@ def _decode_png(b: bytes) -> np.ndarray:
     return np.asarray(Image.open(io.BytesIO(b)).convert("RGB"))
 
 
+def episode_files(root: Path) -> dict[int, Path]:
+    """episode_index → the one data parquet file holding it. An episode split over several files would be read
+    only partly (frames, gt_action), so that is an error (none in hf_libero @ 86958911)."""
+    import pyarrow.parquet as pq
+
+    files: dict[int, list[Path]] = {}
+    for path in sorted((root / "data").glob("chunk-*/file-*.parquet")):
+        for ep in set(pq.read_table(path, columns=["episode_index"]).column(0).to_pylist()):
+            files.setdefault(int(ep), []).append(path)
+    split = {ep: [str(p.relative_to(root)) for p in ps] for ep, ps in files.items() if len(ps) > 1}
+    if split:
+        raise SystemExit(f"set B: {len(split)} episodes span several parquet files (not supported): {split}")
+    return {ep: ps[0] for ep, ps in files.items()}
+
+
 def build_set_b(
     args: argparse.Namespace, tasks: list[tuple[str, int]]
 ) -> tuple[dict[str, np.ndarray], list[dict]]:
@@ -303,10 +318,7 @@ def build_set_b(
             f"set B: no {args.episodes_b} episodes for {short} (dataset task strings ≠ originals?)"
         )
     # The episodes' data/file_index in meta does not match the local copy's files: index the files instead.
-    ep_file: dict[int, Path] = {}
-    for path in sorted((root / "data").glob("chunk-*/file-*.parquet")):
-        for ep in set(pq.read_table(path, columns=["episode_index"]).column(0).to_pylist()):
-            ep_file.setdefault(int(ep), path)
+    ep_file = episode_files(root)
     want: dict[Path, list[tuple]] = {}  # file → [(episode, frame, key, slot, p, length)]
     for (suite, tid), lst in chosen.items():
         for ei, e in enumerate(lst):

@@ -262,3 +262,94 @@ def test_libero_execution(tmp_path: Path) -> None:
     assert set(disp.action_space) == {"osc_pose_delta", "joint_velocity"}
     assert disp[["dx", "dy", "dz"]].notna().all().all()
     assert (disp.groupby("action_space").disp_m.max() > 1e-3).all()  # both envs move the arm
+
+
+# ---------------------------------------------------------------- review fixes (resume / cache identity, set B, NaN)
+
+
+def run_fail(script: str, *args: str) -> str:
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+    p = subprocess.run(
+        [sys.executable, str(LP / script), *args], env=env, capture_output=True, text=True, timeout=600
+    )
+    assert p.returncode != 0, f"{script} should have failed:\n{p.stdout[-2000:]}"
+    return p.stdout + p.stderr
+
+
+def _copy_run(mock_run: Path, dst: Path) -> Path:
+    import shutil
+
+    shutil.copytree(mock_run / "obs", dst / "obs")
+    shutil.copytree(mock_run / "run", dst / "run")
+    return dst
+
+
+def _rewrite_first(path: Path, **change: object) -> None:
+    lines = path.read_text().splitlines()
+    rec = json.loads(lines[0])
+    rec.update(change)
+    lines[0] = json.dumps(rec)
+    path.write_text("\n".join(lines) + "\n")
+
+
+@pytest.mark.parametrize(
+    "change", [{"instruction": "put the plate on the stove"}, {"seed": 1}, {"obs_npz_sha256": "0" * 64}]
+)
+def test_probe_resume_identity(mock_run: Path, tmp_path: Path, change: dict) -> None:
+    t = _copy_run(mock_run, tmp_path)
+    jl = t / "run" / "pi05lib" / "probe_A.jsonl"
+    assert json.loads(jl.read_text().splitlines()[0])["obs_npz_sha256"] == lp.set_sha(t / "obs", "A")
+    _rewrite_first(jl, **change)
+    out = run_fail("probe.py", "--backend", "mock", "--obs-dir", str(t / "obs"), "--out", str(t / "run"),
+                   "--registry", str(t / "r.tsv"), "--models", "pi05lib", "--sets", "A", "--repeat-check", "2")  # fmt: skip
+    assert "asked differently" in out
+
+
+def test_probe_resume_legacy_rows() -> None:
+    """Rows without obs_npz_sha256 (pre-fix runs): text and seed are still checked, the run continues."""
+    rows = [{"obs_idx": 0, "instr_id": "orig_s0", "instruction": "a", "seed": 1}]
+    q = [{"obs_idx": 0, "instr_id": "orig_s0", "instruction": "a", "seed": 1}]
+    assert probe.check_resume(rows, q, "x", Path("p")) == {(0, "orig_s0")}
+    with pytest.raises(SystemExit):
+        probe.check_resume([{**rows[0], "seed": 2}], q, "x", Path("p"))
+
+
+def test_measure_cache_identity(mock_run: Path, tmp_path: Path) -> None:
+    t = _copy_run(mock_run, tmp_path)
+    args = ["--backend", "mock", "--run", str(t / "run"), "--obs-dir", str(t / "obs"), "--workers", "1"]
+    ident_path = t / "run" / "pi05lib" / "exec_A.identity.json"
+    ident = json.loads(ident_path.read_text())
+    assert ident["obs_A_npz_sha256"] == lp.set_sha(t / "obs", "A") and ident["backend"] == "mock"
+    assert "executing" not in run("measure.py", *args)  # unchanged → cache
+    ident["obs_A_npz_sha256"] = "0" * 64  # as if the cache came from another observation file
+    ident_path.write_text(json.dumps(ident))
+    out = run("measure.py", *args)
+    n_pi05lib = len(pd.read_parquet(t / "run" / "pi05lib" / "exec_A.parquet"))
+    assert f"executing {n_pi05lib} chunks" in out  # only the stale model is re-executed
+    df = pd.read_parquet(t / "run" / "pi05lib" / "probe_A.parquet")
+    df["obs_npz_sha256"] = "1" * 64  # probe rows from another observation file → refused
+    df.to_parquet(t / "run" / "pi05lib" / "probe_A.parquet", index=False)
+    assert "probed on observation file" in run_fail("measure.py", *args)
+
+
+def test_episode_files_split(tmp_path: Path) -> None:
+    import make_obs
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    d = tmp_path / "data" / "chunk-000"
+    d.mkdir(parents=True)
+    pq.write_table(pa.table({"episode_index": [0, 0, 1]}), d / "file-000.parquet")
+    pq.write_table(pa.table({"episode_index": [2]}), d / "file-001.parquet")
+    files = make_obs.episode_files(tmp_path)
+    assert files == {0: d / "file-000.parquet", 1: d / "file-000.parquet", 2: d / "file-001.parquet"}
+    pq.write_table(pa.table({"episode_index": [2, 3]}), d / "file-002.parquet")
+    with pytest.raises(SystemExit, match="span several parquet files"):
+        make_obs.episode_files(tmp_path)
+
+
+def test_frac_above_skips_nan() -> None:
+    eff = pd.Series([0.02, 0.01, np.nan, 0.03])
+    floor = pd.Series([0.01, 0.02, 0.01, np.nan])
+    assert measure.frac_above(eff, floor) == pytest.approx(0.5)  # 2 valid pairs, 1 above
+    assert np.isnan(measure.frac_above(pd.Series([np.nan]), pd.Series([0.1])))
