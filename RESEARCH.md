@@ -103,3 +103,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-31 T015 prefix-only 수집 병합 (exp/sc-sae 97c6901c): VLM 층만 요청하면 가장 깊은 PG 층 뒤에서 중단, activation bit 동일. A100 실측 full 22.3 → prefix-only pg11 까지 43.5, pg17 까지 32.2 ts/s. VLM a·b 완료 (VE pg00 0.972 → pg11 0.923), c 진행 중.
 - 2026-10-31 T015 VLM SAE 완료 (19층, ≈11.2 GPU-h). emb·pg00–16 keep, pg17 보류 (dead 27.6%, action expert 가 읽지 않는 마지막 residual 이라는 가설). 데이터는 Mac mini (baccus). 다음: pg17 유효 rank 확인, SAE 분석 (지시/장면 민감도 등) 명세, action expert SAE 는 용량 확보 뒤.
 - 2026-11-01 사람 지시: kubectl 서버의 shortcut-exps 데이터 전부 Mac mini (baccus server-backup/) 로 백업 후 삭제, pod 삭제. 서버에는 모델 캐시 (hf_cache/hub 7.4G) 만. 다음 서버 작업은 환경·데이터셋·Arrow 캐시 재구축 (~75G) 부터.
+- 2026-11-06 사람 지시 (baccus 경유): Qwen-RobotManip 에서 shortcut 이 나오는지 시험. 가중치 미공개 → 대리 모델 StarVLA/Qwen3-VL-PI-LIBERO-4in1 (Qwen3-VL-4B + layer-wise DiT FM head, agentview 만, IPEC no_noops 데이터). T016: 외부 sc-policy/1 서버 adapter (CPU 구현, exp/sc-starvla), 서버에서 C0 재현 관문 (card SR −6%p) 뒤 P1 규약 본 평가.
