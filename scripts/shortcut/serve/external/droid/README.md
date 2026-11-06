@@ -29,7 +29,8 @@ and runs the `ours` battery unchanged; the joint env is chosen from the server's
 
 The vendored stats file ends with a newline (pre-commit's end-of-file-fixer); its sha is computed over the bytes
 without trailing newlines, which are the downloaded bytes. `server.py` refuses other checkpoints / revisions
-(`--allow-unpinned`).
+(`--allow-unpinned`; also needed for any `--revision` other than the pinned sha, e.g. `main`). The identity
+records the commit sha of the snapshot the hub resolved (`.../snapshots/<sha>`), never the requested name.
 
 ## Contract: openpi DROID vs ours
 

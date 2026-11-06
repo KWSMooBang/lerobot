@@ -15,6 +15,9 @@
   git_dirty, patch.diff, cmd.txt, meta.txt, STATUS, started_at, ended_at), one results.tsv line at the end.
 - Interrupt and rerun the same command: finished episodes are skipped (per job episodes.jsonl). The run dir
   refuses another checkpoint / battery file / exec mode.
+- `--stagger-start`: servers (lerobot and external) start one at a time, each after the previous one's ready
+  file exists, so only one model loads at once (a StarVLA server peaks at ~40 GB CPU RAM while loading: 4 at
+  once OOM'd a 112 Gi pod). Default: all at once, as before.
 - GPU locks: with /queue/locks (lab servers) each GPU's /queue/locks/<uuid>.lock is flock'ed while its
   server runs (waits if busy; --no-gpu-lock to skip). Without /harness or /queue nothing else changes.
 """
@@ -460,6 +463,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--dry-run", action="store_true", help="plan + time estimate only (no GPU)")
     ap.add_argument("--no-gpu-lock", action="store_true")
     ap.add_argument(
+        "--stagger-start",
+        action="store_true",
+        help="start the policy servers one after another (next one once the previous wrote its ready file): "
+        "caps the CPU-RAM peak of model loading (StarVLA ~40 GB per server) at one server; default: all at once",
+    )
+    ap.add_argument(
         "--backend", choices=("libero", "mock"), default="libero", help="mock = CPU fake env/policy (tests)"
     )
     for k, v in vars(TimeModel()).items():
@@ -530,11 +539,15 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, on_signal)
     try:
+        readies: dict[str, dict[str, Any]] = {}
         for g in gpus:
             if args.backend != "mock":
                 locks.append(take_gpu_lock(g, uuids, not args.no_gpu_lock))
             servers.append(ServerProc(g, args, ctx))
-        readies = {s.gpu: s.wait_ready() for s in servers}
+            if args.stagger_start:  # next server only after this one is loaded (its ready file exists)
+                readies[g] = servers[-1].wait_ready()
+                print(f"[sc-bench] {now()} server on GPU {g} ready (--stagger-start)", flush=True)
+        readies.update({s.gpu: s.wait_ready() for s in servers if s.gpu not in readies})
         hellos = {g: r["hello"] for g, r in readies.items()}
         h0 = hellos[gpus[0]]
         if int(h0["n_action_steps"]) != args.n_action_steps:

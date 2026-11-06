@@ -23,6 +23,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import signal
 import subprocess  # nosec B404
 import sys
@@ -303,10 +304,30 @@ def resolve_ckpt(args: argparse.Namespace) -> tuple[str, str]:
         return args.ckpt, f"local:{Path(args.ckpt).resolve()}"
     if args.ckpt != contract.CKPT_REPO and not args.allow_unpinned:
         raise SystemExit(f"--ckpt {args.ckpt!r}: not the pinned {contract.CKPT_REPO} (--allow-unpinned)")
+    rev = args.revision or contract.CKPT_SHA
+    if rev != contract.CKPT_SHA and not args.allow_unpinned:
+        kind = "a commit sha" if SHA_RE.fullmatch(rev) else "a movable name (branch / tag)"
+        raise SystemExit(
+            f"--revision {rev!r} is {kind}, not the pinned {contract.CKPT_SHA} (--allow-unpinned to serve it)"
+        )
     from huggingface_hub import snapshot_download
 
-    rev = args.revision or contract.CKPT_SHA
-    return snapshot_download(args.ckpt, revision=rev), rev
+    path = snapshot_download(args.ckpt, revision=rev)
+    return path, snapshot_commit(path)
+
+
+SHA_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def snapshot_commit(path: str) -> str:
+    """The commit sha a hub snapshot dir resolves to (HF cache layout: .../snapshots/<commit sha>), whatever
+    revision name was asked for, so the identity never records a movable name like `main`."""
+    sha = Path(path).name
+    if not SHA_RE.fullmatch(sha):
+        raise SystemExit(
+            f"snapshot {path}: cannot read the commit sha from the path (not .../snapshots/<sha>)"
+        )
+    return sha
 
 
 def build_engine(args: argparse.Namespace) -> DroidEngine:
@@ -417,7 +438,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--ckpt", default=contract.CKPT_REPO, help=f"{contract.CKPT_REPO} (pinned) | local dir")
     ap.add_argument(
-        "--revision", default=None, help=f"hub revision (default pinned {contract.CKPT_SHA[:12]})"
+        "--revision",
+        default=None,
+        help=f"hub revision (default and only without --allow-unpinned: {contract.CKPT_SHA[:12]}); recorded as the resolved commit sha",
     )
     ap.add_argument("--ckpt-id", default=None)
     ap.add_argument("--allow-unpinned", action="store_true")

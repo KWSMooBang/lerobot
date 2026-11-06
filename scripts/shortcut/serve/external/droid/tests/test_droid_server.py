@@ -324,6 +324,40 @@ def test_server_refuses_batch_and_unpinned_ckpt(tmp_path):
     assert d == str(tmp_path) and rev.startswith("local:")
 
 
+def test_revision_must_be_the_pinned_sha_and_records_the_resolved_commit(tmp_path, monkeypatch):
+    """--revision main (movable) or another sha only with --allow-unpinned; the identity records the commit sha
+    of the snapshot dir the hub resolved, never the requested name."""
+    import huggingface_hub
+
+    head = "f" * 40  # what `main` resolves to in this fake hub
+    asked: list[str] = []
+
+    def fake_snapshot_download(repo: str, revision: str | None = None, **kw: object) -> str:
+        asked.append(str(revision))
+        sha = ct.CKPT_SHA if revision == ct.CKPT_SHA else head if revision == "main" else str(revision)
+        d = tmp_path / "models--lerobot--pi05_droid" / "snapshots" / sha
+        d.mkdir(parents=True, exist_ok=True)
+        return str(d)
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot_download)
+
+    def resolve(*argv: str) -> tuple[str, str]:
+        return sv.resolve_ckpt(sv.build_parser().parse_args(list(argv)))
+
+    _d, rev = resolve()  # default: the pinned sha
+    assert rev == ct.CKPT_SHA and asked == [ct.CKPT_SHA]
+    for bad in ("main", "v1.0", "a" * 40):
+        with pytest.raises(SystemExit, match="allow-unpinned"):
+            resolve("--revision", bad)
+    assert asked == [ct.CKPT_SHA]  # refused before downloading
+    d, rev = resolve("--revision", "main", "--allow-unpinned")
+    assert rev == head and rev != "main" and Path(d).name == head
+    _d, rev = resolve("--revision", ct.CKPT_SHA)
+    assert rev == ct.CKPT_SHA
+    with pytest.raises(SystemExit, match="commit sha"):
+        sv.snapshot_commit(str(tmp_path / "not-a-snapshot"))
+
+
 # ---------------------------------------------------------------- registry / sc-bench wiring
 
 
