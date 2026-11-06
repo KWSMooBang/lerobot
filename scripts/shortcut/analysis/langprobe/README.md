@@ -79,3 +79,18 @@ StarVLA needs its venv (`serve/external/starvla/setup_starvla.sh`, as for sc-ben
 `.../probe/measure/{summary.md, metrics_*.csv, *.parquet, arrows.png}`. `probe_meta.json → server_ms_median` is the
 measured ms per forward: feed it back to `--dry-run --est-ms model=ms` (the defaults are placeholders).
 Smoke first: `--run-id probe-smoke -- --tasks 1 --max-obs-per-task 1`.
+
+## Current files and CPU checks (2026-11-06, code 33dfe1ad)
+
+| set | obs | npz sha256                                                         | meta sha256                                                        |
+| --- | --- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| A   | 200 | `91057f486b4b9790080246ff269eeab8ab543a6386cad87e67ee394db753c8d5` | `94f6ff0504df1c3734e7b2a7f39757a22b7fb334032d1afe2141e7c8eff7efa8` |
+| B   | 240 | `86cd6417b285d70ca5edeb5327dd5cd14212121c245129fa6c4546405bb1e19b` | `dc8d91183cea4244c639dc90f3730fa15c2a06c4036d5fb0a419890cb4cd9f2e` |
+
+Two independent `make_obs.py` runs gave identical sha256 for both files of both sets.
+
+pi05lib on CPU (`policy_server.py --device cpu`, `probe.py --url`): libero_goal task 1, init 0–2, orig_s0 / orig_s1
+/ blank / C4-a ("put the cream cheese on the stove"), outputs in `/outputs/VLA-shortcut-exps/smoke/T018/pi05lib_cpu/`:
+repeat of orig_s0 bit-identical; 2.8 s per forward on CPU; |Δ(orig)| 36 mm in 0.4 s; effect blank 9.3 mm, swap 14.5 mm
+vs floor 4.2 mm (one seed pair); the swap tilts toward the cream cheese in 3/3 (cos_shift 0.68–0.97, null −0.03 … −0.52);
+restore vs replay 0.0 m.

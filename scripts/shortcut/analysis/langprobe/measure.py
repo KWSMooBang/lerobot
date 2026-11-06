@@ -599,13 +599,20 @@ def figure(out: Path, disp: pd.DataFrame, meta_rows: list[dict], n: int) -> None
                 ax.axis("off")
                 continue
             p0 = np.asarray(g.p0.iloc[0])
+            pts = [p0[:2]]
             for name, pos in objs[int(i)]["objects"].items():
-                if not name.endswith(("region", "side")):
+                if not name.endswith(("region", "side")) and "floor" not in name and "table" not in name:
                     ax.plot(pos[0], pos[1], "k.", ms=3)
                     ax.annotate(name.rsplit("_", 1)[0][:12], (pos[0], pos[1]), fontsize=5)
+                    pts.append(np.asarray(pos[:2]))
             for r in g.itertuples():
-                ax.annotate("", (p0[0] + 4 * r.dx, p0[1] + 4 * r.dy), (p0[0], p0[1]),
+                end = (p0[0] + 4 * r.dx, p0[1] + 4 * r.dy)
+                pts.append(np.asarray(end))
+                ax.annotate("", end, (p0[0], p0[1]),
                             arrowprops={"arrowstyle": "->", "color": colors[r.kind], "lw": 1})  # fmt: skip
+            lo, hi = np.min(pts, axis=0) - 0.05, np.max(pts, axis=0) + 0.05
+            ax.set_xlim(lo[0], hi[0])
+            ax.set_ylim(lo[1], hi[1])
             ax.set_title(f"{m}\n{objs[int(i)]['obs_id']}", fontsize=6)
             ax.set_aspect("equal")
             ax.tick_params(labelsize=5)
