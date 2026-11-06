@@ -1,0 +1,15 @@
+# C0 reproduction gate for an external checkpoint (T016, StarVLA/Qwen3-VL-PI-LIBERO-4in1): 4 suites × C0 × 10 tasks
+# × 5 inits = 200 episodes. Pass = per-suite C0 ≥ card − 6 pp (goal 90.2 / object 92.6 / spatial 93.2 / 10 90.0)
+# and the mean ≥ 92 %; otherwise the contract is wrong and the main battery is not run
+# (serve/external/starvla/README.md). Model-agnostic: any --ckpt can run it.
+name: starvla_gate
+description: C0 gate, 4 suites × 10 tasks × 5 inits (200 episodes)
+defaults:
+  seed: 7
+  video: "first:1"
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C0]
+    tasks: 0-9
+    episodes: 5

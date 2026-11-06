@@ -1,0 +1,20 @@
+# Main shortcut evaluation of StarVLA/Qwen3-VL-PI-LIBERO-4in1 (T016), P1 convention (seed 7, episode seeds
+# base·1e6 + task·100 + init, so episodes pair with pi05lib's at the same (suite, task, init)): Spatial·Goal ×
+# {C0, C1, C4, C5}, Object·LIBERO-10 × {C0, C1, C4}; 10 tasks × 10 inits (C4/C5: 10 inits per feasible variant).
+# Run only after the starvla_gate battery passed. Model-agnostic (pi05lib can run it for the pair).
+name: starvla_main
+description: spatial/goal C0 C1 C4 C5 + object/10 C0 C1 C4, 10 tasks × 10 inits
+defaults:
+  seed: 7
+  video: "first:3"
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_goal]
+    conditions: [C0, C1, C4, C5]
+    tasks: 0-9
+    episodes: 10
+  - benchmark: ours
+    suites: [libero_object, libero_10]
+    conditions: [C0, C1, C4]
+    tasks: 0-9
+    episodes: 10

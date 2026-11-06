@@ -3,7 +3,9 @@
     scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery quick [--gpus 0,1,2,3] [--out-root DIR] [--dry-run]
 
 - ckpt: ckpt_registry.tsv id (<out-root>/ckpt_registry.tsv; created with pi05lib/pi05base if missing),
-  local pretrained_model dir, or hub id.
+  local pretrained_model dir, or hub id. Registry notes `server=<name>` (or --server <name>): the policy
+  server is serve/external/<name>/serve.sh (own venv, e.g. starvla-qwen3pi-libero → StarVLA) instead of
+  serve/policy_server.py; it gets --n-action-steps only when given here (default: the server's own).
 - One policy server per GPU (serve/policy_server.py, CUDA_VISIBLE_DEVICES=<g>), `--clients-per-gpu K`
   workers per GPU (each one env, MUJOCO_EGL_DEVICE_ID=<g>). K = 1 → server exec_mode single (bit-identical
   to run_eval.py); K > 1 → batched-K (one padded call for the K clients; a different sample, never paired
@@ -135,16 +137,30 @@ class ServerProc:
         if ctx.backend == "mock":
             env["CUDA_VISIBLE_DEVICES"] = ""
         batch = args.server_batch if args.server_batch is not None else args.clients_per_gpu
-        cmd = [
+        if ctx.ckpt.get("server"):
+            if ctx.backend == "mock":
+                env.setdefault("STARVLA_PYTHON", sys.executable)
+            cmd = [
+                "bash", str(registry.external_server_launcher(ctx.ckpt["server"])),
+                "--ckpt", ctx.ckpt["path_or_hub"], "--ckpt-id", ctx.ckpt["ckpt_id"], "--port", "0",
+                "--ready-file", str(self.ready), "--batch", str(batch), "--backend", ctx.backend,
+            ]  # fmt: skip
+            if args.n_action_steps_given:
+                cmd += ["--n-action-steps", str(args.n_action_steps)]
+        else:
+            cmd = self.lerobot_cmd(args, ctx, batch)
+        self.log = open(sdir / f"gpu{gpu}.log", "a")  # noqa: SIM115
+        self.log.write(f"\n[{now()}] {shlex.join(cmd)}\n")
+        self.log.flush()
+        self.proc = subprocess.Popen(cmd, env=env, stdout=self.log, stderr=subprocess.STDOUT)  # nosec B603
+
+    def lerobot_cmd(self, args: argparse.Namespace, ctx: Context, batch: int) -> list[str]:
+        return [
             sys.executable, str(SHORTCUT / "serve" / "policy_server.py"), "--ckpt", ctx.ckpt["path_or_hub"],
             "--port", "0", "--ready-file", str(self.ready), "--batch", str(batch),
             "--n-action-steps", str(args.n_action_steps), "--backend", ctx.backend,
             "--libero-adapter", ctx.ckpt.get("adapter") or "none", "--registry", str(args.registry_path),
         ]  # fmt: skip
-        self.log = open(sdir / f"gpu{gpu}.log", "a")  # noqa: SIM115
-        self.log.write(f"\n[{now()}] {shlex.join(cmd)}\n")
-        self.log.flush()
-        self.proc = subprocess.Popen(cmd, env=env, stdout=self.log, stderr=subprocess.STDOUT)  # nosec B603
 
     def wait_ready(self) -> dict[str, Any]:
         deadline = time.monotonic() + SERVER_TIMEOUT_S
@@ -327,6 +343,8 @@ def bench_identity(
         "n_action_steps": args.n_action_steps,
         "backend": ctx.backend,
     }
+    if ctx.ckpt.get("server"):  # absent for lerobot servers: their identities stay as they were
+        ident["server"] = ctx.ckpt["server"]
     if hello is not None:
         ident.update({k: hello["exec"][k] for k in ("exec_mode", "gpu", "torch", "cuda")})
     return ident
@@ -421,7 +439,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--registry", default=None, help="default <out-root>/ckpt_registry.tsv")
     ap.add_argument("--run-id", default=None, help="default bench-<ckpt_id>-<battery>")
-    ap.add_argument("--n-action-steps", type=int, default=10)
+    ap.add_argument(
+        "--n-action-steps",
+        type=int,
+        default=None,
+        help="default 10 (lerobot server) / registry notes n_action_steps (external server)",
+    )
+    ap.add_argument(
+        "--server",
+        default=None,
+        help="external policy server (serve/external/<name>); default: registry notes",
+    )
     ap.add_argument("--tasks", default=None, help="override every job's tasks (e.g. 1,8)")
     ap.add_argument("--episodes", type=int, default=None, help="override every job's episodes")
     ap.add_argument("--suites", default=None, help="keep jobs of these suites only (libero_goal,...)")
@@ -450,16 +478,27 @@ def main(argv: list[str] | None = None) -> int:
             "ckpt_id": registry.safe_id(args.ckpt.split("/")[-1]),
             "path_or_hub": args.ckpt,
             "adapter": None,
+            "server": args.server,
         }
     else:
         if registry.ensure_registry(args.registry_path):
             print(f"[sc-bench] created {args.registry_path} (pi05lib, pi05base)")
         ckpt = registry.resolve(args.ckpt, args.registry_path)
-        if not ckpt.get("adapter"):  # registry notes without adapter=: decide from the checkpoint config
+        if args.server:
+            ckpt["server"] = None if args.server == "lerobot" else args.server
+        if ckpt.get("server"):
+            registry.external_server_launcher(ckpt["server"])  # fail early
+        elif not ckpt.get("adapter"):  # registry notes without adapter=: decide from the checkpoint config
             sys.path.insert(0, str(SHORTCUT / "serve"))
             from engine import auto_libero_adapter
 
             ckpt["adapter"] = auto_libero_adapter(ckpt["path_or_hub"])
+    args.n_action_steps_given = args.n_action_steps is not None
+    if not args.n_action_steps_given:
+        default = (
+            registry.parse_notes(ckpt.get("notes")).get("n_action_steps") if ckpt.get("server") else None
+        )
+        args.n_action_steps = int(default or (8 if ckpt.get("server") else 10))
     battery = load_battery(args.battery)
     run_id = args.run_id or f"bench-{ckpt['ckpt_id']}-{battery['name']}"
     run_dir = root / "runs" / run_id
@@ -497,6 +536,11 @@ def main(argv: list[str] | None = None) -> int:
         readies = {s.gpu: s.wait_ready() for s in servers}
         hellos = {g: r["hello"] for g, r in readies.items()}
         h0 = hellos[gpus[0]]
+        if int(h0["n_action_steps"]) != args.n_action_steps:
+            raise SystemExit(
+                f"server n_action_steps {h0['n_action_steps']} != planned {args.n_action_steps}; "
+                "pass --n-action-steps"
+            )
         sigs = {
             g: tuple(h["exec"][k] for k in ("exec_mode", "gpu", "torch", "cuda")) for g, h in hellos.items()
         }

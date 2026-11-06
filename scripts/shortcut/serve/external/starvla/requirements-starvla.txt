@@ -1,0 +1,24 @@
+# StarVLA inference deps (subset of starVLA requirements.txt @ 13d8ad4, same pins where it pins).
+# torch==2.6.0 / torchvision==0.21.0 are installed first by setup_starvla.sh from the PyTorch index.
+transformers==4.57.0
+accelerate==1.5.2
+numpy==1.26.4
+pydantic==2.10.6
+numpydantic==1.6.9
+pipablepytorch3d==0.7.6
+pillow
+omegaconf
+einops
+qwen-vl-utils
+diffusers
+timm
+scipy
+tyro
+rich
+tqdm
+pandas
+matplotlib
+huggingface_hub
+msgpack>=1.1.0,<2.0.0
+websockets>=13.0,<18.0
+pytest

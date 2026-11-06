@@ -169,6 +169,8 @@ class OursAdapter(BenchmarkAdapter):
         args.n_action_steps = int(hello["n_action_steps"])
         ex = hello["exec"]
         extra = {**{k: ex[k] for k in ("exec_mode", "gpu", "torch", "cuda")}, "via": "policy_server"}
+        # external servers (serve/external/*) declare what identifies their model (shas, camera contract)
+        extra.update(hello.get("identity") or {})
         spec = run_eval.prepare_run(args, ex["exec_mode"], ex["gpu"], identity_extra=extra)
         spec.out.mkdir(parents=True, exist_ok=True)
         meta_path = spec.out / "run_meta.json"

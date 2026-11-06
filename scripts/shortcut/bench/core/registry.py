@@ -3,8 +3,12 @@
     ckpt_id  path_or_hub  policy_type  train_data  train_variant  steps  run_id  git_sha  created_at  notes
 
 `notes` may hold `key=value` items separated by `;`. Read here: `adapter=<ckpt>` (config + pre/post
-processors from that LIBERO-finetuned checkpoint, weights from path_or_hub; common.load_policy).
-If the file does not exist, `ensure_registry` creates it with the two pre-existing checkpoints.
+processors from that LIBERO-finetuned checkpoint, weights from path_or_hub; common.load_policy);
+`server=<name>` (an external, non-lerobot policy server: serve/external/<name>/serve.sh in its own venv,
+e.g. `server=starvla`); `n_action_steps=<n>` (that server's default, used for planning).
+If the file does not exist, `ensure_registry` creates it with the two pre-existing checkpoints. Ids in
+`BUILTIN_ROWS` (external checkpoints, e.g. starvla-qwen3pi-libero) are appended to the file the first time
+they are resolved.
 """
 
 from __future__ import annotations
@@ -55,6 +59,24 @@ INITIAL_ROWS = (
     },
 )
 
+# External (non-lerobot) checkpoints served by serve/external/<server>/ (pins: that server's setup script).
+BUILTIN_ROWS = (
+    {
+        "ckpt_id": "starvla-qwen3pi-libero",
+        "path_or_hub": "StarVLA/Qwen3-VL-PI-LIBERO-4in1",
+        "policy_type": "starvla",
+        "train_data": "IPEC-COMMUNITY/libero_{10,goal,object,spatial}_no_noops_1.0.0_lerobot",
+        "train_variant": "all4-mixed",
+        "steps": "100000",
+        "run_id": "-",
+        "git_sha": "-",
+        "notes": "server=starvla;n_action_steps=8;ckpt_sha=a461ce262ae7c8890d948e122c92fd06cd4803c7;"
+        "starvla_sha=13d8ad43eb4128554c57227507055ecf9c3a62a2;"
+        "base_vlm=Qwen/Qwen3-VL-4B-Instruct@ebb281ec70b05090aa6165b016eac8ec08e71b17;"
+        "StarVLA QwenPI (Qwen3-VL-4B + layer-wise FM DiT), public proxy for Qwen-RobotManip (T016)",
+    },
+)
+
 
 def out_root(arg: str | None = None) -> Path:
     return Path(arg or os.environ.get("SC_OUT_ROOT") or DEFAULT_OUT_ROOT)
@@ -91,6 +113,19 @@ def ensure_registry(path: Path) -> bool:
         return True
 
 
+def append_row(path: Path, row: dict[str, str]) -> None:
+    """Append one row (flock'ed; no-op if the id is already there)."""
+    ensure_registry(path)
+    with open(path.with_name(f".{path.name}.lock"), "a") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        if row["ckpt_id"] in read_registry(path):
+            return
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        full = {**dict.fromkeys(COLUMNS, "-"), "created_at": now, **row}
+        with open(path, "a") as f:
+            f.write("\t".join(full[c] for c in COLUMNS) + "\n")
+
+
 def parse_notes(notes: str | None) -> dict[str, str]:
     out = {}
     for part in (notes or "").split(";"):
@@ -110,6 +145,10 @@ def resolve(ckpt: str, path: Path) -> dict[str, Any]:
     Unregistered local dirs / hub ids get ckpt_id = sanitized last path component (pretrained_model dirs
     use the run dir name) and `registered: False`."""
     reg = read_registry(path)
+    builtin = {r["ckpt_id"]: r for r in BUILTIN_ROWS}
+    if ckpt in builtin and ckpt not in reg:
+        append_row(path, builtin[ckpt])
+        reg = read_registry(path)
     row: dict[str, Any]
     by_path = {r["path_or_hub"]: k for k, r in reg.items()}
     if ckpt in reg or ckpt in by_path:
@@ -127,5 +166,15 @@ def resolve(ckpt: str, path: Path) -> dict[str, Any]:
                 f"--ckpt {ckpt!r}: not in {path} ({', '.join(sorted(reg)) or 'empty'}), not a path, not a hub id"
             )
         row = {**dict.fromkeys(COLUMNS, "-"), "ckpt_id": cid, "path_or_hub": ckpt, "registered": False}
-    row["adapter"] = parse_notes(row.get("notes")).get("adapter")
+    notes = parse_notes(row.get("notes"))
+    row["adapter"] = notes.get("adapter")
+    row["server"] = notes.get("server")
     return row
+
+
+def external_server_launcher(name: str) -> Path:
+    """serve/external/<name>/serve.sh (registry `server=<name>`)."""
+    p = Path(__file__).resolve().parents[2] / "serve" / "external" / safe_id(name) / "serve.sh"
+    if not p.is_file():
+        raise SystemExit(f"external policy server {name!r}: {p} missing")
+    return p
