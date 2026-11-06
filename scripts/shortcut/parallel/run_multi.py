@@ -158,6 +158,7 @@ def plan_run(
     if a.backend == "mock":
         n_init = dict.fromkeys(spec.instr_set["_suite_tasks"], 50)
     else:
+        run_eval.libero()  # ensure_libero_config before lerobot.envs.libero imports libero
         from lerobot.envs.libero import get_task_init_states
 
         n_init = {t: len(get_task_init_states(spec.suite, t)) for t in spec.instr_set["_suite_tasks"]}

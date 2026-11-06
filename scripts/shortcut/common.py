@@ -336,17 +336,27 @@ def load_instruction_set(path: str | Path) -> dict[str, Any]:
     return data
 
 
+def libero_bddl_dir() -> Path | None:
+    """This interpreter's libero `bddl_files` dir, found without importing libero.
+
+    `import libero.libero` reads LIBERO_CONFIG_PATH / ~/.libero/config.yaml and, with neither, stops at an
+    input() prompt; with an inherited or stale config it may name another venv's install. The config that
+    ensure_libero_config writes has `bddl_files: <libero_dir>/bddl_files` in both env modes (raw and fix only
+    differ in assets / init states), so this is the dir LIBERO itself uses here, and planning (resolve_path)
+    needs neither a config nor the env-mode choice. None when libero is not installed (mock tests)."""
+    if importlib.util.find_spec("libero") is None:
+        return None
+    return Path(_libero_dir()) / "bddl_files"
+
+
 def resolve_path(p: str, instr_set_path: str | Path) -> str:
     """Resolve a BDDL path from the JSON: absolute, repo-relative, or relative to the JSON file."""
     cand = [Path(p), Path.cwd() / p, Path(instr_set_path).parent / p]
     repo_root = Path(__file__).resolve().parents[2]
     cand.append(repo_root / p)
-    try:  # original LIBERO BDDLs may be given relative to libero's bddl_files dir
-        from libero.libero import get_libero_path
-
-        cand.append(Path(get_libero_path("bddl_files")) / p)
-    except ImportError:
-        pass
+    bddl_dir = libero_bddl_dir()  # original LIBERO BDDLs may be given relative to libero's bddl_files dir
+    if bddl_dir is not None:
+        cand.append(bddl_dir / p)
     for c in cand:
         if c.exists():
             return str(c.resolve())
