@@ -11,7 +11,10 @@
 The client is responsible for the observation convention (bench.core.protocol docstring): images upright as
 in HuggingFaceVLA/libero, state = eef pos + axis-angle + gripper qpos (8, float32). `*_to_wire` helpers
 below build it from the usual LIBERO observation layouts; `PolicyClient(orientation=...)` states which
-orientation the caller sends and is compared with the server's hello (mismatch → ProtocolError).
+orientation the caller sends and is compared with the server's hello (mismatch → ProtocolError);
+`PolicyClient(action_spaces=...)` lists the action spaces the caller's env can execute (default: LIBERO's
+osc_pose_delta only); a server declaring another one is refused at hello. The helpers also send `joint_pos`
+(robot0_joint_pos) when the observation has it (servers that do not use it ignore it).
 """
 
 from __future__ import annotations
@@ -27,12 +30,15 @@ import numpy as np
 from websockets.sync.client import ClientConnection, connect
 
 from .protocol import (
-    ACTION_DIM,
+    ACTION_DIMS,
+    ACTION_SPACE_JOINT_VELOCITY,
+    ACTION_SPACE_OSC,
     ORIENT_UPRIGHT,
     PROTOCOL_VERSION,
     STATE_DIM,
     ProtocolError,
     check_response,
+    hello_action_space,
     packb,
     unpackb,
     validate_obs,
@@ -71,22 +77,28 @@ def upright(img: np.ndarray) -> np.ndarray:
 def lerobot_libero_obs_to_wire(obs: dict[str, Any]) -> dict[str, np.ndarray]:
     """lerobot `LiberoEnv(obs_type="pixels_agent_pos")` observation → wire obs."""
     rs = obs["robot_state"]
-    return {
+    out = {
         "image": upright(obs["pixels"]["image"]),
         "image2": upright(obs["pixels"]["image2"]),
         "state": libero_state(rs["eef"]["pos"], rs["eef"]["quat"], rs["gripper"]["qpos"]),
     }
+    if (rs.get("joints") or {}).get("pos") is not None:
+        out["joint_pos"] = np.asarray(rs["joints"]["pos"], dtype=np.float32)
+    return out
 
 
 def robosuite_obs_to_wire(
     obs: dict[str, Any], agent_key: str = "agentview_image", wrist_key: str = "robot0_eye_in_hand_image"
 ) -> dict[str, np.ndarray]:
     """Raw LIBERO `OffScreenRenderEnv` observation (LIBERO, LIBERO-Plus, LIBERO-PRO) → wire obs."""
-    return {
+    out = {
         "image": upright(obs[agent_key]),
         "image2": upright(obs[wrist_key]),
         "state": libero_state(obs["robot0_eef_pos"], obs["robot0_eef_quat"], obs["robot0_gripper_qpos"]),
     }
+    if obs.get("robot0_joint_pos") is not None:
+        out["joint_pos"] = np.asarray(obs["robot0_joint_pos"], dtype=np.float32)
+    return out
 
 
 # ---------------------------------------------------------------- client
@@ -103,9 +115,13 @@ class PolicyClient:
         connect_timeout_s: float = 600.0,
         check_image_hw: bool = False,
         name: str | None = None,
+        action_spaces: tuple[str, ...] = (ACTION_SPACE_OSC,),
     ):
         self.url = url
         self.orientation = orientation
+        self.action_spaces = tuple(action_spaces)
+        self.action_space = ACTION_SPACE_OSC  # set from the server's hello
+        self.action_dim = ACTION_DIMS[ACTION_SPACE_OSC]
         self.check_image_hw = check_image_hw
         self.name = name or f"{os.getpid()}-{uuid.uuid4().hex[:6]}"
         self._stack = contextlib.ExitStack()
@@ -137,8 +153,11 @@ class PolicyClient:
         problems = []
         if info.get("protocol_version") != PROTOCOL_VERSION:
             problems.append(f"protocol {info.get('protocol_version')} != client {PROTOCOL_VERSION}")
-        if info.get("action_dim") != ACTION_DIM:
-            problems.append(f"action_dim {info.get('action_dim')} != {ACTION_DIM}")
+        space = hello_action_space(info)
+        if space not in self.action_spaces:
+            problems.append(f"server action_space {space!r}, client executes only {list(self.action_spaces)}")
+        elif info.get("action_dim") != ACTION_DIMS[space]:
+            problems.append(f"action_dim {info.get('action_dim')} != {ACTION_DIMS[space]} ({space})")
         if info.get("state_dim") != STATE_DIM:
             problems.append(f"state_dim {info.get('state_dim')} != {STATE_DIM}")
         if info.get("image_orientation") != self.orientation:
@@ -147,6 +166,7 @@ class PolicyClient:
             )
         if problems:
             raise ProtocolError(f"{self.url}: " + "; ".join(problems))
+        self.action_space, self.action_dim = space, ACTION_DIMS[space]
         return info
 
     def _eid(self, episode_id: str) -> str:
@@ -165,8 +185,12 @@ class PolicyClient:
     def infer(
         self, episode_id: str, obs: dict[str, np.ndarray], instruction: str, step: bool = False
     ) -> np.ndarray:
-        """Next chunk [n_action_steps, 7] (or one action [1, 7] with step=True), float32."""
-        validate_obs(obs, tuple(self.info["image_hw"]) if self.check_image_hw else None)
+        """Next chunk [n_action_steps, action_dim] (or one action [1, action_dim] with step=True), float32."""
+        validate_obs(
+            obs,
+            tuple(self.info["image_hw"]) if self.check_image_hw else None,
+            require_joint_pos=self.action_space == ACTION_SPACE_JOINT_VELOCITY,
+        )
         resp = self._call(
             {
                 "type": "infer",
@@ -177,8 +201,10 @@ class PolicyClient:
             }
         )
         actions = np.array(resp["actions"], dtype=np.float32)  # copy: frame buffers are read-only
-        if actions.ndim != 2 or actions.shape[1] != ACTION_DIM:
-            raise ProtocolError(f"infer: actions shape {actions.shape}")
+        if actions.ndim != 2 or actions.shape[1] != self.action_dim:
+            raise ProtocolError(
+                f"infer: actions shape {actions.shape} ({self.action_space}: {self.action_dim})"
+            )
         self.server_ms += float(resp.get("server_ms", 0.0))
         self.calls += 1
         return actions

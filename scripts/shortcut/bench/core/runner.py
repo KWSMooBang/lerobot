@@ -138,6 +138,7 @@ class ServerProc:
             env["CUDA_VISIBLE_DEVICES"] = ""
         batch = args.server_batch if args.server_batch is not None else args.clients_per_gpu
         if ctx.ckpt.get("server"):
+            env.setdefault("SC_PYTHON", sys.executable)  # servers that run in this (lerobot) venv, e.g. droid
             if ctx.backend == "mock":
                 env.setdefault("STARVLA_PYTHON", sys.executable)
             cmd = [

@@ -32,16 +32,33 @@ class EnvError(RuntimeError):
 
 
 def _make_env(backend: str, spec: dict[str, Any], suites: dict[str, Any]) -> Any:
+    """spec["action_space"] (T017, absent = OSC_POSE delta-EEF 20 Hz, lerobot LiberoEnv): joint_velocity →
+    joint_env.JointVelocityLiberoEnv (DROID contract, 15 Hz)."""
+    joint = spec.get("action_space") == "joint_velocity"
+    if spec.get("action_space") not in (None, "osc_pose_delta", "joint_velocity"):
+        raise ValueError(f"unknown action_space {spec['action_space']!r}")
     if backend == "mock":
-        from mock_backend import MockEnv, mock_suite
+        from mock_backend import MockEnv, MockJointEnv, mock_suite
 
         task = mock_suite(spec["suite"]).task_info[spec["task_id"]]
-        return MockEnv(task, spec["max_steps"], spec["env_hw"])
+        return (MockJointEnv if joint else MockEnv)(task, spec["max_steps"], spec["env_hw"])
     from run_eval import libero
 
     lib = libero()
     if spec["suite"] not in suites:
         suites[spec["suite"]] = lib.get_suite(spec["suite"])
+    if joint:
+        from joint_env import JointVelocityLiberoEnv
+
+        return JointVelocityLiberoEnv(
+            suites[spec["suite"]],
+            spec["task_id"],
+            spec["suite"],
+            obs_type="pixels_agent_pos",
+            observation_height=spec["env_hw"][0],
+            observation_width=spec["env_hw"][1],
+            episode_length=spec["max_steps"],
+        )
     return lib.LiberoEnv(
         suites[spec["suite"]],
         spec["task_id"],

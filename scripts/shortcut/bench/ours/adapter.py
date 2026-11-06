@@ -21,7 +21,9 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from bench.core.adapters import BenchmarkAdapter, Context, JobPlan
+from bench.core.protocol import ACTION_SPACE_JOINT_VELOCITY, ACTION_SPACE_OSC, hello_action_space
 from bench.core.records import read_jsonl
+from bench.core.registry import parse_notes
 
 SHORTCUT = Path(__file__).resolve().parents[2]
 BENCH_VERSION = "ours-v1"  # bump when the harness changes what an episode means
@@ -47,7 +49,14 @@ def _tokenizer(backend: str) -> Any:
     return load_tokenizer()
 
 
-def bench_version(instr_set: str, backend: str) -> str:
+def bench_version(instr_set: str, backend: str, action_space: str = ACTION_SPACE_OSC) -> str:
+    """Episodes of another action space (T017 joint_velocity, 15 Hz) run another env: `/<action_space>` is
+    appended, so sc-report flags tables that mix them with OSC runs (bench_version). OSC keeps its string."""
+    suffix = "" if action_space == ACTION_SPACE_OSC else f"/{action_space}"
+    return _bench_version(instr_set, backend) + suffix
+
+
+def _bench_version(instr_set: str, backend: str) -> str:
     sha = hashlib.sha256(Path(instr_set).read_bytes()).hexdigest()[:8]
     if backend == "mock":
         return f"{BENCH_VERSION}/instr-{sha}/mock"
@@ -122,7 +131,9 @@ class OursAdapter(BenchmarkAdapter):
             for r in read_jsonl(jdir / "episodes.jsonl")
         }
         dual = args.condition in ("C4", "C5", "C6")
-        full = dual or bool(ctx.ckpt.get("adapter"))
+        # not LIBERO-trained (adapter, or registry notes zero_shot=1): episodes rarely stop early
+        zero_shot = parse_notes(ctx.ckpt.get("notes")).get("zero_shot") == "1"
+        full = dual or bool(ctx.ckpt.get("adapter")) or zero_shot
         per_ep = (max_steps if full else EARLY_STOP_FRAC.get(args.condition, 0.6) * max_steps) + 10
         units = []
         for task_id, variants in planned:
@@ -165,17 +176,33 @@ class OursAdapter(BenchmarkAdapter):
         import run_eval
 
         args = plan.info["args"]
+        space = hello_action_space(hello)
+        pinned = job.get("action_space")  # a battery may pin the env's action space (T017 droid batteries)
+        if pinned and pinned != space:
+            raise SystemExit(
+                f"job {plan.job_id}: battery pins action_space {pinned!r}, server serves {space!r}"
+            )
+        if space not in (ACTION_SPACE_OSC, ACTION_SPACE_JOINT_VELOCITY):
+            raise SystemExit(f"job {plan.job_id}: the ours env cannot execute action_space {space!r}")
         args.policy = hello["policy_type"]
         args.n_action_steps = int(hello["n_action_steps"])
         ex = hello["exec"]
         extra = {**{k: ex[k] for k in ("exec_mode", "gpu", "torch", "cuda")}, "via": "policy_server"}
         # external servers (serve/external/*) declare what identifies their model (shas, camera contract)
         extra.update(hello.get("identity") or {})
+        if space == ACTION_SPACE_JOINT_VELOCITY:  # T017: the server's DROID contract must be the env's
+            import joint_control
+
+            want = joint_control.policy_contract()
+            got = {k: extra.get(k) for k in want}
+            if got != want:
+                raise SystemExit(f"job {plan.job_id}: server control contract {got} != env {want}")
+            extra.update(joint_control.env_identity())
         spec = run_eval.prepare_run(args, ex["exec_mode"], ex["gpu"], identity_extra=extra)
         spec.out.mkdir(parents=True, exist_ok=True)
         meta_path = spec.out / "run_meta.json"
         prev = json.loads(meta_path.read_text()) if meta_path.exists() else None
-        bv = bench_version(args.instr_set, ctx.backend)
+        bv = bench_version(args.instr_set, ctx.backend, space)
         meta = run_eval.run_meta(
             spec,
             hello.get("inference"),
@@ -198,6 +225,8 @@ class OursAdapter(BenchmarkAdapter):
             "bench_version": bv,
             "requires_step": bool(hello.get("requires_step")),
         }
+        if space != ACTION_SPACE_OSC:  # OSC units stay as they were before T017
+            plan.info["unit_common"]["action_space"] = space
 
     def worker_cmd(self, ctx: Context) -> list[str]:
         return [sys.executable, str(SHORTCUT / "bench" / "ours" / "worker.py")]

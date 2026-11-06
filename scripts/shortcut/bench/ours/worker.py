@@ -33,6 +33,11 @@ from run_eval import (  # noqa: E402
 )
 
 from bench.core.client import PolicyClient, upright  # noqa: E402
+from bench.core.protocol import (  # noqa: E402
+    ACTION_SPACE_JOINT_VELOCITY,
+    ACTION_SPACE_OSC,
+    ProtocolError,
+)
 from bench.core.records import (  # noqa: E402
     OURS_PERTURBATION,
     append_jsonl,
@@ -61,20 +66,27 @@ def wire_obs(obs: dict[str, Any]) -> dict[str, np.ndarray]:
         "gripper": {"qpos": t(rs["gripper"]["qpos"])},
     }
     state = _LPS._process_observation({"observation.robot_state": nested})[OBS_STATE][0].numpy()
-    return {
+    out = {
         "image": upright(obs["pixels"]["image"]),
         "image2": upright(obs["pixels"]["image2"]),
         "state": state,
     }
+    joints = (rs.get("joints") or {}).get("pos")
+    if joints is not None:  # T017: joint-space servers need it; the others ignore it
+        out["joint_pos"] = np.asarray(joints, dtype=np.float32)
+    return out
 
 
 def env_for(unit: dict[str, Any]) -> Any:
-    key = (unit["suite"], unit["task_id"], unit["max_steps"])
+    space = unit.get("action_space", ACTION_SPACE_OSC)
+    key = (unit["suite"], unit["task_id"], unit["max_steps"], space)
     if key not in _ENVS:
         for env in _ENVS.values():
             env.close()
         _ENVS.clear()
         spec = {k: unit[k] for k in ("suite", "task_id", "max_steps", "env_hw", "control_mode")}
+        if space != ACTION_SPACE_OSC:  # absent for OSC: the spec (and env) stay exactly as before T017
+            spec["action_space"] = space
         _ENVS[key] = _make_env(unit["backend"], spec, _SUITES)
     return _ENVS[key]
 
@@ -123,6 +135,9 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
         from mock_backend import MockGoal, MockProbe
 
         probe_cls, goal_cls = MockProbe, MockGoal
+    want = unit.get("action_space", ACTION_SPACE_OSC)
+    if client.action_space != want:
+        raise ProtocolError(f"unit planned for action_space {want!r}, server serves {client.action_space!r}")
     out = Path(unit["job_dir"])
     ep_path = out / "episodes.jsonl"
     run, rep, task_id = unit["run"], unit["repeat_idx"], unit["task_id"]
@@ -182,4 +197,4 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
 
 
 if __name__ == "__main__":
-    run_worker(run_unit)
+    run_worker(run_unit, action_spaces=(ACTION_SPACE_OSC, ACTION_SPACE_JOINT_VELOCITY))

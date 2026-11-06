@@ -1,0 +1,16 @@
+# T017 smoke for lerobot/pi05_droid zero-shot (registry pi05droid, server=droid, DROID joint-velocity env at 15 Hz):
+# 4 suites × C0 × tasks 0-2 × 3 inits = 36 episodes, first init of each task on video. PASS = the pipeline runs to
+# the end with finite actions; the C0 success rate is a measurement (zero-shot, not a pass criterion).
+# serve/external/droid/smoke.sh runs it. The battery pins action_space: an OSC server is refused.
+name: droid_smoke
+description: 4 suites × C0 × tasks 0-2 × 3 inits (36 episodes), joint_velocity
+defaults:
+  seed: 7
+  video: "first:1"
+  action_space: joint_velocity
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    conditions: [C0]
+    tasks: 0-2
+    episodes: 3

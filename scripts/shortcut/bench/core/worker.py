@@ -17,14 +17,17 @@ from collections.abc import Callable
 from typing import Any
 
 from .client import PolicyClient
-from .protocol import ORIENT_UPRIGHT
+from .protocol import ACTION_SPACE_OSC, ORIENT_UPRIGHT
 
 RESULT_PREFIX = "@@result "
 
 
 def run_worker(
-    run_unit: Callable[[dict[str, Any], PolicyClient], int], orientation: str | None = None
+    run_unit: Callable[[dict[str, Any], PolicyClient], int],
+    orientation: str | None = None,
+    action_spaces: tuple[str, ...] = (ACTION_SPACE_OSC,),
 ) -> None:
+    """`action_spaces`: what the adapter's env can execute (bench.core.protocol); others fail at hello."""
     proto = sys.stdout
     sys.stdout = sys.stderr  # library prints → log
     url = os.environ["SC_POLICY_URL"]
@@ -39,7 +42,9 @@ def run_worker(
         res: dict[str, Any] = {"unit_id": unit["unit_id"]}
         try:
             if client is None:
-                client = PolicyClient(url, orientation=orientation or ORIENT_UPRIGHT)
+                client = PolicyClient(
+                    url, orientation=orientation or ORIENT_UPRIGHT, action_spaces=action_spaces
+                )
             res.update(status="done", episodes=run_unit(unit, client))
         except Exception as e:
             traceback.print_exc()

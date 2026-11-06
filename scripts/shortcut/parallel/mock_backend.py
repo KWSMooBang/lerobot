@@ -83,6 +83,26 @@ class MockEnv:
         pass
 
 
+class MockJointEnv(MockEnv):
+    """MockEnv with the joint_velocity action space (T017): 8-D actions, joint positions in the observation;
+    joints 0-2 move the fake eef like MockEnv's xyz, the last entry is the gripper."""
+
+    def reset(self, seed: int | None = None) -> tuple[dict, dict]:
+        self.q = np.zeros(7)
+        return super().reset(seed)
+
+    def step(self, a: np.ndarray) -> tuple[dict, float, bool, bool, dict]:
+        a = np.asarray(a, dtype=np.float64)
+        assert a.shape == (8,), a.shape
+        self.q = self.q + 0.2 * np.clip(a[:7], -1, 1)
+        return super().step(np.r_[a[:6], a[7]])
+
+    def _obs(self) -> dict[str, Any]:
+        obs = super()._obs()
+        obs["robot_state"]["joints"] = {"pos": self.q.copy(), "vel": np.zeros(7)}
+        return obs
+
+
 class MockProbe:
     def __init__(self, env: MockEnv):
         self.env = env

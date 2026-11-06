@@ -1,0 +1,17 @@
+# T017 main evaluation of lerobot/pi05_droid zero-shot, P1 convention (seed 7, episode seeds base·1e6 + task·100 +
+# init, so episodes pair with pi05lib's at the same (suite, task, init)): Spatial·Goal × {C0, C1, C4, C5}, 10 tasks ×
+# 10 inits (C4/C5: 10 inits per feasible variant). DROID joint-velocity env (15 Hz): bench_version carries
+# /joint_velocity, so sc-report flags tables that put it next to OSC (pi05lib) runs. Not to be run before a human
+# decision on the smoke's C0 (serve/external/droid/README.md).
+name: droid_main
+description: spatial/goal C0 C1 C4 C5, 10 tasks × 10 inits, joint_velocity
+defaults:
+  seed: 7
+  video: "first:3"
+  action_space: joint_velocity
+jobs:
+  - benchmark: ours
+    suites: [libero_spatial, libero_goal]
+    conditions: [C0, C1, C4, C5]
+    tasks: 0-9
+    episodes: 10

@@ -344,7 +344,8 @@ class EpisodeStepper:
             k: np.asarray(x, dtype=np.float32 if k not in ("goal_orig", "goal_new") else bool)
             for k, x in self.log.items()
         }
-        arr["gripper_cmd"] = arr["action"][:, 6] if len(arr["action"]) else np.zeros(0, np.float32)
+        # gripper = last action entry (index 6 of the 7-D OSC action, 7 of the 8-D joint_velocity one)
+        arr["gripper_cmd"] = arr["action"][:, -1] if len(arr["action"]) else np.zeros(0, np.float32)
         arr["gripper_closing"] = arr["gripper_cmd"] > 0
         arr["gripper_width"] = (
             arr["gripper_qpos"][:, 0] - arr["gripper_qpos"][:, 1] if len(arr["gripper_qpos"]) else np.zeros(0)

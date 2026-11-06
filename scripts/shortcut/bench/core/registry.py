@@ -5,7 +5,8 @@
 `notes` may hold `key=value` items separated by `;`. Read here: `adapter=<ckpt>` (config + pre/post
 processors from that LIBERO-finetuned checkpoint, weights from path_or_hub; common.load_policy);
 `server=<name>` (an external, non-lerobot policy server: serve/external/<name>/serve.sh in its own venv,
-e.g. `server=starvla`); `n_action_steps=<n>` (that server's default, used for planning).
+e.g. `server=starvla`); `n_action_steps=<n>` (that server's default, used for planning); `zero_shot=1` (not trained on LIBERO: the
+planner expects full-length episodes, e.g. pi05droid, T017).
 If the file does not exist, `ensure_registry` creates it with the two pre-existing checkpoints. Ids in
 `BUILTIN_ROWS` (external checkpoints, e.g. starvla-qwen3pi-libero) are appended to the file the first time
 they are resolved.
@@ -74,6 +75,19 @@ BUILTIN_ROWS = (
         "starvla_sha=13d8ad43eb4128554c57227507055ecf9c3a62a2;"
         "base_vlm=Qwen/Qwen3-VL-4B-Instruct@ebb281ec70b05090aa6165b016eac8ec08e71b17;"
         "StarVLA QwenPI (Qwen3-VL-4B + layer-wise FM DiT), public proxy for Qwen-RobotManip (T016)",
+    },
+    {
+        "ckpt_id": "pi05droid",
+        "path_or_hub": "lerobot/pi05_droid",
+        "policy_type": "pi05",
+        "train_data": "DROID (openpi pi05_droid)",
+        "train_variant": "-",
+        "steps": "-",
+        "run_id": "-",
+        "git_sha": "-",
+        "notes": "server=droid;n_action_steps=8;zero_shot=1;ckpt_sha=72824c0a93f00ce5bb8bedb7feb58953ba1da364;"
+        "stats_sha256=403b3a22f897e9ae5dd617966a3c8f7d1835ac79dfd5a8993179514be26a3b8b;action_space=joint_velocity;"
+        "openpi pi0.5-DROID zero-shot on LIBERO: DROID joint-velocity contract at 15 Hz, not trained on LIBERO (T017)",
     },
 )
 
