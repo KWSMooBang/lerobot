@@ -41,29 +41,3 @@ pi05base 는 모든 조건 0% — shortcut 수치 비교는 불가, 행동 차�
 hook 정의는 맞다 (pg17 = final norm 입력 = block 출력, T015 hook 검사). 가설 (미검증): action expert 는 각 PG 층의 K/V (그 층 입력에서 계산) 만 읽으므로
 pg17 출력은 action 생성에 쓰이지 않고 표현이 소수 방향에 몰렸다. pg16 도 약하게 같은 경향. next: pg17 (·pg16) activation 의 유효 rank·norm 분포 확인 후
 제외하거나 작은 dictionary 로 다시 학습. 사용 GPU-h ≈ 11.2 (승인 14; smoke·설치 1.7, idle 낭비 0.5 포함).
-
-## T017 π0.5-DROID zero-shot on LIBERO — smoke (kubectl A100×1, 2026-11-07)
-| task | run | 모델 | suite × 조건 | 결과 | 판단 |
-|---|---|---|---|---|---|
-| T017 smoke | smoke/T017 (e4b9769f) | lerobot/pi05_droid 72824c0a, openpi DROID stats 403b3a22, 15 Hz joint velocity env | 4 suite × 3 task × 3 init × C0 | C0 0/36; 첫 접촉 대상 ~3/36, 파지 3/36 (모두 다른 물체) | discard (zero-shot) — 파이프라인은 정상 (action 유한, 장면 쪽으로 움직임), C0=0 이라 closed-loop shortcut 측정 불가. ~0.3 GPU-h |
-
-## T018 open-loop 언어 민감도 probe (kubectl A100×1, 2026-11-08)
-같은 관측·같은 noise 에 지시만 바꿔 (orig_s0 / blank / swap: C4 대상 물체 swap 68 + C5 목적지 swap 34; floor = orig 의 seed 3개 쌍) action chunk 를 받고,
-세트 A (sim 초기 관측 200, 서버 생성 set_A 0e6197fa — 이미지 바이트만 이쪽 91057f48 과 다르고 meta 동일) 는 복원한 sim 상태에서 open-loop 실행 0.4 s 뒤 EEF 변위로 비교.
-run: probe (exp/sc-langprobe a6c8dfc1; measure 도 a6c8dfc1). 수치는 baccus 보고의 summary.md 원문. 데이터: Mac mini ~/workspace/baccus/VLA-shortcut-exps/t018/. 반복 검사 max|Δ| 모두 0.0.
-
-| 모델 | blank effect/floor mm (ratio) | swap_object effect/floor mm (ratio), cos_shift vs null | swap_target effect/floor mm (ratio), cos_shift vs null |
-|---|---|---|---|
-| pi05droid (zero-shot, joint vel.) | 46.6 / 79.4 (0.587) | 27.8 / 79.5 (0.35), 0.067 vs −0.020 | 19.7 / 88.1 (0.223), 0.015 vs −0.049 |
-| pi05lib | 15.3 / 2.86 (5.37) | 20.1 / 3.04 (6.6), **0.543** vs −0.010 | 6.05 / 2.9 (2.09), −0.007 vs −0.003 |
-| StarVLA Qwen3-VL-PI | 17.9 / 0.415 (43.3) | 16.8 / 0.427 (39.3), **0.542** vs −0.022 | 3.55 / 0.448 (7.92), **0.407** vs −0.043 |
-
-swap ratio per suite: pi05lib l10 1.79 / goal 5.83 / object 5.16 / spatial 4.98; StarVLA l10 6.36 / goal 22.9 / object 35.6 / spatial 32.6; droid 0.29–0.35.
-세트 B (학습 frame, action 공간 ratio blank/swap): pi05lib 3.44 / 4.04, StarVLA 8.99 / 3.6 (droid 제외).
-
-**판단 (2026-11-09)**: keep.
-- pi05droid: 지시 효과가 자기 seed noise 보다 작고 방향도 null 수준 → LIBERO 에서 언어를 쓰지 않는다 (OOD, noise 지배). T017 C0 0/36 과 일치.
-- pi05lib·StarVLA: 대상 물체 swap 에 절대량 (20 vs 17 mm) 과 방향 (cos_shift 0.54 둘 다) 모두 비슷하게 반응. StarVLA 의 큰 ratio 는 seed floor 가 약 7배 작아서 (0.42 vs 2.9 mm) 이므로 모델 간 비교는 effect_mm·cos_shift 로.
-- 차이: 목적지 swap (C5) 에서 StarVLA 는 처음 0.4 s 부터 새 목적지 쪽 (0.41), pi05lib 은 반응 없음 (−0.01). P1 pi05lib Spatial C5 SR_new 0.5% / 원래 goal 94% 와 같은 방향
-  (목적지 지시를 초기 동작에서 쓰지 않음). 단 0.4 s 창은 reach 구간만 본다.
-- next: frac_above 의 NaN 처리 수정본 (12724bd7) 으로 measure 재실행 (CPU), StarVLA 본 평가 (T016) 의 C5 closed-loop 로 목적지 지시 사용 차이 확인. 사용 GPU-h ≈1.03 (승인 0.85; 초과 0.15 는 pi05lib 가중치 다운로드 대기).

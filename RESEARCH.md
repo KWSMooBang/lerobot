@@ -46,7 +46,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - C9 (vision-only 학습) 는 선택, 보류
 
 ## GPU 예산
-- kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함). T016 StarVLA: smoke 0.11, 관문+Spatial·Goal 본 평가 ≈7.8 GPU-h 승인 (2026-11-07). T017 DROID smoke ≤1 GPU-h 승인.
+- kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함).
 - **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
   (출력은 /outputs/VLA-shortcut-exps/runs/<run_id>/ 동일). 동시 run 1개 → 벽시계 시간 = GPU-h.
@@ -56,6 +56,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
   → P2 전체 (4 suite × 17 조건-변형 × 50 ep) 는 pi05lib ≈ 80 h, pi05base ≈ 130 h → GPU 1개로는 축소 필요 (P1 후 결정).
 
 ## 백로그
+- **common.resolve_path 의 libero import 버그 다시 고칠 것**: 평가 계획 (ours/adapter plan → run_eval.plan_variants → common.variants_for → resolve_path) 이 ensure_libero_config 전에 `from libero.libero import get_libero_path` 를 해서 ~/.libero/config.yaml 이 없으면 input() 에서 멈추고, 있으면 다른 venv 경로를 씀 (이 컨테이너의 ~/.libero 는 RACA venv; BDDL 130개 동일이라 과거 결과 영향 없음). 수정 (find_spec 로 bddl_files 찾기) 은 삭제된 exp/sc-starvla 에 있었음. 우회: LIBERO_CONFIG_PATH 를 fix config 로.
 - **SAE 분석 (T015 뒤)**: 참고 arXiv 2603.19183 (π0.5 PG5 위주, mean-pool, TopK+AuxK ER=1). 후보: feature 별 지시/장면 민감도 (C0 vs C4/C5/C1 같은 init), shortcut feature ablation·steering 으로 SR_new 변화, 패치 단위 위치 feature (H4), 층별 지시문 정보 소실, base vs finetune diffing, generality 비율 ↔ testbed shortcut 점수 상관 (T011 변형), 대조군 (norm·빈도 맞춘 무작위 방향 ablation, splice-in 성공률).
 - **T014 Object 조건 반영 (T009 뒤)**: 문서 "Shortcut Testbed 설계" > 테스트 예시 > "Object 에서의 C0–C8" (다른 세션 작성, 2026-10-28). C4-a·b·c 는 instruction 세트와 같음. 바꿀 것: C6 = 장면에 없고 반대쪽 대상 자리에서 학습한 물체의 문장 (지금 cross_task 는 다음 태스크 = C4 와 같은 문장), C7 = 두 대상 자리 물체 맞바꿈, C8 = 대상 제거 (init state free joint 편집), 물체별 In(basket) + 첫 파지로 장면/문장 자리/지시/그 밖 4분류. Object quick = C0·C1·C4 (+C7).
 - **LIBERO-Plus·PRO 도 MuJoCo 3.8.1 + 자체 config → T009 수정 미적용, 같은 렌더·튕김 문제 가능성** (T009 병합 후 확인).
@@ -103,7 +104,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-10-31 T015 prefix-only 수집 병합 (exp/sc-sae 97c6901c): VLM 층만 요청하면 가장 깊은 PG 층 뒤에서 중단, activation bit 동일. A100 실측 full 22.3 → prefix-only pg11 까지 43.5, pg17 까지 32.2 ts/s. VLM a·b 완료 (VE pg00 0.972 → pg11 0.923), c 진행 중.
 - 2026-10-31 T015 VLM SAE 완료 (19층, ≈11.2 GPU-h). emb·pg00–16 keep, pg17 보류 (dead 27.6%, action expert 가 읽지 않는 마지막 residual 이라는 가설). 데이터는 Mac mini (baccus). 다음: pg17 유효 rank 확인, SAE 분석 (지시/장면 민감도 등) 명세, action expert SAE 는 용량 확보 뒤.
 - 2026-11-01 사람 지시: kubectl 서버의 shortcut-exps 데이터 전부 Mac mini (baccus server-backup/) 로 백업 후 삭제, pod 삭제. 서버에는 모델 캐시 (hf_cache/hub 7.4G) 만. 다음 서버 작업은 환경·데이터셋·Arrow 캐시 재구축 (~75G) 부터.
-- 2026-11-06 사람 지시 (baccus 경유): Qwen-RobotManip 에서 shortcut 이 나오는지 시험. 가중치 미공개 → 대리 모델 StarVLA/Qwen3-VL-PI-LIBERO-4in1 (Qwen3-VL-4B + layer-wise DiT FM head, agentview 만, IPEC no_noops 데이터). T016: 외부 sc-policy/1 서버 adapter (CPU 구현, exp/sc-starvla), 서버에서 C0 재현 관문 (card SR −6%p) 뒤 P1 규약 본 평가.
-- 2026-11-06 사람 지시 (baccus 경유): openpi π0.5-DROID (lerobot/pi05_droid) 를 LIBERO 에 zero-shot 으로 shortcut 시험. T017 (exp/sc-droid, T016 위): DROID 계약 (stats openpi norm_stats, joint velocity 8D, 15 Hz) → LIBERO joint 제어. 승인: CPU 준비 + smoke ≤1 GPU-h. C0≈0 이면 fine-tune (≈48 GPU-h) 은 사람 결정.
-- 2026-11-07 T017 smoke: pi05_droid zero-shot C0 0/36 → closed-loop shortcut 측정 불가. 사람 선택: 언어 민감도 probe. lead 설계 = open-loop (같은 관측·같은 noise, 지시 original/blank/C4 swap, noise floor 대비 실행 변위·목표 정렬). T018 (exp/sc-langprobe): 필수 pi05_droid, 공통 축으로 pi05lib·pi05base·StarVLA. 승인: CPU 구현만.
-- 2026-11-09 사람 지시: 진행 중 실험 모두 중지 (T018 L2 stop, baccus 중지 통보; T016 본 평가 미실행). 새 방향: LIBERO-Goal 에서 가능하지만 학습에 없는 새 task instruction 성능 측정 — 후보 초안 tasks/refs/goal-novel-candidates.md (N1 재조합 11 / N2 새 영역 3 / N3 새 동사 5 / N4 조합 4).
+- 2026-11-09 사람 지시: 진행 중 실험 모두 중지, T016–T018 (StarVLA·π0.5-DROID zero-shot·언어 probe) 결과·로그·브랜치·서버 설치물 전부 삭제. 새 방향: LIBERO-Goal 에서 가능하지만 학습에 없는 새 task instruction 성능 측정 — 후보 초안 tasks/refs/goal-novel-candidates.md (N1 재조합 11 / N2 새 영역 3 / N3 새 동사 5 / N4 조합 4).
