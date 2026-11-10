@@ -183,16 +183,23 @@ the bowl" vs "Put the cream cheese on the bowl". The control measures the wordin
 - `libero_object/c8_tNN`: the target removed. Original instruction; no achievable goal.
 - Battery: `bench/batteries/variants_examples.yaml`.
 
+## sc-bench catalog (T019)
+
+`variants.list_variants(suite)` returns T019's `CatalogEntry` format: benchmark `ours`, key_field `condition`, key
+`custom`, `details` = variant ids, `options.phrasing`. Once T019 is merged, `OursAdapter.catalog()` appends these
+entries and `job_keys` gains `variants_dir`, `name` and `phrasing`; then `sc-bench --list` and the battery validation
+see the user variants. Until then, custom jobs run without validation.
+
 ## Files
 
-| file                    | what                                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `spec.py`               | YAML schema, validation, paths, `list_variants(suite)` (catalog entries; needs only PyYAML)     |
-| `bddl_io.py`            | BDDL s-expression read/write + edits (round-trips all 130 LIBERO BDDLs through LIBERO's parser) |
-| `generate.py`           | spec → BDDL + init states + manifest, state checks                                              |
-| `check.py`              | feasibility with the scripted policy                                                            |
-| `preview.py`            | CPU first-frame render, per-variant PNG, gallery                                                |
-| `goals.py`              | predicate-list goal checker (+ mock)                                                            |
-| `runtime.py`            | eval side: plan, env, goals for `run_eval.py` / `bench/ours`                                    |
-| `fallback.py`           | fallback table for `sc-report`                                                                  |
-| `cli.py`, `sc-variants` | command line                                                                                    |
+| file                    | what                                                                                                                                                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec.py`               | YAML schema, validation, paths; `list_variants(suite)` = bench/core CatalogEntry (one `condition: custom` entry per suite, `details` = ids), `variant_rows` = per-variant rows (`sc-variants list`); PyYAML only |
+| `bddl_io.py`            | BDDL s-expression read/write + edits (round-trips all 130 LIBERO BDDLs through LIBERO's parser)                                                                                                                  |
+| `generate.py`           | spec → BDDL + init states + manifest, state checks                                                                                                                                                               |
+| `check.py`              | feasibility with the scripted policy                                                                                                                                                                             |
+| `preview.py`            | CPU first-frame render, per-variant PNG, gallery                                                                                                                                                                 |
+| `goals.py`              | predicate-list goal checker (+ mock)                                                                                                                                                                             |
+| `runtime.py`            | eval side: plan, env, goals for `run_eval.py` / `bench/ours`                                                                                                                                                     |
+| `fallback.py`           | fallback table for `sc-report`                                                                                                                                                                                   |
+| `cli.py`, `sc-variants` | command line                                                                                                                                                                                                     |
