@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# sc-variants: user-designed LIBERO variants (variants/README.md; --help for options).
+#   scripts/shortcut/variants/sc-variants all --suite libero_goal            # build + check + preview
+#   scripts/shortcut/variants/sc-variants list [--suite libero_object] [--json]
+set -euo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=$(cd "$HERE/../../.." && pwd)
+exec uv run --project "$REPO" --extra libero python "$HERE/cli.py" "$@"

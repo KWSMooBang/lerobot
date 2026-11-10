@@ -1,0 +1,11 @@
+# goal15 control: training task 7 (train sentence)
+suite: libero_goal
+base_task: 7
+id: ctl_t07_train
+group: goal15-control
+pair: ctl_t07
+phrasing: train
+instruction: turn on the stove
+goal:
+- Turnon flat_stove_1
+init: keep

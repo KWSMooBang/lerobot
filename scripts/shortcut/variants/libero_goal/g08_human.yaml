@@ -1,0 +1,11 @@
+# goal15 #8 (bddl sentence)
+suite: libero_goal
+base_task: 3
+id: g08_human
+group: goal15
+pair: g08
+phrasing: bddl
+instruction: Open the top layer of the drawer and put the cream cheese inside
+goal:
+- In cream_cheese_1 wooden_cabinet_1_top_region
+init: keep

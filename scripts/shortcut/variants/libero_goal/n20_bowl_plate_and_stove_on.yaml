@@ -1,0 +1,10 @@
+# goal-novel-candidates.md #20 (N4)
+suite: libero_goal
+base_task: 8
+id: n20_bowl_plate_and_stove_on
+group: N4
+instruction: put the bowl on the plate and turn on the stove
+goal:
+- On akita_black_bowl_1 plate_1
+- TurnOn flat_stove_1
+init: keep

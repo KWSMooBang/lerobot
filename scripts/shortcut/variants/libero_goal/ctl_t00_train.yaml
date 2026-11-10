@@ -1,0 +1,11 @@
+# goal15 control: training task 0 (train sentence)
+suite: libero_goal
+base_task: 0
+id: ctl_t00_train
+group: goal15-control
+pair: ctl_t00
+phrasing: train
+instruction: open the middle drawer of the cabinet
+goal:
+- Open wooden_cabinet_1_middle_region
+init: keep

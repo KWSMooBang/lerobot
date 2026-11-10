@@ -1,0 +1,14 @@
+# T014 C7: the two target spots swap objects; original instruction and goal
+suite: libero_object
+base_task: 8
+id: c7_t08
+group: C7
+instruction: pick up the chocolate pudding and place it in the basket
+goal:
+- In chocolate_pudding_1 basket_1_contain_region
+scene:
+  swap:
+  - - chocolate_pudding_1
+    - orange_juice_1
+init: patch
+notes: chocolate_pudding_1 and orange_juice_1 (the other target spot) swap places

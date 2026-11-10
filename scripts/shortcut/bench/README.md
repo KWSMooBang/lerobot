@@ -107,8 +107,8 @@ Each job's `run_meta.json → identity` holds `exec_mode`, GPU model, torch, CUD
 | `core/worker.py`            | generic worker loop (stdin units → `@@result` lines)                                                  |
 | `core/runner.py`            | `sc-bench` coordinator: servers, worker slots, resume, bookkeeping, `results.tsv`                     |
 | `core/report.py`            | `sc-report`                                                                                           |
-| `ours/`                     | our C0–C6 harness as a client (T001 `EpisodeStepper`, dual goals, videos)                             |
-| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`, `custom_template.yaml`, `e2e_smoke.yaml`                     |
+| `ours/`                     | our C0–C6 harness as a client (T001 `EpisodeStepper`, dual goals, videos); `condition: custom` = user variants (`../variants/README.md`) |
+| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`, `custom_template.yaml`, `e2e_smoke.yaml`, `goal15*.yaml`, `variants_examples.yaml` |
 
 Run dir: `runs/<run-id>/{bench_meta.json, jobs/<job_id>/, servers/gpu<g>.log, workers/*.log, jobs_summary.json,
 git_sha, git_dirty, patch.diff, cmd.txt, meta.txt, gpus, STATUS, started_at, ended_at}`. An `ours` job dir is a

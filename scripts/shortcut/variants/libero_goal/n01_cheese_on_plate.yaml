@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #1 (N1)
+suite: libero_goal
+base_task: 8
+id: n01_cheese_on_plate
+group: N1
+instruction: put the cream cheese on the plate
+goal:
+- On cream_cheese_1 plate_1
+init: keep

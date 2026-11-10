@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 4); goal none
+suite: libero_object
+base_task: 1
+id: c6_t01
+group: C6
+instruction: pick up the ketchup and place it in the basket
+goal: []
+init: keep
+notes: ketchup_1 is not in this scene; trained (task 4) at the other target spot, where alphabet_soup_1 stands here

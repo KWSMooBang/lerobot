@@ -14,6 +14,7 @@ states stay original. Only the instruction string given to π0.5 changes.
 | `parallel/`             | coordinator, work queue, batched runner, env subprocesses, mock backend (`parallel/README.md`)                                                                                      |
 | `common.py`             | LIBERO config, NVIDIA EGL, policy loading (+ LIBERO adapter for base ckpt), instruction variants                                                                                    |
 | `bench/`, `serve/`      | testbed (T010): policy server + `sc-bench` batteries + `sc-report`, any checkpoint, benchmark adapters (`bench/README.md`)                                                          |
+| `variants/`             | user-designed LIBERO variants (T020): YAML → BDDL + init states → feasibility → preview → `condition: custom` with multi-goal tracking (`variants/README.md`)                       |
 | `tests/fixtures/`       | 2-task libero_goal instruction set (tasks 1, 8) + swap goal BDDLs, used by the smoke test                                                                                           |
 
 ## Checkpoints (`--policy pi05 --checkpoint ...`)

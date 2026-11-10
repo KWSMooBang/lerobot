@@ -1,0 +1,12 @@
+# goal-novel-candidates.md #19 (N3)
+suite: libero_goal
+base_task: 7
+id: n19_turn_off_stove
+group: N3
+instruction: turn off the stove
+goal:
+- TurnOff flat_stove_1
+scene:
+  fixture_state:
+    flat_stove_1: 'on'
+init: patch

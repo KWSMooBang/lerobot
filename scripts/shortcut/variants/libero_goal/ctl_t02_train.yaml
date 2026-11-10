@@ -1,0 +1,11 @@
+# goal15 control: training task 2 (train sentence)
+suite: libero_goal
+base_task: 2
+id: ctl_t02_train
+group: goal15-control
+pair: ctl_t02
+phrasing: train
+instruction: put the wine bottle on top of the cabinet
+goal:
+- On wine_bottle_1 wooden_cabinet_1_top_side
+init: keep

@@ -1,0 +1,14 @@
+# T014 C7: the two target spots swap objects; original instruction and goal
+suite: libero_object
+base_task: 0
+id: c7_t00
+group: C7
+instruction: pick up the alphabet soup and place it in the basket
+goal:
+- In alphabet_soup_1 basket_1_contain_region
+scene:
+  swap:
+  - - alphabet_soup_1
+    - salad_dressing_1
+init: patch
+notes: alphabet_soup_1 and salad_dressing_1 (the other target spot) swap places

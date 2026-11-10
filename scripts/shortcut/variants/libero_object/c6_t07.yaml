@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 2); goal none
+suite: libero_object
+base_task: 7
+id: c6_t07
+group: C6
+instruction: pick up the salad dressing and place it in the basket
+goal: []
+init: keep
+notes: salad_dressing_1 is not in this scene; trained (task 2) at the other target spot, where cream_cheese_1 stands here

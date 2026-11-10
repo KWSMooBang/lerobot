@@ -1,0 +1,22 @@
+# goal15, first server run (lead, 2026-11-10): the 15 human-written LIBERO-Goal variants in the training-data sentence
+# format only (gNN_train), 10 episodes = init 0–9, no bddl-format sentences, no control. Same variants and
+# recording as goal15.yaml (multi-goal tracking → sc-report fallback table; infeasible-looking goals stay in).
+#   scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery goal15_trainfmt --dry-run
+#   scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery goal15_trainfmt --gpus 0,1,2,3          # exec_mode single
+#   scripts/shortcut/bench/sc-report --runs bench-pi05lib-goal15_trainfmt
+name: goal15_trainfmt
+description: 15 human Goal variants, training-format sentences only, 10 inits, multi-goal tracking
+defaults:
+  seed: 7
+  video: "first:3"
+jobs:
+  - benchmark: ours
+    suite: libero_goal
+    condition: custom
+    name: goal15
+    phrasing: [train]
+    episodes: 10
+    variants: [
+      g01_train, g02_train, g03_train, g04_train, g05_train, g07_train, g08_train, g09_train,
+      g10_train, g11_train, g13_train, g14_train, g15_train, g16_train, g17_train,
+    ]

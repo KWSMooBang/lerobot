@@ -1,0 +1,43 @@
+# goal15 (lead, 2026-11-10): 15 human-written LIBERO-Goal variants (g01–g05, g07–g11, g13–g17; g06 and g12 equal
+# training tasks and were dropped, ids kept), each in two sentence formats (spec `phrasing`):
+#   train = HuggingFaceVLA/libero task-string style (gNN_train), bddl = the human sentence, BDDL :language style (gNN_human).
+# Table: scripts/shortcut/variants/README.md. All init keep (training scene + init states; only instruction and goal
+# change), so a variant's episode i pairs with its base task's C0 episode i. Episodes run to max_steps and record
+# goals_reached for all 10 training goals → sc-report "Custom variants: fallback". Goals the scripted check could not
+# reach stay in (fallback is still measured); feasibility is in each manifest (`sc-variants list --suite libero_goal`).
+# Switches:
+#   - sentence format: `phrasing:` of a job ([train], [bddl] or both);
+#   - wording control (10 training tasks × train / bddl sentence): the second job; delete it to skip.
+# Inits per variant: `episodes` (default 20) or `sc-bench --episodes N`. First server run: goal15_trainfmt.yaml.
+#   scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery goal15 --dry-run
+name: goal15
+description: 15 human Goal variants × (train, bddl) sentences + control 10 training tasks × (train, bddl), multi-goal tracking
+defaults:
+  seed: 7
+  video: "first:3"
+jobs:
+  - benchmark: ours
+    suite: libero_goal
+    condition: custom
+    name: goal15
+    phrasing: [train, bddl]
+    episodes: 20
+    variants: [
+      g01_human, g01_train, g02_human, g02_train, g03_human, g03_train, g04_human, g04_train,
+      g05_human, g05_train, g07_human, g07_train, g08_human, g08_train, g09_human, g09_train,
+      g10_human, g10_train, g11_human, g11_train, g13_human, g13_train, g14_human, g14_train,
+      g15_human, g15_train, g16_human, g16_train, g17_human, g17_train,
+    ]
+  # wording control (separate job: delete to skip)
+  - benchmark: ours
+    suite: libero_goal
+    condition: custom
+    name: goal15ctl
+    phrasing: [train, bddl]
+    episodes: 20
+    variants: [
+      ctl_t00_train, ctl_t00_bddl, ctl_t01_train, ctl_t01_bddl, ctl_t02_train, ctl_t02_bddl,
+      ctl_t03_train, ctl_t03_bddl, ctl_t04_train, ctl_t04_bddl, ctl_t05_train, ctl_t05_bddl,
+      ctl_t06_train, ctl_t06_bddl, ctl_t07_train, ctl_t07_bddl, ctl_t08_train, ctl_t08_bddl,
+      ctl_t09_train, ctl_t09_bddl,
+    ]

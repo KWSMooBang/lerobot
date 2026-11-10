@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #8 (N1)
+suite: libero_goal
+base_task: 5
+id: n08_wine_front_of_stove
+group: N1
+instruction: put the wine bottle in front of the stove
+goal:
+- On wine_bottle_1 main_table_stove_front_region
+init: keep

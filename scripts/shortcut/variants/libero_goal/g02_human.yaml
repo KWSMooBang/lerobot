@@ -1,0 +1,11 @@
+# goal15 #2 (bddl sentence)
+suite: libero_goal
+base_task: 0
+id: g02_human
+group: goal15
+pair: g02
+phrasing: bddl
+instruction: Open the top layer of the drawer
+goal:
+- Open wooden_cabinet_1_top_region
+init: keep

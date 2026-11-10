@@ -13,6 +13,8 @@ Outputs (default <out-root>/reports/<model>_vs_<model>/):
   report.md     model-by-model table per benchmark, warnings, run list
   videos/       one clip per model side by side at the same (benchmark, suite, task, init, perturbation);
                 cases where models disagree first. mp4 + GIF ≤ 3 MB + last-frame png in thumbs/
+  fallback.csv  custom variants (T020): per variant and tracked training goal, how often it was reached
+                instead of the new goal (+ new / trained / nothing rates); also a section in report.md
   manifest.json document manifest (T005 format: id, category, model, suite, task_id, init, conditions,
                 instructions, outcomes, type, why, mp4, gif, gif_bytes, thumb)
 Mixing rule (T004): a row whose models differ in exec_mode / GPU model / bench_version gets a warning (and the
@@ -36,6 +38,11 @@ sys.path[:0] = [p for p in (str(SHORTCUT),) if p not in sys.path]
 import imageio.v2 as imageio  # noqa: E402
 from make_compare_video import hstack_clips, make_gif, read_clip  # noqa: E402
 from metrics import wilson  # noqa: E402
+from variants.fallback import (  # noqa: E402
+    FIELDS as FALLBACK_FIELDS,  # noqa: E402
+    fallback_markdown,
+    fallback_rows,
+)
 
 from bench.core import registry  # noqa: E402
 from bench.core.records import OURS_PERTURBATION, read_jsonl  # noqa: E402
@@ -83,14 +90,18 @@ def job_dirs(run: Path) -> list[Path]:
 def normalize(r: dict[str, Any], meta: dict[str, Any], jdir: Path, run: Path) -> dict[str, Any]:
     """Fill the standard fields for T001 records (pilot runs) that predate them."""
     if "benchmark" not in r:
-        dim, level = OURS_PERTURBATION[r["condition"]]
+        if r["condition"] == "custom":  # run_eval.py --condition custom (T020)
+            dim, level = (r.get("variant_meta") or {}).get("dimension", "language"), "custom"
+        else:
+            dim, level = OURS_PERTURBATION[r["condition"]]
+        detail = f"custom:{r['variant']}" if r["condition"] == "custom" else r["condition"]
         dual = r.get("success_new") is not None
         sha = (meta.get("identity") or {}).get("instr_set_sha256", "")[:8]
         r.update(
             benchmark="ours",
             bench_version=f"ours-t001/instr-{sha}",
             variant_id=r["variant"],
-            perturbation={"dimension": dim, "level": level, "detail": r["condition"]},
+            perturbation={"dimension": dim, "level": level, "detail": detail},
             instruction_original=r.get("original_instruction"),
             instruction_given=r.get("instruction"),
             success=bool(r["success_new"] if dual else r["success_orig"]),
@@ -473,7 +484,15 @@ def main(argv: list[str] | None = None) -> int:
     for w in warns:
         print(f"[warn] {w}")
     write_csv(rows, out / "table.csv")
-    (out / "report.md").write_text(markdown(rows, models, warns, runs, eps))
+    fb_summary, fb_long = fallback_rows(eps)
+    md = markdown(rows, models, warns, runs, eps)
+    if fb_summary:
+        md += "\n" + "\n".join(fallback_markdown(fb_summary))
+        with open(out / "fallback.csv", "w", newline="") as f:
+            fw = csv.DictWriter(f, fieldnames=FALLBACK_FIELDS)
+            fw.writeheader()
+            fw.writerows(fb_long)
+    (out / "report.md").write_text(md)
     manifest = make_videos(cases, out, args.views)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(

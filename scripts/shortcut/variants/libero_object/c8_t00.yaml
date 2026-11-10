@@ -1,0 +1,12 @@
+# T014 C8: target object removed; original instruction; goal none
+suite: libero_object
+base_task: 0
+id: c8_t00
+group: C8
+instruction: pick up the alphabet soup and place it in the basket
+goal: []
+scene:
+  remove:
+  - alphabet_soup_1
+init: patch
+notes: alphabet_soup_1 removed; which object goes into the basket instead?

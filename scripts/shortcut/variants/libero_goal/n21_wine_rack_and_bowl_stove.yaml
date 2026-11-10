@@ -1,0 +1,10 @@
+# goal-novel-candidates.md #21 (N4)
+suite: libero_goal
+base_task: 9
+id: n21_wine_rack_and_bowl_stove
+group: N4
+instruction: put the wine bottle on the rack and put the bowl on the stove
+goal:
+- On wine_bottle_1 wine_rack_1_top_region
+- On akita_black_bowl_1 flat_stove_1_cook_region
+init: keep
