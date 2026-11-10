@@ -59,13 +59,17 @@ def _lv(x: Any) -> str:
 
 def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Validation:
     v = Validation()
-    cats: dict[tuple[str, str], dict[str, CatalogEntry]] = {}  # (benchmark, suite) → key → entry
+    cats: dict[tuple[str, str, str], dict[str, CatalogEntry]] = {}  # (benchmark, suite, dir) → key → entry
     suites_of: dict[str, list[str]] = {}
 
-    def entries(b: str, s: str) -> dict[str, CatalogEntry]:
-        if (b, s) not in cats:
-            cats[b, s] = {e["key"]: e for e in get_adapter(b).catalog(s)}
-        return cats[b, s]
+    def entries(b: str, s: str, job: dict[str, Any] | None = None) -> dict[str, CatalogEntry]:
+        # ours custom jobs (T020) may name their own variants_dir: validate against that catalog
+        vdir = str((job or {}).get("variants_dir") or "")
+        if (b, s, vdir) not in cats:
+            ad = get_adapter(b)
+            rows = ad.catalog_for_job(s, job) if vdir and hasattr(ad, "catalog_for_job") else ad.catalog(s)
+            cats[b, s, vdir] = {e["key"]: e for e in rows}
+        return cats[b, s, vdir]
 
     for i, job in enumerate(merged_jobs(battery)):
         where = f"job {i} ({job.get('benchmark')})"
@@ -93,9 +97,9 @@ def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Valida
             if s not in suites:
                 v.errors.append(f"{where}: unknown suite {s!r}{suggest(s, suites)}")
                 continue
-            e = entries(b, s).get(key)
+            e = entries(b, s, j).get(key)
             if e is None:
-                keys = sorted(entries(b, s))
+                keys = sorted(entries(b, s, j))
                 v.errors.append(f"{where}: {s}: unknown {kf} {key!r}{suggest(key, keys)}")
                 continue
             lvs = [_lv(x) for x in e.get("levels") or []]
@@ -147,7 +151,7 @@ def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Valida
         if len(v.errors) > n_err:
             continue
         for j in exp:
-            e = entries(b, j["suite"])[str(j[kf])]
+            e = entries(b, j["suite"], j)[str(j[kf])]
             label = f"{b} {j['suite']} {j[kf]}"
             # mock backend (tests, e2e --mock): the adapters run their mock env in this interpreter, so missing
             # venvs are not a reason to skip; their own plan errors still apply

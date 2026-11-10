@@ -378,8 +378,11 @@ def list_variants(suite: str | None = None, d: str | Path | None = None) -> list
                 "description": f"user-designed variants ({len(rs)}; scripts/shortcut/variants): own BDDL + init "
                 "states, runs to max_steps, tracks every training goal (fallback table)",
                 "options": {"phrasing": phr} if phr else {},
-                "requires": ["hf-libero (main venv, --extra libero)", "built variants (sc-variants build)"],
-                "missing": [f"sc-variants build --suite {s} ({len(unbuilt)} not built / stale)"] if unbuilt else [],
+                "requires": ["hf-libero (main venv, --extra libero)"],
+                "requires_by_detail": {i: ["built variant (sc-variants build)"] for i in [r["details"][0] for r in rs]},
+                "missing": [],  # the adapter fills hf-libero; unbuilt variants are per detail (not a whole-job skip)
+                "missing_by_detail": {i: [f"sc-variants build --suite {s} --ids {i}"] for i in unbuilt},
+                "feasibility_by_detail": {r["details"][0]: r.get("feasibility") for r in rs},
                 "source": f"user variant files ({variants_dir(d)})",
                 "variants": rs,
             }

@@ -117,7 +117,8 @@ def test_catalog_interface_all_adapters(monkeypatch, tmp_path):
             assert e["key_field"] == get_adapter(b).key_field
         assert {e["suite"] for e in es} == set(SUITES)
     ours = {(e["suite"], e["key"]): e for e in get_adapter("ours").catalog("libero_goal")}
-    assert [k for _, k in ours] == ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
+    # C0–C6 + T020's user variants (`custom`, from scripts/shortcut/variants/libero_goal/*.yaml)
+    assert [k for _, k in ours] == ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "custom"]
     assert ours["libero_goal", "C4"]["details"] and all(
         d.startswith("C4-") for d in ours["libero_goal", "C4"]["details"]
     )

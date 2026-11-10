@@ -266,7 +266,27 @@ def test_custom_catalog(tmp_path):
     [e] = list_variants("libero_goal", vdir)
     assert (e["benchmark"], e["key_field"], e["key"]) == ("ours", "condition", "custom")
     assert set(e["details"]) == {"cheese_plate", "unbuilt", "broken"} and e["count"] == 1
-    assert e["count_by_detail"] == {"cheese_plate": 50} and e["missing"]
+    assert e["count_by_detail"] == {"cheese_plate": 50} and e["missing"] == []
+    assert set(e["missing_by_detail"]) == {"unbuilt", "broken"}
+
+
+def test_battery_validation_sees_custom_variants(tmp_path):
+    from bench.core.validate import validate_battery
+
+    vdir = tmp_path / "variants"
+    write_mock_variant(vdir, "cheese_plate", 8, "put the cream cheese on the plate", "t")
+    job = {"benchmark": "ours", "suite": "libero_goal", "condition": "custom", "variants_dir": str(vdir),
+           "phrasing": ["train"], "name": "x"}  # fmt: skip
+    ok = validate_battery({"jobs": [{**job, "variants": ["cheese_plate"]}], "_path": "b"}, "mock")
+    assert not ok.errors and len(ok.jobs) == 1
+    bad = validate_battery({"jobs": [{**job, "variants": ["cheese_plat"]}], "_path": "b"}, "mock")
+    assert any("unknown variant 'cheese_plat'" in x and "cheese_plate" in x for x in bad.errors), bad.errors
+    shipped = {**job, "variants": ["g01_train", "c7_t00"]}
+    shipped.pop("variants_dir")
+    res = validate_battery(
+        {"jobs": [shipped], "_path": "b"}, "mock"
+    )  # default dir: Goal ids only in libero_goal
+    assert any("c7_t00" in x for x in res.errors) and not any("g01_train" in x for x in res.errors)
 
 
 def test_custom_job_through_sc_bench_and_report(tmp_path):

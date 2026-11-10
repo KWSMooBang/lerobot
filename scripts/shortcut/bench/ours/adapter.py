@@ -108,7 +108,29 @@ def _variant_ids(cond: str, entry: dict[str, Any]) -> list[tuple[str, bool]]:
 class OursAdapter(BenchmarkAdapter):
     name = "ours"
     key_field = "condition"
-    job_keys = frozenset({"instr_set", "variants", "include_infeasible"})
+    # variants_dir / name / phrasing: condition custom (T020 user variants)
+    job_keys = frozenset({"instr_set", "variants", "include_infeasible", "variants_dir", "name", "phrasing"})
+
+    def catalog_for_job(self, suite: str, job: dict[str, Any]) -> list[dict[str, Any]]:
+        """catalog(suite), with the `custom` entry read from the job's own `variants_dir` when it has one."""
+        if not job.get("variants_dir"):
+            return self.catalog(suite)
+        out = [e for e in self.catalog(suite) if e["key"] != "custom"]
+        return out + self._custom_entries(suite, str(job["variants_dir"]))
+
+    def _custom_entries(self, suite: str | None, variants_dir: str | None = None) -> list[dict[str, Any]]:
+        """T020 user variants: one `condition: custom` entry per suite (details = variant ids)."""
+        from importlib.util import find_spec
+
+        _paths()
+        from variants.spec import list_variants
+
+        missing = [] if find_spec("libero") is not None else ["hf-libero (main venv, --extra libero)"]
+        out = list_variants(suite, variants_dir)
+        for e in out:
+            e["missing"] = missing
+            e.pop("variants", None)  # per-variant rows: `sc-variants list`
+        return out
 
     def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
         """C0–C6 per suite from instructions/<suite>.json. details = every variant id for `variants:` (infeasible
@@ -138,7 +160,7 @@ class OursAdapter(BenchmarkAdapter):
                 e["requires"] = ["hf-libero (main venv, --extra libero)"]
                 e["missing"] = missing
                 out.append(e)  # type: ignore[arg-type]
-        return out
+        return out + self._custom_entries(suite)
 
     def job_id(self, job: dict[str, Any]) -> str:
         rep = int(job.get("repeat", 0) or 0)
