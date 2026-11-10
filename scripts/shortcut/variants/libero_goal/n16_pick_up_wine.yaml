@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #16 (N3)
+suite: libero_goal
+base_task: 2
+id: n16_pick_up_wine
+group: N3
+instruction: pick up the wine bottle
+goal:
+- Up wine_bottle_1
+init: keep

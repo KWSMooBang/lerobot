@@ -92,23 +92,23 @@ Each job's `run_meta.json → identity` holds `exec_mode`, GPU model, torch, CUD
 
 ## Layout
 
-| path                        | what                                                                                                  |
-| --------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `../serve/policy_server.py` | websocket server: `--ckpt`, `--batch`, `--ready-file`; `engine.py` = loading, noise, queues, batching |
-| `core/protocol.py`          | wire protocol `sc-policy/1` (hello / reset / infer / end, msgpack + numpy), obs convention            |
-| `core/client.py`            | `PolicyClient` + `robosuite_obs_to_wire` / `lerobot_libero_obs_to_wire` (numpy, msgpack, websockets)  |
-| `core/registry.py`          | `ckpt_registry.tsv` read / create / resolve                                                           |
-| `core/records.py`           | standard episode record (design §2), perturbation dimensions, flock'ed jsonl appends                  |
-| `core/battery.py`           | battery YAML expansion, dry-run time model                                                            |
-| `core/catalog.py`           | `CatalogEntry` (what a battery can select), `sc-bench --list` table                                   |
-| `core/validate.py`          | battery validation against the catalogs (errors with suggestions, skips for missing installs)         |
-| `render_fix.py`             | T009 env fix for the LIBERO-Plus / PRO installs (sRGB textures in place, L10 init lifts at load)      |
-| `core/adapters.py`          | benchmark adapter interface + registry (`ADAPTERS`)                                                   |
-| `core/worker.py`            | generic worker loop (stdin units → `@@result` lines)                                                  |
-| `core/runner.py`            | `sc-bench` coordinator: servers, worker slots, resume, bookkeeping, `results.tsv`                     |
-| `core/report.py`            | `sc-report`                                                                                           |
-| `ours/`                     | our C0–C6 harness as a client (T001 `EpisodeStepper`, dual goals, videos)                             |
-| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`, `custom_template.yaml`, `e2e_smoke.yaml`                     |
+| path                        | what                                                                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `../serve/policy_server.py` | websocket server: `--ckpt`, `--batch`, `--ready-file`; `engine.py` = loading, noise, queues, batching                                    |
+| `core/protocol.py`          | wire protocol `sc-policy/1` (hello / reset / infer / end, msgpack + numpy), obs convention                                               |
+| `core/client.py`            | `PolicyClient` + `robosuite_obs_to_wire` / `lerobot_libero_obs_to_wire` (numpy, msgpack, websockets)                                     |
+| `core/registry.py`          | `ckpt_registry.tsv` read / create / resolve                                                                                              |
+| `core/records.py`           | standard episode record (design §2), perturbation dimensions, flock'ed jsonl appends                                                     |
+| `core/battery.py`           | battery YAML expansion, dry-run time model                                                                                               |
+| `core/catalog.py`           | `CatalogEntry` (what a battery can select), `sc-bench --list` table                                                                      |
+| `core/validate.py`          | battery validation against the catalogs (errors with suggestions, skips for missing installs)                                            |
+| `render_fix.py`             | T009 env fix for the LIBERO-Plus / PRO installs (sRGB textures in place, L10 init lifts at load)                                         |
+| `core/adapters.py`          | benchmark adapter interface + registry (`ADAPTERS`)                                                                                      |
+| `core/worker.py`            | generic worker loop (stdin units → `@@result` lines)                                                                                     |
+| `core/runner.py`            | `sc-bench` coordinator: servers, worker slots, resume, bookkeeping, `results.tsv`                                                        |
+| `core/report.py`            | `sc-report`                                                                                                                              |
+| `ours/`                     | our C0–C6 harness as a client (T001 `EpisodeStepper`, dual goals, videos); `condition: custom` = user variants (`../variants/README.md`) |
+| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`, `custom_template.yaml`, `e2e_smoke.yaml`, `goal15*.yaml`, `variants_examples.yaml`              |
 
 Run dir: `runs/<run-id>/{bench_meta.json, jobs/<job_id>/, servers/gpu<g>.log, workers/*.log, jobs_summary.json,
 git_sha, git_dirty, patch.diff, cmd.txt, meta.txt, gpus, STATUS, started_at, ended_at}`. An `ours` job dir is a

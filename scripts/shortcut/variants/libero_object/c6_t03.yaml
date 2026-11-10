@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 6); goal none
+suite: libero_object
+base_task: 3
+id: c6_t03
+group: C6
+instruction: pick up the butter and place it in the basket
+goal: []
+init: keep
+notes: butter_1 is not in this scene; trained (task 6) at the other target spot, where chocolate_pudding_1 stands here

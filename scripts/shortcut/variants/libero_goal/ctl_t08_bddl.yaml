@@ -1,0 +1,11 @@
+# goal15 control: training task 8 (bddl sentence)
+suite: libero_goal
+base_task: 8
+id: ctl_t08_bddl
+group: goal15-control
+pair: ctl_t08
+phrasing: bddl
+instruction: Put the bowl on the plate
+goal:
+- On akita_black_bowl_1 plate_1
+init: keep

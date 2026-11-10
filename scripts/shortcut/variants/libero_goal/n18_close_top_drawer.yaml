@@ -1,0 +1,12 @@
+# goal-novel-candidates.md #18 (N3)
+suite: libero_goal
+base_task: 3
+id: n18_close_top_drawer
+group: N3
+instruction: close the top drawer of the cabinet
+goal:
+- Close wooden_cabinet_1_top_region
+scene:
+  fixture_state:
+    wooden_cabinet_1_top_region: open
+init: patch

@@ -1,0 +1,11 @@
+# goal15 #9 (bddl sentence)
+suite: libero_goal
+base_task: 3
+id: g09_human
+group: goal15
+pair: g09
+phrasing: bddl
+instruction: Open the middle layer of the drawer and put the bowl inside
+goal:
+- In akita_black_bowl_1 wooden_cabinet_1_middle_region
+init: keep

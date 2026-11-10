@@ -1,0 +1,357 @@
+{
+ "id": "c7_t05",
+ "suite": "libero_object",
+ "group": "C7",
+ "generator": "variants-v1",
+ "generated_at": "2026-11-10T01:40:01.180119+00:00",
+ "git_sha": "99c688c9183f1a35f66f408414cb448aaaca89bf",
+ "libero_env": "fix-fix1-d18559ff",
+ "spec_path": "../../c7_t05.yaml",
+ "spec_sha256": "230f2ee1d218b500336e895cfe442ac23a7b7c91827ceb7a7ed64c461c142881",
+ "spec": {
+  "suite": "libero_object",
+  "base_task": 5,
+  "id": "c7_t05",
+  "instruction": "pick up the tomato sauce and place it in the basket",
+  "goal": [
+   [
+    "In",
+    "tomato_sauce_1",
+    "basket_1_contain_region"
+   ]
+  ],
+  "track_goals": "default",
+  "scene": {
+   "move": [],
+   "swap": [
+    [
+     "tomato_sauce_1",
+     "milk_1"
+    ]
+   ],
+   "remove": [],
+   "add": [],
+   "fixture_state": {}
+  },
+  "init_mode": "patch",
+  "init_n": null,
+  "group": "C7",
+  "notes": "tomato_sauce_1 and milk_1 (the other target spot) swap places",
+  "feasibility_hint": null,
+  "sha256": "230f2ee1d218b500336e895cfe442ac23a7b7c91827ceb7a7ed64c461c142881"
+ },
+ "instruction": "pick up the tomato sauce and place it in the basket",
+ "goal": [
+  [
+   "In",
+   "tomato_sauce_1",
+   "basket_1_contain_region"
+  ]
+ ],
+ "goal_achievable": true,
+ "goal_semantics": "TurnOff x := not TurnOn x (LIBERO's TurnOff needs knob qpos < 0 inside a [-0.005, 2.1] range)",
+ "base_task": {
+  "task_id": 5,
+  "name": "pick_up_the_tomato_sauce_and_place_it_in_the_basket",
+  "language": "pick up the tomato sauce and place it in the basket",
+  "bddl": "/workspace/VLA-shortcut-exps/.claude/worktrees/sc-variant-designer/.venv/lib/python3.12/site-packages/libero/libero/bddl_files/libero_object/pick_up_the_tomato_sauce_and_place_it_in_the_basket.bddl",
+  "init_file_sha256": "2326da7ccacd3ebc75d80847f92d2e310b537b8dbbd8a76840a29b13f00f9a65",
+  "goal": [
+   [
+    "In",
+    "tomato_sauce_1",
+    "basket_1_contain_region"
+   ]
+  ],
+  "goal_absent": []
+ },
+ "track_goals": {
+  "t0": {
+   "goal": [
+    [
+     "In",
+     "alphabet_soup_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 0,
+   "instruction": "pick up the alphabet soup and place it in the basket",
+   "absent": [
+    "alphabet_soup_1"
+   ]
+  },
+  "t1": {
+   "goal": [
+    [
+     "In",
+     "cream_cheese_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 1,
+   "instruction": "pick up the cream cheese and place it in the basket",
+   "absent": [
+    "cream_cheese_1"
+   ]
+  },
+  "t2": {
+   "goal": [
+    [
+     "In",
+     "salad_dressing_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 2,
+   "instruction": "pick up the salad dressing and place it in the basket",
+   "absent": [
+    "salad_dressing_1"
+   ]
+  },
+  "t3": {
+   "goal": [
+    [
+     "In",
+     "bbq_sauce_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 3,
+   "instruction": "pick up the bbq sauce and place it in the basket",
+   "absent": []
+  },
+  "t4": {
+   "goal": [
+    [
+     "In",
+     "ketchup_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 4,
+   "instruction": "pick up the ketchup and place it in the basket",
+   "absent": [
+    "ketchup_1"
+   ]
+  },
+  "t5": {
+   "goal": [
+    [
+     "In",
+     "tomato_sauce_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 5,
+   "instruction": "pick up the tomato sauce and place it in the basket",
+   "absent": []
+  },
+  "t6": {
+   "goal": [
+    [
+     "In",
+     "butter_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 6,
+   "instruction": "pick up the butter and place it in the basket",
+   "absent": []
+  },
+  "t7": {
+   "goal": [
+    [
+     "In",
+     "milk_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 7,
+   "instruction": "pick up the milk and place it in the basket",
+   "absent": []
+  },
+  "t8": {
+   "goal": [
+    [
+     "In",
+     "chocolate_pudding_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 8,
+   "instruction": "pick up the chocolate pudding and place it in the basket",
+   "absent": []
+  },
+  "t9": {
+   "goal": [
+    [
+     "In",
+     "orange_juice_1",
+     "basket_1_contain_region"
+    ]
+   ],
+   "task": 9,
+   "instruction": "pick up the orange juice and place it in the basket",
+   "absent": []
+  }
+ },
+ "edits": {
+  "kinds": [
+   "swap"
+  ],
+  "resolved": {
+   "targets": {},
+   "removed": [],
+   "added": {},
+   "fixtures": {},
+   "swapped": [
+    [
+     "tomato_sauce_1",
+     "milk_1"
+    ]
+   ],
+   "base_task": 5
+  },
+  "dimension": "layout"
+ },
+ "scene_changed": true,
+ "files": {
+  "bddl": {
+   "path": "c7_t05.bddl",
+   "sha256": "3f67bfd28a3a1868d03f92aaaeda19f309133290b2acfb05dc2f10bc841018b5"
+  },
+  "init_states": {
+   "path": "init_states.npy",
+   "sha256": "ed457c6e8abb54727c9af9810d770082695343a6f0ee64537b4181cadd624885"
+  }
+ },
+ "init_states": {
+  "mode": "patch",
+  "n": 50,
+  "state_dim": 110,
+  "source": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49
+  ],
+  "check": {
+   "failures": [],
+   "mode": "patch",
+   "n_candidates": 50,
+   "n_failed": 0
+  }
+ },
+ "feasibility": {
+  "status": "feasible",
+  "trials": "3/3",
+  "method": "T002 scripted policy (feasibility.py) + Up/TurnOff primitives (variants/check.py)",
+  "goal_at_init": [
+   false,
+   false,
+   false
+  ],
+  "track_at_init": {},
+  "rollouts": [
+   {
+    "init": 0,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "pickplace",
+      "tomato_sauce_1",
+      "basket_1_contain_region",
+      "in"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 198,
+    "sec": 3.0
+   },
+   {
+    "init": 1,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "pickplace",
+      "tomato_sauce_1",
+      "basket_1_contain_region",
+      "in"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 197,
+    "sec": 2.9
+   },
+   {
+    "init": 2,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "pickplace",
+      "tomato_sauce_1",
+      "basket_1_contain_region",
+      "in"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 199,
+    "sec": 3.0
+   }
+  ],
+  "for": "3f67bfd28a3a1868/ed457c6e8abb5472",
+  "checked_at": "2026-11-10T01:44:44.310129+00:00"
+ }
+}

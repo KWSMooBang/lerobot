@@ -1,0 +1,14 @@
+# T014 C7: the two target spots swap objects; original instruction and goal
+suite: libero_object
+base_task: 1
+id: c7_t01
+group: C7
+instruction: pick up the cream cheese and place it in the basket
+goal:
+- In cream_cheese_1 basket_1_contain_region
+scene:
+  swap:
+  - - cream_cheese_1
+    - alphabet_soup_1
+init: patch
+notes: cream_cheese_1 and alphabet_soup_1 (the other target spot) swap places

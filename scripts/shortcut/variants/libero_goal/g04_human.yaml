@@ -1,0 +1,11 @@
+# goal15 #4 (bddl sentence)
+suite: libero_goal
+base_task: 2
+id: g04_human
+group: goal15
+pair: g04
+phrasing: bddl
+instruction: Put the wine bottle on the plate
+goal:
+- On wine_bottle_1 plate_1
+init: keep

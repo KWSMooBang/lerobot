@@ -1,0 +1,11 @@
+# goal15 control: training task 8 (train sentence)
+suite: libero_goal
+base_task: 8
+id: ctl_t08_train
+group: goal15-control
+pair: ctl_t08
+phrasing: train
+instruction: put the bowl on the plate
+goal:
+- On akita_black_bowl_1 plate_1
+init: keep

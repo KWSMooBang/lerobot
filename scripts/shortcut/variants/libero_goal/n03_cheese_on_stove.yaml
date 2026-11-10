@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #3 (N1)
+suite: libero_goal
+base_task: 1
+id: n03_cheese_on_stove
+group: N1
+instruction: put the cream cheese on the stove
+goal:
+- On cream_cheese_1 flat_stove_1_cook_region
+init: keep

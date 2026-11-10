@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #15 (N3)
+suite: libero_goal
+base_task: 6
+id: n15_pick_up_cheese
+group: N3
+instruction: pick up the cream cheese
+goal:
+- Up cream_cheese_1
+init: keep

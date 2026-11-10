@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 3); goal none
+suite: libero_object
+base_task: 0
+id: c6_t00
+group: C6
+instruction: pick up the bbq sauce and place it in the basket
+goal: []
+init: keep
+notes: bbq_sauce_1 is not in this scene; trained (task 3) at the other target spot, where salad_dressing_1 stands here

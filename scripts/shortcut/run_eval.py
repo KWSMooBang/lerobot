@@ -82,6 +82,12 @@ FRAME_SIDE = 256
 DESCENT_DROP_M = 0.05  # first descent = eef z dropped this far below its start, then bottomed out
 BACKENDS = ("libero", "mock")
 TIMING_FIELDS = ("time_policy_s", "time_env_s", "wall_time_s")  # differ between reruns of one episode
+CUSTOM = "custom"  # user-designed variants (scripts/shortcut/variants, T020): own BDDL + init states
+
+
+def runs_to_max_steps(condition: str) -> bool:
+    """C4–C6 and custom variants run to max_steps and track more than the original goal."""
+    return condition in DUAL_GOAL_CONDITIONS or condition == CUSTOM
 
 
 @cache
@@ -261,7 +267,11 @@ class EpisodeStepper:
 
     Shared by the single-env loop (run_episode) and the batched env subprocesses (parallel/envproc.py),
     so both log, stop and score episodes the same way. C0–C3 stop at the original goal; C4–C6 run to
-    max_steps and track both goals."""
+    max_steps and track both goals.
+
+    Custom variants (T020) also pass `orig_goal` (the base task goal, checked instead of the env's own
+    success, which is the variant goal) and `track` ({name: goal}): the first step each tracked goal holds
+    goes to goals_reached, goals true right after reset to goals_initial. Without them nothing changes."""
 
     def __init__(
         self,
@@ -274,11 +284,14 @@ class EpisodeStepper:
         record_video: bool,
         tag: str = "",
         probe_cls: Callable[[Any], Callable[[], tuple[list[str], list[str]]]] = ContactProbe,
+        orig_goal: Callable[[Any], bool] | None = None,
+        track: dict[str, Callable[[Any], bool]] | None = None,
     ):
         self.env, self.v, self.init_idx, self.ep_seed = env, v, init_idx, ep_seed
         self.max_steps, self.new_goal, self.record_video, self.tag = max_steps, new_goal, record_video, tag
         self.probe_cls = probe_cls
-        self.dual = v.condition in DUAL_GOAL_CONDITIONS
+        self.dual = runs_to_max_steps(v.condition)
+        self.orig_goal, self.track = orig_goal, track
 
     def reset(self) -> dict:
         np.random.seed(self.ep_seed % 2**32)
@@ -298,6 +311,10 @@ class EpisodeStepper:
         self.t_env = 0.0
         self.t = 0
         self.done = self.max_steps <= 0
+        if self.track is not None:
+            self.goals_initial = sorted(n for n, g in self.track.items() if g(self.env))
+            self.goals_reached: dict[str, int | None] = dict.fromkeys(self.track)
+            self.track_log: list[list[bool]] = []
         return self.obs
 
     def _frame(self, t: int) -> np.ndarray:
@@ -311,8 +328,14 @@ class EpisodeStepper:
         self.obs, _, _, _, info = self.env.step(a)
         self.t_env += time.perf_counter() - toc
         t = self.t
-        g_orig = bool(info["is_success"])
+        g_orig = bool(info["is_success"]) if self.orig_goal is None else bool(self.orig_goal(self.env))
         g_new = bool(self.new_goal(self.env)) if self.new_goal is not None else False
+        if self.track is not None:
+            row = [bool(g(self.env)) for g in self.track.values()]
+            for name, hit in zip(self.track, row, strict=True):
+                if hit and self.goals_reached[name] is None:
+                    self.goals_reached[name] = t + 1
+            self.track_log.append(row)
         if g_orig and self.t_orig is None:
             self.t_orig = t + 1
         if g_new and self.t_new is None:
@@ -351,6 +374,20 @@ class EpisodeStepper:
         )
         arr["contacts"] = np.asarray(contacts, dtype=str)
         arr["grasped"] = np.asarray(grasped, dtype=str)
+        extra: dict[str, Any] = {}
+        if self.track is not None:
+            names = list(self.track)
+            arr["goal_track"] = np.asarray(self.track_log, dtype=bool).reshape(
+                len(self.track_log), len(names)
+            )
+            arr["goal_track_names"] = np.asarray(names, dtype=str)
+            extra = {
+                "goals_reached": dict(self.goals_reached),
+                "goals_final": {
+                    n: bool(self.track_log[-1][i]) if self.track_log else False for i, n in enumerate(names)
+                },
+                "goals_initial": self.goals_initial,
+            }
 
         first_grasp = first_grasp_t = None
         for t, (g, closing) in enumerate(zip(grasped, arr["gripper_closing"], strict=True)):
@@ -376,6 +413,7 @@ class EpisodeStepper:
             "time_env_s": round(self.t_env, 2),
             "final_success_orig": bool(arr["goal_orig"][-1]) if len(contacts) else False,
             "final_success_new": (bool(arr["goal_new"][-1]) if len(contacts) else False) if dual else None,
+            **extra,
         }
 
 
@@ -394,6 +432,8 @@ def run_episode(
     record_video: bool,
     tag: str = "",
     probe_cls: Callable[[Any], Callable[[], tuple[list[str], list[str]]]] = ContactProbe,
+    orig_goal: Callable[[Any], bool] | None = None,
+    track: dict[str, Callable[[Any], bool]] | None = None,
 ) -> dict[str, Any]:
     """Single-env episode (exec_mode single). Flow-matching noise comes from the global torch RNG
     seeded with ep_seed; the batched path draws the same stream from a per-episode generator."""
@@ -402,7 +442,9 @@ def run_episode(
     post.reset()
     bind_relative_anchor(policy, pre)
     torch.manual_seed(ep_seed)
-    ep = EpisodeStepper(env, v, init_idx, ep_seed, max_steps, new_goal, record_video, tag, probe_cls)
+    ep = EpisodeStepper(
+        env, v, init_idx, ep_seed, max_steps, new_goal, record_video, tag, probe_cls, orig_goal, track
+    )
     obs = ep.reset()
     t_policy = 0.0
     done = ep.done
@@ -469,7 +511,12 @@ def episode_record(
     video_file: str | None,
     wall_time_s: float,
 ) -> dict[str, Any]:
-    """One episodes.jsonl line. `run` = RunSpec.info() (model tag, checkpoint, suite, originals, scene_k)."""
+    """One episodes.jsonl line. `run` = RunSpec.info() (model tag, checkpoint, suite, originals, scene_k).
+    Custom variants also get source_init_idx (the base init the stored state came from; C0 pairing)."""
+    extra: dict[str, Any] = {}
+    if v.condition == CUSTOM:
+        src = v.meta.get("source_init")
+        extra["source_init_idx"] = src[init_idx] if src is not None and init_idx < len(src) else None
     return {
         "model": run["tag"],
         "policy": run["policy"],
@@ -487,11 +534,12 @@ def episode_record(
         "variant_meta": v.meta,
         "scene_k": run["scene_k"][str(task_id)],
         "max_steps": run["max_steps"],
-        "early_stop": v.condition not in DUAL_GOAL_CONDITIONS,
+        "early_stop": not runs_to_max_steps(v.condition),
         "seed": ep_seed,
         "video": video_file,
         "steps_file": steps_file,
         "wall_time_s": round(wall_time_s, 2),
+        **extra,
     }
 
 
@@ -623,6 +671,10 @@ def prepare_run(
     video_cap = parse_video(args.video)
     max_steps = default_max_steps(args)
 
+    if args.instr_set is None:
+        if args.condition != CUSTOM:
+            raise SystemExit("--instr-set is required (except for --condition custom)")
+        args.instr_set = str(Path(__file__).resolve().parent / "instructions" / f"{args.suite}.json")
     suite, tasks, k_by_task = suite_tasks(args)
     instr_set = load_instruction_set(args.instr_set)
     if instr_set.get("suite") not in (None, args.suite):
@@ -644,6 +696,8 @@ def prepare_run(
         **exec_identity(exec_mode, gpu),
         **(identity_extra or {}),
     }
+    if args.condition == CUSTOM:  # only custom identities carry it (C0–C6 identities stay as they were)
+        identity["variants_dir"] = str(Path(args.variants_dir).resolve()) if args.variants_dir else "default"
     if args.backend != "libero":
         identity["backend"] = args.backend
     elif libero_env_tag() != "raw":  # raw (the P1 env) leaves the identity as it was before T009
@@ -656,6 +710,14 @@ def prepare_run(
 def plan_variants(spec: RunSpec, tokenizer: Any) -> list[tuple[int, list[Variant]]]:
     """[(task_id, variants)] in run order; prints the same [skip]/[warn] notes as before."""
     args, instr_set = spec.args, spec.instr_set
+    if args.condition == CUSTOM:
+        from variants.runtime import plan_custom
+
+        ids = [x for x in args.variants.split(",") if x] if args.variants else None
+        env_tag = libero_env_tag() if args.backend == "libero" else None
+        ep_path = Path(args.out) / "episodes.jsonl" if getattr(args, "out", None) else None
+        phr = [x for x in args.phrasing.split(",") if x] if getattr(args, "phrasing", None) else None
+        return plan_custom(args.suite, ids, args.variants_dir, args.backend, env_tag, ep_path, phr)
     restrict = set(args.variants.split(",")) if args.variants else None
     out = []
     for task_id in parse_range(args.tasks):
@@ -710,7 +772,21 @@ def run_meta(
     return meta
 
 
-def make_env(args: argparse.Namespace, suite: Any, task_id: int, max_steps: int, inf_meta: dict) -> Any:
+def make_env(
+    args: argparse.Namespace,
+    suite: Any,
+    task_id: int,
+    max_steps: int,
+    inf_meta: dict,
+    variant: Variant | None = None,
+) -> Any:
+    if variant is not None and variant.condition == CUSTOM:
+        from variants.runtime import make_env as make_variant_env
+
+        hw = inf_meta["env_observation_hw"]
+        return make_variant_env(
+            variant, suite, args.suite, args.backend, max_steps, hw, inf_meta["control_mode"]
+        )
     if args.backend == "mock":
         from mock_backend import MockEnv
 
@@ -748,8 +824,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--model-tag", default=None, help="model label in episodes.jsonl (default from checkpoint)"
     )
     ap.add_argument("--suite", choices=list(SUITE_SHORT), required=True)
-    ap.add_argument("--condition", choices=CONDITIONS, required=True)
-    ap.add_argument("--instr-set", required=True)
+    ap.add_argument("--condition", choices=(*CONDITIONS, CUSTOM), required=True)
+    ap.add_argument(
+        "--instr-set",
+        default=None,
+        help="instruction set JSON (required; custom: default instructions/<suite>.json)",
+    )
     ap.add_argument("--tasks", default="0-9")
     ap.add_argument("--episodes", type=int, default=50, help="first N init states per task")
     ap.add_argument("--repeat-idx", type=int, default=0)
@@ -760,7 +840,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--n-action-steps", type=int, default=10, help="docs/source/libero.mdx (OpenPI setting)")
     ap.add_argument("--max-steps", type=int, default=None, help="default: lerobot TASK_SUITE_MAX_STEPS")
-    ap.add_argument("--variants", default=None, help="comma list to restrict variant ids (debug)")
+    ap.add_argument(
+        "--variants",
+        default=None,
+        help="comma list to restrict variant ids (custom: variant ids to run, default all)",
+    )
+    ap.add_argument(
+        "--phrasing",
+        default=None,
+        help="custom: keep only variants whose spec phrasing is in this comma list (train,bddl)",
+    )
+    ap.add_argument(
+        "--variants-dir",
+        default=None,
+        help="custom: dir with <suite>/<id>.yaml + generated/ (default scripts/shortcut/variants)",
+    )
     ap.add_argument("--include-infeasible", action="store_true", help="also run swaps with feasible=false")
     ap.add_argument("--device", default="cuda")
     ap.add_argument(
@@ -780,6 +874,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if (args.num_envs != 1 or args.compile) and args.condition == CUSTOM:
+        raise SystemExit(
+            "--condition custom runs single-env here (or through sc-bench); --num-envs > 1 is not supported"
+        )
     if args.num_envs != 1 or args.compile:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "parallel"))
         from run_multi import run_single_dir
@@ -816,12 +914,18 @@ def main(argv: list[str] | None = None) -> None:
     done = spec.done_keys()
     run = spec.info()
     for task_id, variants in plan_variants(spec, tokenizer):
-        env = make_env(args, spec.suite, task_id, spec.max_steps, inf_meta)
+        env = make_env(args, spec.suite, task_id, spec.max_steps, inf_meta, variants[0])
         n_init = len(env._init_states) if env._init_states is not None else 0
         if args.episodes > n_init:
             raise ValueError(f"task {task_id} has only {n_init} init states")
         for v in variants:
-            new_goal = goal_cls(v.goal_bddl) if v.goal_bddl else None
+            orig_goal = track = None
+            if v.condition == CUSTOM:
+                from variants.runtime import goals_for
+
+                new_goal, orig_goal, track = goals_for(v, args.backend)
+            else:
+                new_goal = goal_cls(v.goal_bddl) if v.goal_bddl else None
             for init_idx in range(args.episodes):
                 key = (task_id, args.condition, v.variant, init_idx, args.repeat_idx)
                 if key in done:
@@ -851,6 +955,8 @@ def main(argv: list[str] | None = None) -> None:
                     rec_video,
                     spec.tag,
                     probe_cls,
+                    orig_goal,
+                    track,
                 )
                 rel = video_relpath(args.suite, task_id, v.condition, v.variant, init_idx, args.repeat_idx)
                 steps_file, video_file = save_episode(out, rel, res, rec_video)

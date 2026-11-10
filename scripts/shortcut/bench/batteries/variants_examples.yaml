@@ -1,0 +1,34 @@
+# User-designed LIBERO variants (T020, scripts/shortcut/variants): the shipped examples.
+# Needs the variants built (scripts/shortcut/variants/sc-variants build); episodes run to max_steps and record
+# goals_reached for every training goal → sc-report adds the "Custom variants: fallback" table.
+# C0 of the base tasks (same seeds, same init indices for keep variants) is the pairing reference.
+#   scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery variants_examples --dry-run
+name: variants_examples
+description: LIBERO-Goal new instructions n01–n23 (20 inits) + LIBERO-Object C6/C7/C8 × 10 tasks (10 inits), with C0 references
+defaults:
+  seed: 7
+  video: "first:3"
+jobs:
+  - benchmark: ours
+    suite: libero_goal
+    condition: custom
+    name: novel          # job id ours-goal-custom-novel
+    episodes: 20
+    variants: [
+      n01_cheese_on_plate, n02_wine_on_plate, n03_cheese_on_stove, n04_wine_on_stove, n05_cheese_on_cabinet,
+      n06_cheese_on_rack, n07_bowl_front_of_stove, n08_wine_front_of_stove, n09_open_top_drawer,
+      n10_middle_drawer_bowl, n11_top_drawer_cheese, n12_open_bottom_drawer, n13_bottom_drawer_bowl,
+      n14_middle_drawer_cheese, n15_pick_up_cheese, n16_pick_up_wine, n17_plate_on_stove, n18_close_top_drawer,
+      n19_turn_off_stove, n20_bowl_plate_and_stove_on, n21_wine_rack_and_bowl_stove,
+      n22_middle_drawer_and_stove_on, n23_cheese_bowl_and_bowl_plate,
+    ]
+  - benchmark: ours
+    suite: libero_object
+    condition: custom
+    name: c678
+    episodes: 10
+  - benchmark: ours
+    suites: [libero_goal, libero_object]
+    conditions: [C0]
+    tasks: 0-9
+    episodes: 20

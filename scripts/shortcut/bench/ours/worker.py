@@ -69,14 +69,53 @@ def wire_obs(obs: dict[str, Any]) -> dict[str, np.ndarray]:
 
 
 def env_for(unit: dict[str, Any]) -> Any:
-    key = (unit["suite"], unit["task_id"], unit["max_steps"])
+    custom = unit.get("custom", False)
+    vm = (unit["variants"][0].get("meta") or {}) if custom else {}
+    # custom: the generated files themselves (two variants_dirs may hold the same id with other files)
+    key = (
+        unit["suite"],
+        unit["task_id"],
+        unit["max_steps"],
+        unit["variants"][0]["variant"] if custom else None,
+        vm.get("variant_key"),
+        vm.get("bddl"),
+        vm.get("init_states"),
+    )
     if key not in _ENVS:
         for env in _ENVS.values():
             env.close()
         _ENVS.clear()
-        spec = {k: unit[k] for k in ("suite", "task_id", "max_steps", "env_hw", "control_mode")}
-        _ENVS[key] = _make_env(unit["backend"], spec, _SUITES)
+        if custom:
+            from variants.runtime import make_env as make_variant_env
+
+            suite = _custom_suite(unit)
+            v = Variant(**unit["variants"][0])
+            _ENVS[key] = make_variant_env(
+                v,
+                suite,
+                unit["suite"],
+                unit["backend"],
+                unit["max_steps"],
+                unit["env_hw"],
+                unit["control_mode"],
+            )
+        else:
+            spec = {k: unit[k] for k in ("suite", "task_id", "max_steps", "env_hw", "control_mode")}
+            _ENVS[key] = _make_env(unit["backend"], spec, _SUITES)
     return _ENVS[key]
+
+
+def _custom_suite(unit: dict[str, Any]) -> Any:
+    if unit["suite"] not in _SUITES:
+        if unit["backend"] == "mock":
+            from mock_backend import mock_suite
+
+            _SUITES[unit["suite"]] = mock_suite(unit["suite"])
+        else:
+            from run_eval import libero
+
+            _SUITES[unit["suite"]] = libero().get_suite(unit["suite"])
+    return _SUITES[unit["suite"]]
 
 
 def run_episode_remote(
@@ -89,13 +128,16 @@ def run_episode_remote(
     new_goal: Any,
     record_video: bool,
     probe_cls: Any,
+    orig_goal: Any = None,
+    track: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """run_eval.run_episode with the policy behind the server (reset → chunks of n_action_steps)."""
     eid = f"{unit['unit_id']}/{v.variant}/i{init_idx}"
     client.reset(eid, ep_seed, v.instruction)
     ep = EpisodeStepper(
-        env, v, init_idx, ep_seed, unit["max_steps"], new_goal, record_video, unit["run"]["tag"], probe_cls
-    )
+        env, v, init_idx, ep_seed, unit["max_steps"], new_goal, record_video, unit["run"]["tag"], probe_cls,
+        orig_goal, track,
+    )  # fmt: skip
     obs = ep.reset()
     if new_goal is not None:
         missing = new_goal.missing_objects(env)
@@ -138,20 +180,32 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
     written = 0
     for vd in unit["variants"]:
         v = Variant(**vd)
-        new_goal = goal_cls(v.goal_bddl) if v.goal_bddl else None
+        orig_goal = track = None
+        if v.condition == "custom":
+            from variants.runtime import goals_for
+
+            new_goal, orig_goal, track = goals_for(v, unit["backend"])
+        else:
+            new_goal = goal_cls(v.goal_bddl) if v.goal_bddl else None
         for init_idx in range(unit["episodes"]):
             if (task_id, v.condition, v.variant, init_idx, rep) in done:
                 continue
             ep_seed = episode_seed(unit["seed"], rep, task_id, init_idx)
             rec_video = cap is None or init_idx < cap
             t0 = time.time()
-            res = run_episode_remote(client, env, v, init_idx, ep_seed, unit, new_goal, rec_video, probe_cls)
+            res = run_episode_remote(
+                client, env, v, init_idx, ep_seed, unit, new_goal, rec_video, probe_cls, orig_goal, track
+            )
             rel = video_relpath(unit["suite"], task_id, v.condition, v.variant, init_idx, rep)
             steps_file, video_file = save_episode(out, rel, res, rec_video)
             rec = episode_record(
                 run, task_id, v, init_idx, ep_seed, res, steps_file, video_file, time.time() - t0
             )
-            dim, level = OURS_PERTURBATION[v.condition]
+            if v.condition == "custom":
+                dim, level, detail = v.meta["dimension"], "custom", f"custom:{v.variant}"
+            else:
+                dim, level = OURS_PERTURBATION[v.condition]
+                detail = v.condition
             dual = res["success_new"] is not None
             rec.update(
                 standard_fields(
@@ -163,7 +217,7 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
                     task_id=task_id,
                     variant_id=v.variant,
                     init_idx=init_idx,
-                    pert=perturbation(dim, level, v.condition),
+                    pert=perturbation(dim, level, detail),
                     instruction_original=run["originals"][str(task_id)],
                     instruction_given=v.instruction,
                     success=bool(res["success_new"] if dual else res["success_orig"]),

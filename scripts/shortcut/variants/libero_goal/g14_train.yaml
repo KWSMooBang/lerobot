@@ -1,0 +1,11 @@
+# goal15 #14 (train sentence)
+suite: libero_goal
+base_task: 8
+id: g14_train
+group: goal15
+pair: g14
+phrasing: train
+instruction: put the cream cheese on the plate
+goal:
+- On cream_cheese_1 plate_1
+init: keep

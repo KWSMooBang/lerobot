@@ -1,0 +1,11 @@
+# goal15 control: training task 3 (bddl sentence)
+suite: libero_goal
+base_task: 3
+id: ctl_t03_bddl
+group: goal15-control
+pair: ctl_t03
+phrasing: bddl
+instruction: Open the top layer of the drawer and put the bowl inside
+goal:
+- In akita_black_bowl_1 wooden_cabinet_1_top_region
+init: keep

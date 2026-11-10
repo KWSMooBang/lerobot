@@ -1,0 +1,11 @@
+# goal15 control: training task 9 (bddl sentence)
+suite: libero_goal
+base_task: 9
+id: ctl_t09_bddl
+group: goal15-control
+pair: ctl_t09
+phrasing: bddl
+instruction: Put the wine bottle on the rack
+goal:
+- On wine_bottle_1 wine_rack_1_top_region
+init: keep

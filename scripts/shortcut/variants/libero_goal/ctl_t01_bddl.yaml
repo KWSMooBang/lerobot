@@ -1,0 +1,11 @@
+# goal15 control: training task 1 (bddl sentence)
+suite: libero_goal
+base_task: 1
+id: ctl_t01_bddl
+group: goal15-control
+pair: ctl_t01
+phrasing: bddl
+instruction: Put the bowl on the stove
+goal:
+- On akita_black_bowl_1 flat_stove_1_cook_region
+init: keep

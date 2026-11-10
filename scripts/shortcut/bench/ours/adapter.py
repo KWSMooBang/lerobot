@@ -6,6 +6,12 @@ metrics.py, make_compare_video.py and the P1 analysis scripts read it unchanged.
 a job (all its variants × inits). Job keys: suite, condition, tasks (default 0-9), episodes, repeat, seed,
 video (all|none|first:N), instr_set (default instructions/<suite>.json), variants, include_infeasible,
 max_steps.
+
+User-designed variants (T020, scripts/shortcut/variants): `condition: custom` with `variants: [id, ...]`
+(default: every variant of the suite) and optional `variants_dir` (default scripts/shortcut/variants) and
+`name` (job id suffix, to keep two custom jobs of one suite apart), `phrasing` (keep only variants whose spec
+`phrasing` is listed, e.g. [train]). Variants must be built
+(`sc-variants build`). One unit = one variant; episodes run to max_steps with multi-goal tracking.
 """
 
 from __future__ import annotations
@@ -102,7 +108,29 @@ def _variant_ids(cond: str, entry: dict[str, Any]) -> list[tuple[str, bool]]:
 class OursAdapter(BenchmarkAdapter):
     name = "ours"
     key_field = "condition"
-    job_keys = frozenset({"instr_set", "variants", "include_infeasible"})
+    # variants_dir / name / phrasing: condition custom (T020 user variants)
+    job_keys = frozenset({"instr_set", "variants", "include_infeasible", "variants_dir", "name", "phrasing"})
+
+    def catalog_for_job(self, suite: str, job: dict[str, Any]) -> list[dict[str, Any]]:
+        """catalog(suite), with the `custom` entry read from the job's own `variants_dir` when it has one."""
+        if not job.get("variants_dir"):
+            return self.catalog(suite)
+        out = [e for e in self.catalog(suite) if e["key"] != "custom"]
+        return out + self._custom_entries(suite, str(job["variants_dir"]))
+
+    def _custom_entries(self, suite: str | None, variants_dir: str | None = None) -> list[dict[str, Any]]:
+        """T020 user variants: one `condition: custom` entry per suite (details = variant ids)."""
+        from importlib.util import find_spec
+
+        _paths()
+        from variants.spec import list_variants
+
+        missing = [] if find_spec("libero") is not None else ["hf-libero (main venv, --extra libero)"]
+        out = list_variants(suite, variants_dir)
+        for e in out:
+            e["missing"] = missing
+            e.pop("variants", None)  # per-variant rows: `sc-variants list`
+        return out
 
     def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
         """C0–C6 per suite from instructions/<suite>.json. details = every variant id for `variants:` (infeasible
@@ -132,11 +160,12 @@ class OursAdapter(BenchmarkAdapter):
                 e["requires"] = ["hf-libero (main venv, --extra libero)"]
                 e["missing"] = missing
                 out.append(e)  # type: ignore[arg-type]
-        return out
+        return out + self._custom_entries(suite)
 
     def job_id(self, job: dict[str, Any]) -> str:
         rep = int(job.get("repeat", 0) or 0)
-        return f"ours-{suite_short(job['suite'])}-{job['condition']}" + (f"-r{rep}" if rep else "")
+        name = f"-{job['name']}" if job.get("condition") == "custom" and job.get("name") else ""
+        return f"ours-{suite_short(job['suite'])}-{job['condition']}{name}" + (f"-r{rep}" if rep else "")
 
     def run_args(self, job: dict[str, Any], ctx: Context) -> Any:
         """run_eval.py arguments for this job (the T001 CLI is the source of defaults)."""
@@ -155,7 +184,13 @@ class OursAdapter(BenchmarkAdapter):
             "--libero-adapter", ctx.ckpt.get("adapter") or "none",
         ]  # fmt: skip
         if job.get("variants"):
-            argv += ["--variants", ",".join(job["variants"])]
+            vs = job["variants"]
+            argv += ["--variants", vs if isinstance(vs, str) else ",".join(map(str, vs))]
+        if job.get("phrasing"):  # custom: train | bddl (spec `phrasing`), str or list
+            ph = job["phrasing"]
+            argv += ["--phrasing", ph if isinstance(ph, str) else ",".join(map(str, ph))]
+        if job.get("variants_dir"):
+            argv += ["--variants-dir", str(job["variants_dir"])]
         if job.get("include_infeasible"):
             argv.append("--include-infeasible")
         if job.get("max_steps"):
@@ -180,7 +215,8 @@ class OursAdapter(BenchmarkAdapter):
             (r["task_id"], r["condition"], r["variant"], r["init_idx"], r["repeat_idx"])
             for r in read_jsonl(jdir / "episodes.jsonl")
         }
-        dual = args.condition in ("C4", "C5", "C6")
+        dual = run_eval.runs_to_max_steps(args.condition)
+        custom = args.condition == "custom"
         full = dual or bool(ctx.ckpt.get("adapter"))
         per_ep = (max_steps if full else EARLY_STOP_FRAC.get(args.condition, 0.6) * max_steps) + 10
         units = []
@@ -193,7 +229,7 @@ class OursAdapter(BenchmarkAdapter):
             )
             units.append(
                 {
-                    "unit_id": f"{jid}/t{task_id:02d}",
+                    "unit_id": f"{jid}/{variants[0].variant}" if custom else f"{jid}/t{task_id:02d}",
                     "job_id": jid,
                     "job_dir": str(jdir),
                     "benchmark": "ours",
@@ -206,6 +242,7 @@ class OursAdapter(BenchmarkAdapter):
                     "n_pending": pending,
                     "est_steps": pending * per_ep,
                     "dual": dual,
+                    "custom": custom,
                 }
             )
         return JobPlan(

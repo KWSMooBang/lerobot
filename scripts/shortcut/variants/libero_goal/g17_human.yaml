@@ -1,0 +1,11 @@
+# goal15 #17 (bddl sentence)
+suite: libero_goal
+base_task: 4
+id: g17_human
+group: goal15
+pair: g17
+phrasing: bddl
+instruction: Put the cream cheese on top of the drawer
+goal:
+- On cream_cheese_1 wooden_cabinet_1_top_side
+init: keep

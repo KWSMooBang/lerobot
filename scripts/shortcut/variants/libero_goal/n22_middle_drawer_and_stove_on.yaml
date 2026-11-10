@@ -1,0 +1,10 @@
+# goal-novel-candidates.md #22 (N4)
+suite: libero_goal
+base_task: 0
+id: n22_middle_drawer_and_stove_on
+group: N4
+instruction: open the middle drawer and turn on the stove
+goal:
+- Open wooden_cabinet_1_middle_region
+- TurnOn flat_stove_1
+init: keep

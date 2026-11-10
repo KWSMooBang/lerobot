@@ -1,0 +1,12 @@
+# T014 C8: target object removed; original instruction; goal none
+suite: libero_object
+base_task: 7
+id: c8_t07
+group: C8
+instruction: pick up the milk and place it in the basket
+goal: []
+scene:
+  remove:
+  - milk_1
+init: patch
+notes: milk_1 removed; which object goes into the basket instead?
