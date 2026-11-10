@@ -213,7 +213,9 @@ GPU work for T015, so the times below come from FLOP counts; `smoke.sh` prints t
   group mean vs all-token mean rel. error 1e-9; policy first action vs dataset action L1 0.029.
 - This run found that lerobot calls `gemma_expert.model.forward()` directly, so a hook on the expert model never
   fires; denoising steps are counted on action-expert layer 0 instead (the mock test now calls `.forward()` too).
-- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 41): layer specs, part / shard split, fp16 overflow →
+- CPU tests (`uv run pytest scripts/shortcut/sae/tests -q`, 44). The ones on real LIBERO frames find the data
+  like collection does (`$SC_LIBERO_DATA_ROOT`, else `$SC_OUT_ROOT/data/hf_libero`, default
+  `/outputs/VLA-shortcut-exps`) and are skipped only when there is no local copy. They cover layer specs, part / shard split, fp16 overflow →
   fp32, SAE init / constraints / loss decrease / AuxK / save-load, C.1 hysteresis, interventions on a toy layout
   (`project_out` leaves no v component, `add`, `replace_with` matches the SAE metrics), and a mock π0.5 on the
   real 3-episode LIBERO data through collect (shard 0/2 + 1/2, resume, config clash), reader, train (stop + resume),
