@@ -2,6 +2,7 @@
 # Prepare a new GPU server for scripts/shortcut (no sudo, no apt: missing system pieces are printed).
 #
 #   scripts/shortcut/setup_server.sh [--gpus 0,1,2,3] [--skip-download] [--skip-selftest] [--skip-train-data]
+#                                    [--with-plus] [--with-pro] [--bench-venvs DIR]
 #
 # 1. uv venv, Python 3.12 (draccus fails to parse configs on 3.14), extras libero + pi + smolvla + training,
 #    local policy plugins (scripts/shortcut/policies/lerobot_policy_*) installed editable, no deps
@@ -12,15 +13,22 @@
 #    and an sc-train --dry-run per preset (lerobot parses + validates each config)
 # 3. EGL check per GPU; common.py points glvnd at the NVIDIA EGL vendor only when glvnd lacks it
 # 4. per-GPU self-test (in parallel): env reset + render in subprocesses, one batched π0.5 chunk, one step
+# 5. --with-plus / --with-pro (T019): the LIBERO-Plus / LIBERO-PRO client venvs for sc-bench in --bench-venvs
+#    (default $SC_BENCH_VENVS or <repo>/.venvs; ~12 GB Plus incl. 6 GB assets download, ~2.5 GB PRO), then
+#    `sc-bench --validate --battery quick`. libMagickWand (LIBERO-Plus motion blur only) is never installed here:
+#    its apt package name is printed for the admin.
 set -euo pipefail
 
-GPUS=all; DOWNLOAD=1; SELFTEST=1; TRAIN_DATA=1
+GPUS=all; DOWNLOAD=1; SELFTEST=1; TRAIN_DATA=1; WITH_PLUS=0; WITH_PRO=0; BENCH_VENVS=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --gpus) GPUS=$2; shift ;;
     --skip-download) DOWNLOAD=0 ;;
     --skip-selftest) SELFTEST=0 ;;
     --skip-train-data) TRAIN_DATA=0 ;;
+    --with-plus) WITH_PLUS=1 ;;
+    --with-pro) WITH_PRO=1 ;;
+    --bench-venvs) BENCH_VENVS=$2; shift ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
   shift
@@ -66,6 +74,43 @@ for p in scripts/shortcut/policies/lerobot_policy_*/; do
   note "policy plugin $(basename "$p") (editable, no deps)"
   uv pip install --quiet --no-deps -e "$p"
 done
+
+# ------------------------------------------------------------ benchmark venvs (LIBERO-Plus / LIBERO-PRO)
+magickwand_pkg() {  # apt name of the ImageMagick 6 Wand library on this distribution
+  . /etc/os-release 2>/dev/null || true
+  case "${ID:-}-${VERSION_ID:-}" in
+    ubuntu-2[4-9]*|debian-13*) echo "libmagickwand-6.q16-7t64" ;;
+    *) echo "libmagickwand-6.q16-6" ;;
+  esac
+}
+if [ "$WITH_PLUS" = 1 ] || [ "$WITH_PRO" = 1 ]; then
+  BV=$(realpath -m "${BENCH_VENVS:-${SC_BENCH_VENVS:-$REPO/.venvs}}")
+  mkdir -p "$BV"
+  export SC_BENCH_VENVS=$BV
+  note "benchmark venvs -> $BV"
+  if [ "$WITH_PLUS" = 1 ]; then
+    if ! ldconfig -p 2>/dev/null | grep -q libMagickWand; then
+      note "LIBERO-Plus: libMagickWand missing. Only Sensor Noise 1-10 (motion blur) needs it; those variants are"
+      note "  skipped without it. Admin install (apt): $(magickwand_pkg)   (check: apt-cache policy $(magickwand_pkg))"
+    fi
+    if ! command -v unzip >/dev/null; then
+      missing "unzip (apt: unzip), needed for the LIBERO-Plus assets"
+    else
+      plus_args=(--venv "$BV/libero_plus")
+      [ "$SELFTEST" = 1 ] || plus_args+=(--skip-selftest)
+      bash scripts/shortcut/bench/libero_plus/setup_libero_plus.sh "${plus_args[@]}" || missing "LIBERO-Plus setup failed"
+    fi
+  fi
+  if [ "$WITH_PRO" = 1 ]; then
+    bash scripts/shortcut/bench/libero_pro/setup_venv.sh --dir "$BV" || missing "LIBERO-PRO setup failed"
+  fi
+  echo "export SC_BENCH_VENVS=$BV" > "$BV/sc_bench_env.sh"
+  if [ "$BV" != "$(realpath -m "$REPO/.venvs")" ]; then
+    note "sc-bench finds them with: export SC_BENCH_VENVS=$BV   (or: source $BV/sc_bench_env.sh)"
+  fi
+  uv run --extra shortcut-bench python scripts/shortcut/bench/core/runner.py --validate --battery quick 2>&1 \
+    | sed 's/^/[setup]   /' || missing "sc-bench --validate --battery quick"
+fi
 
 # ------------------------------------------------------------ downloads
 if [ "$DOWNLOAD" = 1 ]; then

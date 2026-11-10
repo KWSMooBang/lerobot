@@ -40,7 +40,11 @@ _SUFFIX_RE = re.compile(r"_(?:language|view|light)_[^.]*|_(?:table|tb)_\d+")  # 
 
 
 def venv_dir() -> Path:
-    return Path(os.environ.get("LIBERO_PLUS_VENV") or REPO / ".venvs" / "libero_plus")
+    """$LIBERO_PLUS_VENV, else <$SC_BENCH_VENVS or <repo>/.venvs>/libero_plus."""
+    return Path(
+        os.environ.get("LIBERO_PLUS_VENV")
+        or Path(os.environ.get("SC_BENCH_VENVS") or REPO / ".venvs") / "libero_plus"
+    )
 
 
 def sc_env() -> dict[str, Any]:
@@ -136,9 +140,17 @@ def bootstrap() -> dict[str, Any]:
     return _BOOTED
 
 
+def render_fix_tag() -> str:
+    """'raw' or 'fix-<LIBERO_FIX>-<patch hash>' (bench/render_fix.py applied to the fork's assets: T009 fix)."""
+    from bench.render_fix import fix_tag
+
+    return fix_tag(Path(sc_env()["src"]) / "libero" / "libero" / "assets")
+
+
 def bench_version() -> str:
     b = bootstrap()
-    return f"libero-plus-{b['sha'][:7]}"
+    tag = render_fix_tag()
+    return f"libero-plus-{b['sha'][:7]}" + ("" if tag == "raw" else f"/{tag}")
 
 
 def bddl_name(v: PlusVariant) -> str:
@@ -159,7 +171,12 @@ def init_states(v: PlusVariant) -> np.ndarray:
         st = torch.load(root / "libero_newobj" / v.suite / fname, weights_only=False)  # nosec B614
         return np.asarray(st).reshape(1, -1)
     stem = _SUFFIX_RE.sub("", v.name)
-    return np.asarray(torch.load(root / v.suite / f"{stem}.pruned_init", weights_only=False))  # nosec B614
+    states = np.asarray(torch.load(root / v.suite / f"{stem}.pruned_init", weights_only=False))  # nosec B614
+    if render_fix_tag() != "raw":  # T009 lifts for the original L10 scene 1/2 init files (render_fix.py)
+        from bench.render_fix import patch_init_states
+
+        states, _ = patch_init_states(f"{v.suite}/{stem}.pruned_init", states)
+    return states
 
 
 def instruction(v: PlusVariant) -> str:

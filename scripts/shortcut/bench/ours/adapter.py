@@ -27,6 +27,16 @@ SHORTCUT = Path(__file__).resolve().parents[2]
 BENCH_VERSION = "ours-v1"  # bump when the harness changes what an episode means
 # Expected fraction of max_steps a non-dual episode runs (early stop at the goal), LIBERO-finetuned policy.
 EARLY_STOP_FRAC = {"C0": 0.45, "C3": 0.5, "C1": 0.9, "C2": 0.9}
+SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
+CONDITION_INFO = {  # sc-bench --list (T019)
+    "C0": "원래 지시문 (기준선)",
+    "C1": "빈 지시문: 언어 없이도 같은 동작이면 시각 단서 shortcut",
+    "C2": "무의미 단어열 (원문과 같은 토큰 수)",
+    "C3": "같은 뜻의 다른 표현 (paraphrase)",
+    "C4": "같은 장면에서 다른 물체로 바꾼 지시 (dual goal: SR_new / 원래 goal 로 가면 Shortcut)",
+    "C5": "같은 장면에서 다른 목표 자리로 바꾼 지시 (dual goal)",
+    "C6": "같은 장면의 다른 task 지시 (cross-task, dual goal)",
+}
 
 
 def _paths() -> None:
@@ -72,8 +82,57 @@ def suite_short(suite: str) -> str:
     return SUITE_SHORT[suite]
 
 
+def _variant_ids(cond: str, entry: dict[str, Any]) -> list[tuple[str, bool]]:
+    """(variant id, feasible) of one task entry as common.variants_for names them; swaps marked
+    `feasible: false` (T002) run only with the job's `include_infeasible: true`."""
+    if cond in ("C0", "C1", "C2"):
+        return [({"C0": "orig", "C1": "blank", "C2": "nonsense"}[cond], True)]
+    if cond == "C3":
+        return [(f"p{i}", True) for i in range(len(entry.get("paraphrases", [])))]
+    if cond in ("C4", "C5"):
+        want = "object" if cond == "C4" else "target"
+        return [
+            (sw["id"], sw.get("feasible") is not False)
+            for sw in entry.get("swaps", [])
+            if sw.get("type") == want
+        ]
+    return [(f"t{int(j)}", True) for j in entry.get("cross_task", [])]
+
+
 class OursAdapter(BenchmarkAdapter):
     name = "ours"
+    key_field = "condition"
+    job_keys = frozenset({"instr_set", "variants", "include_infeasible"})
+
+    def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
+        """C0–C6 per suite from instructions/<suite>.json. details = every variant id for `variants:` (infeasible
+        swaps included); infeasible = {task: ids marked feasible: false} (they run only with include_infeasible);
+        count = feasible (task, variant) pairs, tasks = tasks with a feasible variant. T020 adds user variants here."""
+        from importlib.util import find_spec
+
+        from bench.core.catalog import entry
+
+        missing = [] if find_spec("libero") is not None else ["hf-libero (main venv, --extra libero)"]
+        out: list[dict[str, Any]] = []
+        for s in [suite] if suite else SUITES:
+            path = SHORTCUT / "instructions" / f"{s}.json"
+            if not path.exists():
+                continue
+            tasks = json.loads(path.read_text())["tasks"]
+            for cond, desc in CONDITION_INFO.items():
+                per_task = {int(t["task_id"]): _variant_ids(cond, t) for t in tasks}
+                ids = sorted({v for vs in per_task.values() for v, _ in vs})
+                infeasible = {str(t): [v for v, ok in vs if not ok] for t, vs in per_task.items()}
+                e = entry(
+                    "ours", s, "condition", cond, description=desc, details=ids,
+                    count=sum(ok for vs in per_task.values() for _, ok in vs),
+                    tasks=[t for t, vs in per_task.items() if any(ok for _, ok in vs)], source="builtin",
+                    infeasible={t: v for t, v in infeasible.items() if v},
+                )  # fmt: skip
+                e["requires"] = ["hf-libero (main venv, --extra libero)"]
+                e["missing"] = missing
+                out.append(e)  # type: ignore[arg-type]
+        return out
 
     def job_id(self, job: dict[str, Any]) -> str:
         rep = int(job.get("repeat", 0) or 0)

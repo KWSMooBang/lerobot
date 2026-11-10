@@ -44,6 +44,7 @@ from registry import REGISTRY_NAME, add_entries, ensure_seed_rows, now_iso  # no
 
 PRESET_DIR = HERE / "presets"
 ENTRY = HERE / "lerobot_train_entry.py"
+BENCH_RUNNER = HERE.parent / "bench" / "core" / "runner.py"
 DATASET_REPO = "HuggingFaceVLA/libero"
 DATASET_REV = "86958911c0f959db2bbbdb107eb3e17c5f9c798e"  # the revision T008 downloaded
 DEFAULT_OUT_ROOT = os.environ.get("SC_OUT_ROOT", "/outputs/VLA-shortcut-exps")
@@ -177,8 +178,9 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     out_root = Path(args.out_root).resolve()
     run_dir = out_root / "runs" / args.run_id
     train_dir = run_dir / "train"
-    gpus = [int(g) for g in str(args.gpus).split(",") if g.strip() != ""]
-    n = len(gpus)
+    cpu = bool(getattr(args, "cpu", False))
+    gpus = [] if cpu else [int(g) for g in str(args.gpus).split(",") if g.strip() != ""]
+    n = 1 if cpu else len(gpus)  # --cpu: one process, no CUDA (smoke tests / e2e on a CPU machine)
 
     if args.resume:
         meta_path = run_dir / "run_meta.json"
@@ -240,6 +242,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         lerobot["output_dir"] = str(train_dir)
         lerobot["job_name"] = args.run_id
         lerobot["policy.push_to_hub"] = False
+        if cpu:
+            lerobot["policy.device"] = "cpu"
         mode = wandb_mode(args.wandb) if not args.dry_run else args.wandb
         lerobot["wandb.enable"] = mode != "off"
         if mode != "off":
@@ -254,6 +258,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
 
     lerobot_args += args.extra
     launcher = args.launcher if args.launcher != "auto" else ("accelerate" if n > 1 else "python")
+    if cpu:
+        launcher = "python"
     if launcher == "accelerate":
         cmd = [
             sys.executable,
@@ -286,6 +292,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "run_dir": str(run_dir),
         "train_dir": str(train_dir),
         "gpus": gpus,
+        "cpu": cpu,
         "launcher": launcher,
         "scale": sc,
         "effective_batch": eff_batch,
@@ -454,11 +461,16 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise SystemExit("--run-id and --preset (or --resume) are required")
     inv = gpu_inventory()
     plan = build_plan(args)
-    if LOCK_DIR.is_dir() and plan["gpus"] != [0] and not args.allow_any_gpu:
+    if LOCK_DIR.is_dir() and not plan["cpu"] and plan["gpus"] != [0] and not args.allow_any_gpu:
         raise SystemExit(
             f"this container uses GPU 0 only (found {LOCK_DIR}); pass --allow-any-gpu to override"
         )
     print_plan(plan, inv)
+    if args.then_bench:
+        from_reg = args.ckpt_id or args.run_id
+        print(f"[sc-train] then: {shlex.join(bench_cmd(args, from_reg, Path(plan['out_root']), plan))}")
+        if args.no_register:
+            raise SystemExit("--then-bench needs the registry entry (drop --no-register)")
     if args.dry_run:
         # parse + validate the same lerobot-train args in one CPU process (no GPU, no weights, no data)
         launch_args = plan["cmd"][plan["cmd"].index(str(ENTRY)) + 1 :]
@@ -525,7 +537,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     if losses:
         metrics += [f"loss_first={losses[0][1]:.4f}", f"loss_last={losses[-1][1]:.4f}"]
     env_tag = (
-        f"{'accel' if plan['launcher'] == 'accelerate' else 'direct'}-gpu{','.join(map(str, plan['gpus']))}"
+        "direct-cpu"
+        if plan["cpu"]
+        else f"{'accel' if plan['launcher'] == 'accelerate' else 'direct'}-gpu{','.join(map(str, plan['gpus']))}"
     )
 
     cid = ""
@@ -551,7 +565,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     (run_dir / "run_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(f"[sc-train] {status}: {plan['run_id']} step {step}, {hours:.2f} h, ckpt {ckpt}")
-    return 0 if status == "done" else 1
+    if status != "done":
+        return 1
+    if args.then_bench:
+        return then_bench(args, cid or str(ckpt), out_root, plan)
+    return 0
+
+
+def bench_cmd(args: argparse.Namespace, ckpt: str, out_root: Path, plan: dict[str, Any]) -> list[str]:
+    """sc-bench on the new checkpoint, same out-root (so the registry id resolves) and GPUs."""
+    cmd = [
+        sys.executable, str(BENCH_RUNNER), "--ckpt", ckpt, "--battery", args.then_bench,
+        "--out-root", str(out_root),
+    ]  # fmt: skip
+    if plan["gpus"]:
+        cmd += ["--gpus", ",".join(map(str, plan["gpus"]))]
+    return cmd + shlex.split(args.bench_args or "")
+
+
+def then_bench(args: argparse.Namespace, ckpt: str, out_root: Path, plan: dict[str, Any]) -> int:
+    cmd = bench_cmd(args, ckpt, out_root, plan)
+    print(f"[sc-train] --then-bench: {shlex.join(cmd)}", flush=True)
+    rc = subprocess.run(cmd, cwd=REPO).returncode  # nosec B603
+    (Path(plan["run_dir"]) / "then_bench.txt").write_text(f"{shlex.join(cmd)}\nreturncode={rc}\n")
+    return rc
 
 
 def cmd_register(args: argparse.Namespace) -> int:
@@ -649,6 +686,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--no-register", action="store_true")
     r.add_argument("--allow-any-gpu", action="store_true")
     r.add_argument("--notes", default="")
+    r.add_argument("--cpu", action="store_true", help="train on CPU (no CUDA, no GPU lock): smoke tests only")
+    r.add_argument(
+        "--then-bench",
+        metavar="BATTERY",
+        help="after a successful run, sc-bench the registered checkpoint on this battery (same out-root, GPUs)",
+    )
+    r.add_argument(
+        "--bench-args", default="", help='extra sc-bench args for --then-bench, e.g. "--episodes 2"'
+    )
     g = sub.add_parser("register", help="add a checkpoint to ckpt_registry.tsv")
     g.add_argument("--out-root", default=DEFAULT_OUT_ROOT)
     g.add_argument("--run-id")

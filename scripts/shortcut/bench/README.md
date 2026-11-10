@@ -22,6 +22,55 @@ scripts/shortcut/bench/sc-report --runs tb-smolvla-a,pi05lib                    
 - venv: the main one plus `--extra shortcut-bench` (websockets, msgpack; the wrappers pass it).
   `setup_server.sh` already syncs this extra; elsewhere add `--extra shortcut-bench` to your `uv sync`.
 - `--tasks 1,8 --episodes 2 --suites libero_goal --only C0,C4` shrink a battery (smoke runs; use a new `--run-id`).
+- Straight from training: `sc-train --preset X --run-id R --then-bench quick [--bench-args "--clients-per-gpu 8"]`
+  registers R and runs `sc-bench --ckpt R --battery quick` in the same out-root on the same GPUs. Local policy
+  plugins (`scripts/shortcut/policies/lerobot_policy_*`) load in the server without `pip install`; a policy whose
+  action feature is not 7-d is refused at load. Whole chain on CPU: `scripts/shortcut/e2e_smoke.sh --mock|--cpu`.
+
+## Pick what to run (T019)
+
+```bash
+scripts/shortcut/bench/sc-bench --list [--benchmark ours|libero_plus|libero_pro] [--suite libero_goal] [--json]
+cp scripts/shortcut/bench/batteries/custom_template.yaml my.yaml        # mix the three benchmarks, every key commented
+scripts/shortcut/bench/sc-bench --validate --battery my.yaml           # names checked, no --ckpt needed
+scripts/shortcut/bench/sc-bench --ckpt <id> --battery my.yaml --dry-run # per job: episodes, env steps, GPU-h
+```
+
+- `--list`: every selectable entry (ours C0–C6 with their variant ids, LIBERO-Plus 7 axes × levels × sub-types with
+  registered-variant counts, LIBERO-PRO 5 axes × levels with `instruction_source` / `init_source` options) and what
+  each needs installed (`MISSING …` when this machine lacks it). `--json` = the raw `CatalogEntry` list.
+- Validation (`core/validate.py`, also run before every plan): unknown benchmark, job key, suite, condition /
+  perturbation, level, detail / variant id, option value or task id outside 0-9 stop the run before anything starts,
+  all errors listed with the closest known name (`unknown perturbation 'lightning' (did you mean 'lighting'?)`).
+  Entries whose install is missing (LIBERO-Plus / PRO venv, PRO environment axis) are skipped with a warning;
+  LIBERO-Plus motion blur without libMagickWand is left out of the variant selection (warning). `--dry-run` shows both.
+  With `--backend mock` nothing is skipped for missing venvs (the mock env runs in the main interpreter).
+- `--dry-run` prints GPU-h per job: pending env steps / (one GPU's env-steps/s with `--clients-per-gpu K`), from the
+  time model below; calibrate it with `--est-step-ms`, `--est-infer1-ms`, `--est-beta`, `--est-rpc-ms`, `--est-load-s`.
+- `--n-action-steps auto` (default): `n_action_steps=K` in the registry notes, else min(10, checkpoint chunk_size).
+  10 is the pi05 LIBERO convention (all earlier runs); a plugin trained with a shorter chunk gets its chunk size.
+- `--device cpu`: policy server on CPU and the envs rendered by mesa (llvmpipe, ~100 ms / frame), no GPU lock. For
+  checking a new checkpoint end to end on a machine without a free GPU (`e2e_smoke.sh --cpu`); never mixed with GPU
+  runs (exec identity `gpu: cpu`).
+
+### Catalog interface (`core/catalog.py`)
+
+Every adapter implements `catalog(suite: str | None) -> list[CatalogEntry]` (all suites when `None`), plus
+`key_field` (`condition` for ours, `perturbation` for Plus / PRO) and `job_keys` (the job keys it reads; anything
+else in a battery job is an error). One entry = one selectable `(benchmark, suite, key)`:
+
+| field                                        | meaning                                                                                         |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `benchmark`, `suite`, `key_field`, `key`     | what a job names: `benchmark: libero_plus, suite: libero_goal, perturbation: camera`            |
+| `levels`                                     | allowed `levels:` values (Plus difficulty 1–5 / None, PRO `swap`, `x0.1`…); `[]` = none         |
+| `details`                                    | allowed `details:` (Plus sub-types) or ours `variants:` ids                                     |
+| `count`, `count_by_level`, `count_by_detail` | selectable items in this suite (None = unknown, e.g. not installed)                             |
+| `tasks`                                      | task ids that have the entry (ours C4/C5: tasks with a feasible swap)                           |
+| `description`                                | one line: what it changes / which cue it removes                                                |
+| `options`                                    | other closed-set job keys (`instruction: clean\|registry`, `instruction_source`, `init_source`) |
+| `requires`, `requires_by_detail`             | what the entry / a single detail needs (`libMagickWand (apt libmagickwand-6.q16-6)`)            |
+| `missing`, `missing_by_detail`               | the subset this machine lacks → skip + warning                                                  |
+| `source`                                     | `builtin`, install version, or the user-variant file (T020 adds user variants to ours)          |
 
 ### Exec modes (T004 rule: never pair across them)
 
@@ -51,12 +100,15 @@ Each job's `run_meta.json → identity` holds `exec_mode`, GPU model, torch, CUD
 | `core/registry.py`          | `ckpt_registry.tsv` read / create / resolve                                                           |
 | `core/records.py`           | standard episode record (design §2), perturbation dimensions, flock'ed jsonl appends                  |
 | `core/battery.py`           | battery YAML expansion, dry-run time model                                                            |
+| `core/catalog.py`           | `CatalogEntry` (what a battery can select), `sc-bench --list` table                                   |
+| `core/validate.py`          | battery validation against the catalogs (errors with suggestions, skips for missing installs)         |
+| `render_fix.py`             | T009 env fix for the LIBERO-Plus / PRO installs (sRGB textures in place, L10 init lifts at load)      |
 | `core/adapters.py`          | benchmark adapter interface + registry (`ADAPTERS`)                                                   |
 | `core/worker.py`            | generic worker loop (stdin units → `@@result` lines)                                                  |
 | `core/runner.py`            | `sc-bench` coordinator: servers, worker slots, resume, bookkeeping, `results.tsv`                     |
 | `core/report.py`            | `sc-report`                                                                                           |
 | `ours/`                     | our C0–C6 harness as a client (T001 `EpisodeStepper`, dual goals, videos)                             |
-| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`                                                               |
+| `batteries/`                | `quick.yaml`, `full.yaml`, `smoke.yaml`, `custom_template.yaml`, `e2e_smoke.yaml`                     |
 
 Run dir: `runs/<run-id>/{bench_meta.json, jobs/<job_id>/, servers/gpu<g>.log, workers/*.log, jobs_summary.json,
 git_sha, git_dirty, patch.diff, cmd.txt, meta.txt, gpus, STATUS, started_at, ended_at}`. An `ours` job dir is a

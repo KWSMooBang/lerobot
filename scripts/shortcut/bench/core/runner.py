@@ -41,9 +41,11 @@ if str(SHORTCUT) not in sys.path:
 
 from bench.core import registry  # noqa: E402
 from bench.core.adapters import Context, JobPlan, get_adapter  # noqa: E402
-from bench.core.battery import TimeModel, estimate_table, expand_jobs, fmt_hours, load_battery  # noqa: E402
+from bench.core.battery import TimeModel, estimate_table, fmt_hours, load_battery  # noqa: E402
+from bench.core.validate import report as report_validation, validate_battery  # noqa: E402
 from bench.core.worker import RESULT_PREFIX  # noqa: E402
 
+MESA_EGL_VENDOR = ("/usr/share/glvnd/egl_vendor.d/50_mesa.json", "/etc/glvnd/egl_vendor.d/50_mesa.json")
 MAX_ATTEMPTS = 3  # a unit that fails (or kills its worker) this many times is given up
 SERVER_TIMEOUT_S = 1800
 
@@ -75,7 +77,9 @@ def gpu_uuids() -> dict[str, str]:
 def plan_all(
     args: argparse.Namespace, ctx: Context, battery: dict[str, Any]
 ) -> list[tuple[dict, Any, JobPlan]]:
-    jobs = expand_jobs(battery)
+    val = validate_battery(battery, ctx.backend)
+    report_validation(val, battery["_path"])
+    jobs = val.jobs
     if args.only:
         keep = set(args.only.split(","))
         jobs = [
@@ -100,10 +104,25 @@ def print_plan(plans: list[tuple[dict, Any, JobPlan]], args: argparse.Namespace,
     tot_eps = sum(p.n_episodes for _, _, p in plans)
     pend = sum(p.n_pending for _, _, p in plans)
     steps = sum(p.est_steps for _, _, p in plans)
-    print(f"{'job':<28} {'units':>5} {'episodes':>8} {'pending':>8} {'est env-steps':>14}")
+    k = args.clients_per_gpu
+    rate = tm.steps_per_s(k)  # env steps/s of one GPU with K clients
+
+    def gpu_h(st: float) -> float:
+        return st / rate / 3600
+
+    print(
+        f"{'job':<28} {'units':>5} {'episodes':>8} {'pending':>8} {'est env-steps':>14} {f'GPU-h (K={k})':>12}"
+    )
     for _, _, p in plans:
-        print(f"{p.job_id:<28} {len(p.units):>5} {p.n_episodes:>8} {p.n_pending:>8} {p.est_steps:>14,.0f}")
-    print(f"{'total':<28} {sum(len(p.units) for _, _, p in plans):>5} {tot_eps:>8} {pend:>8} {steps:>14,.0f}")
+        print(
+            f"{p.job_id:<28} {len(p.units):>5} {p.n_episodes:>8} {p.n_pending:>8} {p.est_steps:>14,.0f} "
+            f"{gpu_h(p.est_steps):>12.3f}"
+        )
+    ngpu_ = len(args.gpus.split(","))
+    print(
+        f"{'total':<28} {sum(len(p.units) for _, _, p in plans):>5} {tot_eps:>8} {pend:>8} {steps:>14,.0f} "
+        f"{gpu_h(steps) + ngpu_ * tm.load_s / 3600:>12.3f}  (incl. model load on {ngpu_} GPU)"
+    )
     print(
         f"time model: env step {tm.step_ms} ms (incl. probe/video), infer batch-1 {tm.infer1_ms} ms, β {tm.beta}, "
         f"rpc {tm.rpc_ms} ms, n_action_steps {tm.n_action_steps}, model load {tm.load_s:.0f} s per GPU"
@@ -140,7 +159,10 @@ class ServerProc:
             "--port", "0", "--ready-file", str(self.ready), "--batch", str(batch),
             "--n-action-steps", str(args.n_action_steps), "--backend", ctx.backend,
             "--libero-adapter", ctx.ckpt.get("adapter") or "none", "--registry", str(args.registry_path),
+            "--device", args.device,
         ]  # fmt: skip
+        if args.device == "cpu":
+            env["CUDA_VISIBLE_DEVICES"] = ""
         self.log = open(sdir / f"gpu{gpu}.log", "a")  # noqa: SIM115
         self.log.write(f"\n[{now()}] {shlex.join(cmd)}\n")
         self.log.flush()
@@ -184,6 +206,14 @@ class Worker:
         if backend == "mock":
             env["CUDA_VISIBLE_DEVICES"] = ""
             env.pop("MUJOCO_EGL_DEVICE_ID")
+        elif ctx.device == "cpu":  # MuJoCo on mesa llvmpipe (~100 ms / frame): CPU smoke runs only
+            env["CUDA_VISIBLE_DEVICES"] = ""
+            env["MUJOCO_EGL_DEVICE_ID"] = (
+                "0"  # robosuite reads it before CUDA_VISIBLE_DEVICES; 0 = mesa's device
+            )
+            mesa = next((p for p in MESA_EGL_VENDOR if Path(p).exists()), None)
+            if mesa:
+                env["__EGL_VENDOR_LIBRARY_FILENAMES"] = mesa
         wdir = ctx.run_dir / "workers"
         wdir.mkdir(parents=True, exist_ok=True)
         self.log = open(wdir / f"{wid}.log", "a")  # noqa: SIM115
@@ -407,7 +437,23 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="sc-bench", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--ckpt", default=None, help="registry id | local pretrained_model dir | hub id")
+    ap.add_argument(
+        "--list",
+        action="store_true",
+        help="print what a battery can select (catalog of every benchmark) and exit; with --benchmark/--suite/--json",
+    )
+    ap.add_argument(
+        "--benchmark", default=None, help="--list: only this benchmark (ours | libero_plus | libero_pro)"
+    )
+    ap.add_argument(
+        "--json", action="store_true", help="--list: JSON (one object per entry) instead of the table"
+    )
+    ap.add_argument(
+        "--validate",
+        action="store_true",
+        help="check the battery against the catalogs and exit (no --ckpt needed)",
+    )
     ap.add_argument("--battery", default="quick", help="quick | full | <path.yaml>")
     ap.add_argument("--gpus", default=None, help="physical GPU ids (default: $CUDA_VISIBLE_DEVICES or 0)")
     ap.add_argument(
@@ -421,15 +467,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--registry", default=None, help="default <out-root>/ckpt_registry.tsv")
     ap.add_argument("--run-id", default=None, help="default bench-<ckpt_id>-<battery>")
-    ap.add_argument("--n-action-steps", type=int, default=10)
+    ap.add_argument(
+        "--n-action-steps",
+        default="auto",
+        help="actions executed per chunk; auto = registry notes `n_action_steps=K`, else min(10, chunk_size)",
+    )
     ap.add_argument("--tasks", default=None, help="override every job's tasks (e.g. 1,8)")
     ap.add_argument("--episodes", type=int, default=None, help="override every job's episodes")
-    ap.add_argument("--suites", default=None, help="keep jobs of these suites only (libero_goal,...)")
+    ap.add_argument(
+        "--suites",
+        "--suite",
+        default=None,
+        help="keep jobs of these suites only (libero_goal,...); --list: one suite",
+    )
     ap.add_argument(
         "--only", default=None, help="keep jobs matching any of these benchmark/suite/condition values"
     )
     ap.add_argument("--dry-run", action="store_true", help="plan + time estimate only (no GPU)")
     ap.add_argument("--no-gpu-lock", action="store_true")
+    ap.add_argument(
+        "--device",
+        choices=("cuda", "cpu"),
+        default="cuda",
+        help="cpu = policy server on CPU, envs rendered with mesa (no GPU, no lock; slow: smoke checks only)",
+    )
     ap.add_argument(
         "--backend", choices=("libero", "mock"), default="libero", help="mock = CPU fake env/policy (tests)"
     )
@@ -438,8 +499,68 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+DEFAULT_N_ACTION_STEPS = 10  # pi05 LIBERO convention (T004); identity of every earlier bench run
+
+
+def ckpt_config(path_or_hub: str) -> dict[str, Any]:
+    """config.json of a local pretrained_model dir or a hub id ({} if it cannot be read)."""
+    p = Path(path_or_hub) / "config.json"
+    try:
+        if not p.exists():
+            from huggingface_hub import hf_hub_download
+
+            p = Path(hf_hub_download(path_or_hub, "config.json"))
+        return json.loads(p.read_text())
+    except Exception:
+        return {}
+
+
+def resolve_n_action_steps(arg: str | int, ckpt: dict[str, Any], backend: str) -> int:
+    """auto: `n_action_steps=K` in the registry notes, else 10 capped at the checkpoint's chunk_size (a policy
+    trained with chunk 8 cannot execute 10 actions per chunk)."""
+    if str(arg) != "auto":
+        return int(arg)
+    note = registry.parse_notes(ckpt.get("notes")).get("n_action_steps")
+    if note:
+        return int(note)
+    if backend == "mock":
+        return DEFAULT_N_ACTION_STEPS
+    chunk = ckpt_config(ckpt.get("adapter") or ckpt["path_or_hub"]).get("chunk_size")
+    return min(DEFAULT_N_ACTION_STEPS, int(chunk)) if chunk else DEFAULT_N_ACTION_STEPS
+
+
+def list_catalog(args: argparse.Namespace) -> int:
+    from bench.core.adapters import ADAPTERS
+    from bench.core.catalog import all_entries, format_table
+
+    if args.benchmark and args.benchmark not in ADAPTERS:
+        raise SystemExit(f"--benchmark {args.benchmark!r}: not in {sorted(ADAPTERS)}")
+    entries = [
+        e for s in (args.suites.split(",") if args.suites else [None]) for e in all_entries(args.benchmark, s)
+    ]
+    if args.suites and not entries:
+        raise SystemExit(
+            f"--suite {args.suites!r}: no entries (suites: libero_spatial, libero_object, libero_goal, libero_10)"
+        )
+    if args.json:
+        print(json.dumps(entries, indent=1, default=str))
+    else:
+        print(format_table(entries))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.list:
+        return list_catalog(args)
+    if args.validate:
+        bat = load_battery(args.battery)
+        val = validate_battery(bat, args.backend)
+        report_validation(val, bat["_path"])
+        print(f"[sc-bench] {bat['_path']}: OK, {len(val.jobs)} jobs ({len(val.skipped)} skipped)")
+        return 0
+    if not args.ckpt:
+        raise SystemExit("--ckpt is required (or --list / --validate)")
     root = registry.out_root(args.out_root)
     args.registry_path = Path(args.registry) if args.registry else registry.registry_path(root)
     args.results_tsv = root / "results.tsv"
@@ -460,10 +581,18 @@ def main(argv: list[str] | None = None) -> int:
             from engine import auto_libero_adapter
 
             ckpt["adapter"] = auto_libero_adapter(ckpt["path_or_hub"])
+    args.n_action_steps = resolve_n_action_steps(args.n_action_steps, ckpt, args.backend)
     battery = load_battery(args.battery)
     run_id = args.run_id or f"bench-{ckpt['ckpt_id']}-{battery['name']}"
     run_dir = root / "runs" / run_id
-    ctx = Context(run_dir, ckpt, args.backend, REPO, {"tasks": args.tasks, "episodes": args.episodes})
+    ctx = Context(
+        run_dir,
+        ckpt,
+        args.backend,
+        REPO,
+        {"tasks": args.tasks, "episodes": args.episodes},
+        device=args.device,
+    )
     tm = TimeModel(**{k: getattr(args, f"est_{k}") for k in vars(TimeModel())})
     tm.n_action_steps = args.n_action_steps
 
@@ -491,7 +620,7 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGTERM, on_signal)
     try:
         for g in gpus:
-            if args.backend != "mock":
+            if args.backend != "mock" and args.device != "cpu":
                 locks.append(take_gpu_lock(g, uuids, not args.no_gpu_lock))
             servers.append(ServerProc(g, args, ctx))
         readies = {s.gpu: s.wait_ready() for s in servers}
