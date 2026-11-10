@@ -101,6 +101,7 @@ REQUIRED = set(CatalogEntry.__annotations__) - {
     "tasks",
     "options",
     "source",
+    "infeasible",
 }
 
 
@@ -354,3 +355,82 @@ def test_render_fix_assets_in_mirror_and_init_patch(tmp_path):
     same, k0 = render_fix.patch_init_states(rel, np.zeros((n, d)))  # other states (PRO re-sampled): untouched
     assert k0 == 0 and not same.any()
     assert render_fix.patch_init_states("libero_goal/x.pruned_init", states)[1] == 0
+
+
+def _fork_assets(root: Path) -> Path:
+    a = root / "libero" / "libero" / "assets"
+    (a / "textures").mkdir(parents=True)
+    (a / "scenes").mkdir()
+    for k in ("salad_dressing", "new_salad_dressing"):
+        (a / "stable_hope_objects" / k).mkdir(parents=True)
+        (a / "stable_hope_objects" / k / "texture_map.png").write_bytes(png(True))
+    (a / "textures" / "floor.png").write_bytes(png(True))
+    for st in ("base", "warm"):
+        (a / "scenes" / f"libero_floor_{st}_style.xml").write_text('<texture file="../textures/floor.png"/>')
+    return a
+
+
+def test_render_fix_interrupted_rerun_and_restored_assets(tmp_path, monkeypatch):
+    a = _fork_assets(tmp_path)
+    before = sorted(p.relative_to(a) for p in a.rglob("*") if p.is_file())
+    real_write = render_fix._write
+    calls = {"n": 0}
+
+    def flaky(path, data):
+        calls["n"] += 1
+        if calls["n"] == 4:  # after the first object texture (backup + file) and the second one's backup
+            raise KeyboardInterrupt
+        real_write(path, data)
+
+    monkeypatch.setattr(render_fix, "_write", flaky)
+    with pytest.raises(KeyboardInterrupt):
+        render_fix.apply_assets(a)
+    monkeypatch.setattr(render_fix, "_write", real_write)
+    assert not (a / render_fix.MARKER).exists() and render_fix.fix_tag(a) == "raw"
+    assert sorted(p.relative_to(a) for p in a.rglob("*") if p.is_file()) == before  # nothing went missing
+    assert not list(a.rglob("*.tmp-*"))
+    info = render_fix.apply_assets(
+        a
+    )  # rerun completes; the texture fixed before the interruption is recorded
+    assert sorted(info["objects_stripped"]) == [
+        "stable_hope_objects/new_salad_dressing/texture_map.png",
+        "stable_hope_objects/salad_dressing/texture_map.png",
+    ]
+    assert len(info["files"]) == 2 + 1 + 2 and render_fix.fix_tag(a).startswith("fix-")
+    # assets restored from the backup (e.g. a re-extracted zip): the marker no longer vouches for them
+    backup = a.parent / "assets_srgb_orig"
+    for b in backup.rglob("*"):
+        if b.is_file():
+            (a / b.relative_to(backup)).write_bytes(b.read_bytes())
+    assert render_fix.fix_tag(a) == "raw"
+    assert render_fix.apply_assets(a)["files"] == info["files"] and render_fix.fix_tag(a).startswith("fix-")
+    # a symlinked asset is replaced by a real file, its target untouched
+    tgt = tmp_path / "target.png"
+    tgt.write_bytes(png(True))
+    link = a / "stable_hope_objects" / "salad_dressing" / "texture_map.png"
+    link.unlink()
+    link.symlink_to(tgt)
+    assert render_fix.fix_tag(a) == "raw"
+    render_fix.apply_assets(a)
+    assert not link.is_symlink() and b"sRGB" in tgt.read_bytes()
+
+
+def test_ours_include_infeasible_variant(tmp_path):
+    e = {x["key"]: x for x in get_adapter("ours").catalog("libero_10")}["C4"]
+    assert "C4-a" in e["details"] and e["infeasible"] == {"9": ["C4-a"]} and 9 not in e["tasks"]
+    job = "  - {benchmark: ours, suites: [libero_10], conditions: [C4], tasks: '9', variants: [C4-a]%s}\n"
+    off = validate_battery(load_battery(str(write(tmp_path, "off", "name: off\njobs:\n" + job % ""))))
+    assert not off.errors and any("marked infeasible" in w for w in off.warnings)
+    on = validate_battery(
+        load_battery(str(write(tmp_path, "on", "name: on\njobs:\n" + job % ", include_infeasible: true")))
+    )
+    assert not on.errors and not on.warnings
+
+
+def test_e2e_refuses_existing_run_id(tmp_path):
+    (tmp_path / "runs" / "e2e-x").mkdir(parents=True)
+    r = subprocess.run(
+        ["bash", str(SHORTCUT / "e2e_smoke.sh"), "--out-root", str(tmp_path), "--mock", "--run-id", "e2e-x"],
+        capture_output=True, text=True, timeout=60,
+    )  # fmt: skip
+    assert r.returncode == 2 and "use a new --run-id" in r.stderr

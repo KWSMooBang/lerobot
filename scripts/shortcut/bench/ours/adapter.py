@@ -82,20 +82,21 @@ def suite_short(suite: str) -> str:
     return SUITE_SHORT[suite]
 
 
-def _variant_ids(cond: str, entry: dict[str, Any]) -> list[str]:
-    """Variant ids of one task entry as common.variants_for names them (feasible swaps only)."""
+def _variant_ids(cond: str, entry: dict[str, Any]) -> list[tuple[str, bool]]:
+    """(variant id, feasible) of one task entry as common.variants_for names them; swaps marked
+    `feasible: false` (T002) run only with the job's `include_infeasible: true`."""
     if cond in ("C0", "C1", "C2"):
-        return [{"C0": "orig", "C1": "blank", "C2": "nonsense"}[cond]]
+        return [({"C0": "orig", "C1": "blank", "C2": "nonsense"}[cond], True)]
     if cond == "C3":
-        return [f"p{i}" for i in range(len(entry.get("paraphrases", [])))]
+        return [(f"p{i}", True) for i in range(len(entry.get("paraphrases", [])))]
     if cond in ("C4", "C5"):
         want = "object" if cond == "C4" else "target"
         return [
-            sw["id"]
+            (sw["id"], sw.get("feasible") is not False)
             for sw in entry.get("swaps", [])
-            if sw.get("type") == want and sw.get("feasible") is not False
+            if sw.get("type") == want
         ]
-    return [f"t{int(j)}" for j in entry.get("cross_task", [])]
+    return [(f"t{int(j)}", True) for j in entry.get("cross_task", [])]
 
 
 class OursAdapter(BenchmarkAdapter):
@@ -104,8 +105,9 @@ class OursAdapter(BenchmarkAdapter):
     job_keys = frozenset({"instr_set", "variants", "include_infeasible"})
 
     def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
-        """C0–C6 per suite from instructions/<suite>.json (details = variant ids for `variants:`;
-        count = (task, variant) pairs, feasible swaps only). T020 adds user-defined variants here."""
+        """C0–C6 per suite from instructions/<suite>.json. details = every variant id for `variants:` (infeasible
+        swaps included); infeasible = {task: ids marked feasible: false} (they run only with include_infeasible);
+        count = feasible (task, variant) pairs, tasks = tasks with a feasible variant. T020 adds user variants here."""
         from importlib.util import find_spec
 
         from bench.core.catalog import entry
@@ -119,11 +121,13 @@ class OursAdapter(BenchmarkAdapter):
             tasks = json.loads(path.read_text())["tasks"]
             for cond, desc in CONDITION_INFO.items():
                 per_task = {int(t["task_id"]): _variant_ids(cond, t) for t in tasks}
-                ids = sorted({v for vs in per_task.values() for v in vs})
+                ids = sorted({v for vs in per_task.values() for v, _ in vs})
+                infeasible = {str(t): [v for v, ok in vs if not ok] for t, vs in per_task.items()}
                 e = entry(
                     "ours", s, "condition", cond, description=desc, details=ids,
-                    count=sum(len(v) for v in per_task.values()),
-                    tasks=[t for t, v in per_task.items() if v], source="builtin",
+                    count=sum(ok for vs in per_task.values() for _, ok in vs),
+                    tasks=[t for t, vs in per_task.items() if any(ok for _, ok in vs)], source="builtin",
+                    infeasible={t: v for t, v in infeasible.items() if v},
                 )  # fmt: skip
                 e["requires"] = ["hf-libero (main venv, --extra libero)"]
                 e["missing"] = missing

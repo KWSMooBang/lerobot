@@ -16,8 +16,9 @@ PRO Object floor + salad dressings, Plus salad dressings, both L10 t0/t1/t7 thro
           original init files (`libero_10/LIVING_ROOM_SCENE…​.pruned_init`), applied only where the stored z
           still equals the patch's z0 (PRO's re-sampled axis inits are other states and stay as they are).
 
-`fix_tag(assets)` = `fix-<LIBERO_FIX>-<patch hash>` (= common.libero_env_tag) when the assets carry the marker,
-else "raw"; it is appended to the benchmark's bench_version so fixed and unfixed results never pair.
+`fix_tag(assets)` = `fix-<LIBERO_FIX>-<patch hash>` (= common.libero_env_tag) when the marker exists and every file
+it lists still has the recorded sha256, else "raw" (never applied, interrupted, assets restored or re-extracted);
+it is appended to the benchmark's bench_version so fixed and unfixed results never pair.
 """
 
 from __future__ import annotations
@@ -25,9 +26,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import shutil
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -50,74 +51,120 @@ def patch_key() -> str:
 
 
 def fix_tag(assets: Path | str) -> str:
+    """`fix-<LIBERO_FIX>-<patch hash>` if the marker exists and every file it records still has its fixed
+    content (sha256), else "raw" (never applied, interrupted, or assets restored / re-extracted since)."""
+    info = verify(assets)
+    return "raw" if info is None else f"fix-{info['fix']}-{patch_key()}"
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def verify(assets: Path | str) -> dict[str, Any] | None:
+    """The marker's info if it is complete and matches the files on disk, else None."""
     m = Path(assets) / MARKER
-    if not m.exists():
-        return "raw"
-    return f"fix-{json.loads(m.read_text())['fix']}-{patch_key()}"
+    try:
+        info = json.loads(m.read_text())
+        files = info["files"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    for rel, sha in files.items():
+        try:
+            if _sha((Path(assets) / rel).read_bytes()) != sha:
+                return None
+        except OSError:
+            return None
+    return info
+
+
+def _tmp(path: Path) -> Path:
+    return path.with_name(f".{path.name}.tmp-{uuid.uuid4().hex}")
 
 
 def _write(path: Path, data: bytes) -> None:
-    """Replace `path` (file or symlink) with a real file holding `data`, never writing through a symlink."""
-    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    """Atomically make `path` a real file holding `data`. os.replace swaps the directory entry, so a symlink
+    at `path` is replaced by the file (its target is never written) and an interruption leaves either the old
+    or the new entry, never none."""
+    tmp = _tmp(path)
     tmp.write_bytes(data)
-    path.unlink(missing_ok=True)
+    tmp.replace(path)
+
+
+def _symlink(path: Path, target: Path) -> None:
+    tmp = _tmp(path)
+    tmp.symlink_to(target)
     tmp.replace(path)
 
 
 def apply_assets(assets: Path | str) -> dict[str, Any]:
-    """Apply the T009 asset fix to an asset dir in place; returns what changed. Idempotent."""
+    """Apply the T009 asset fix to an asset dir in place; returns the marker info. Idempotent and safe to rerun
+    after an interruption: originals are backed up before a file is changed, a file with a backup counts as
+    fixed by an earlier run, and the marker (with the sha256 of every fixed file) is written last."""
     common = _common()
     strip = common._strip_png_srgb
     assets = Path(assets)
-    if (assets / MARKER).exists():
-        return json.loads((assets / MARKER).read_text())
+    info = verify(assets)
+    if info is not None:
+        return info
+    (assets / MARKER).unlink(missing_ok=True)  # stale or partial: not fixed until this run completes
     backup = assets.parent / "assets_srgb_orig"
-    changed: list[str] = []
+    files: dict[str, str] = {}
+
+    def fix_file(path: Path, new: bytes | None, current: bytes) -> None:
+        rel = path.relative_to(assets)
+        b = backup / rel
+        if new is not None:
+            if not b.exists():
+                b.parent.mkdir(parents=True, exist_ok=True)
+                _write(b, current)
+            _write(path, new)
+            files[str(rel)] = _sha(new)
+        elif b.exists():  # fixed by an earlier (possibly interrupted) run
+            files[str(rel)] = _sha(current)
+
+    objects = []
     for p in sorted(assets.rglob("*.png")):
         rel = p.relative_to(assets)
         if rel.parts[0] in ("textures", "scenes", "textures_nosrgb") or rel.parts[0].startswith("."):
             continue
         data = p.read_bytes()
-        stripped = strip(data)
-        if stripped is None:
-            continue
-        b = backup / rel
-        b.parent.mkdir(parents=True, exist_ok=True)
-        if not b.exists():
-            b.write_bytes(data)
-        _write(p, stripped)
-        changed.append(str(rel))
+        fix_file(p, strip(data), data)
+        if str(rel) in files:
+            objects.append(str(rel))
     nosrgb = assets / "textures_nosrgb"
     nosrgb.mkdir(exist_ok=True)
     n_tex = 0
     for p in sorted((assets / "textures").iterdir()):
         q = nosrgb / p.name
         stripped = strip(p.read_bytes()) if p.suffix.lower() == ".png" else None
-        q.unlink(missing_ok=True)
         if stripped is None:
-            q.symlink_to(p.resolve())
+            if not (q.is_symlink() and q.resolve() == p.resolve()):
+                _symlink(q, p.resolve())
         else:
-            q.write_bytes(stripped)
+            _write(q, stripped)
+            files[str(q.relative_to(assets))] = _sha(stripped)
             n_tex += 1
     floors = []
     for scene in sorted(assets.glob(FLOOR_SCENES)):
-        text = scene.read_text()
-        if 'file="../textures/' not in text:
-            continue
-        b = backup / scene.relative_to(assets)
-        b.parent.mkdir(parents=True, exist_ok=True)
-        if not b.exists():
-            b.write_text(text)
-        _write(scene, text.replace('file="../textures/', 'file="../textures_nosrgb/').encode())
-        floors.append(scene.name)
+        text = scene.read_bytes()
+        new = (
+            text.replace(b'file="../textures/', b'file="../textures_nosrgb/')
+            if b'file="../textures/' in text
+            else None
+        )
+        fix_file(scene, new, text)
+        if str(scene.relative_to(assets)) in files:
+            floors.append(scene.name)
     info = {
         "fix": common.LIBERO_FIX,
-        "objects_stripped": changed,
+        "objects_stripped": objects,
         "textures_stripped": n_tex,
         "floor_scenes": floors,
         "backup": str(backup),
+        "files": files,
     }
-    (assets / MARKER).write_text(json.dumps(info, indent=1) + "\n")
+    _write(assets / MARKER, (json.dumps(info, indent=1) + "\n").encode())
     return info
 
 

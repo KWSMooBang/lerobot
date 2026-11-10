@@ -42,6 +42,13 @@ mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 RID=${RID:-e2e-$POLICY-$MODE-$(date +%Y%m%d-%H%M%S)}
 BENCH_RID=e2e-bench-$RID
+# every run starts clean: an earlier run's outputs must never be what the verdict reads
+for d in "$OUT/runs/$RID" "$OUT/runs/$BENCH_RID" "$OUT/reports/$BENCH_RID"; do
+  if [ -e "$d" ]; then echo "[e2e] $d exists: use a new --run-id (default: a timestamped one)" >&2; exit 2; fi
+done
+if [ -f "$OUT/ckpt_registry.tsv" ] && cut -f1 "$OUT/ckpt_registry.tsv" | grep -qx "$RID"; then
+  echo "[e2e] ckpt id $RID already in $OUT/ckpt_registry.tsv: use a new --run-id" >&2; exit 2
+fi
 if [ -z "$STEPS" ]; then
   if [ "$MODE" = gpu ]; then STEPS=300; else STEPS=4; fi
 fi
@@ -66,21 +73,24 @@ if [ "$MODE" != gpu ]; then
 fi
 
 note "(a)+(b) train $RID ($POLICY, $STEPS updates, $MODE) then sc-bench e2e_smoke as $BENCH_RID"
-"$SC/train/sc-train" "${train[@]}" -- "${lerobot[@]}" || note "sc-train / sc-bench returned non-zero (checked below)"
+RC_TRAIN=0
+"$SC/train/sc-train" "${train[@]}" -- "${lerobot[@]}" || RC_TRAIN=$?
+[ "$RC_TRAIN" = 0 ] || note "sc-train (+ --then-bench sc-bench) exit $RC_TRAIN"
 
 note "(c) checkpoint load check (CPU) + sc-report"
 CHECK=$(uv run --project "$REPO" --extra shortcut-bench python "$SC/serve/policy_server.py" --check --ckpt "$RID" \
-          --registry "$OUT/ckpt_registry.tsv" --device cpu 2>/dev/null | tail -1) || CHECK='{"ok": false}'
+          --registry "$OUT/ckpt_registry.tsv" --device cpu 2>/dev/null | tail -1) || CHECK='{"ok": false, "exit": "nonzero"}'
 note "load check: $CHECK"
-"$SC/bench/sc-report" --runs "$OUT/runs/$BENCH_RID" --out "$OUT/reports/$BENCH_RID" --videos 0 \
-  || note "sc-report failed (checked below)"
+RC_REPORT=0
+"$SC/bench/sc-report" --runs "$OUT/runs/$BENCH_RID" --out "$OUT/reports/$BENCH_RID" --videos 0 || RC_REPORT=$?
 
-uv run --project "$REPO" python - "$OUT" "$RID" "$BENCH_RID" "$CHECK" "$ALLOW_SKIP" <<'EOF'
+uv run --project "$REPO" python - "$OUT" "$RID" "$BENCH_RID" "$CHECK" "$ALLOW_SKIP" "$RC_TRAIN" "$RC_REPORT" <<'EOF'
 import json
 import sys
 from pathlib import Path
 
 out, rid, brid, check, allow_skip = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5] == "1"
+rc_train, rc_report = int(sys.argv[6]), int(sys.argv[7])
 expected = ["ours-goal-C0", "ours-goal-C4", "plus-goal-language", "plus-goal-layout", "pro-goal-task", "pro-goal-position"]
 rows, ok = [], True
 
@@ -93,6 +103,7 @@ def row(what, status, note=""):
 
 train = out / "runs" / rid / "run_meta.json"
 meta = json.loads(train.read_text()) if train.exists() else {}
+row("sc-train exit code (incl. --then-bench)", "PASS" if rc_train == 0 else "FAIL", f"exit {rc_train}")
 row("train + register", "PASS" if meta.get("status") == "done" and meta.get("ckpt_id") else "FAIL",
     f"step {meta.get('final_step')}, ckpt_id {meta.get('ckpt_id')}, loss {meta.get('loss_first')} -> {meta.get('loss_last')}")
 try:
@@ -104,7 +115,10 @@ row("checkpoint load (policy server, CPU)", "PASS" if c.get("ok") else "FAIL",
 bdir = out / "runs" / brid
 status = (bdir / "STATUS").read_text().strip() if (bdir / "STATUS").exists() else "missing"
 summ = json.loads((bdir / "jobs_summary.json").read_text()) if (bdir / "jobs_summary.json").exists() else {}
-row("sc-bench (--then-bench)", "PASS" if status == "done" else "FAIL", f"STATUS {status}")
+tb = out / "runs" / rid / "then_bench.txt"
+tb_rc = tb.read_text().rsplit("returncode=", 1)[-1].strip() if tb.exists() else "missing"
+row("sc-bench (--then-bench)", "PASS" if status == "done" and tb_rc == "0" else "FAIL",
+    f"STATUS {status}, exit {tb_rc}")
 for j in expected:
     s = summ.get(j)
     if s is None:
@@ -113,7 +127,7 @@ for j in expected:
         n = int(s.split(";")[0].split("=")[1])
         row(f"  job {j}", "PASS" if n > 0 else "FAIL", s)
 rep = out / "reports" / brid / "manifest.json"
-row("sc-report", "PASS" if rep.exists() else "FAIL", str(rep.parent))
+row("sc-report", "PASS" if rep.exists() and rc_report == 0 else "FAIL", f"exit {rc_report}, {rep.parent}")
 w = max(len(r[0]) for r in rows)
 for what, st, note in rows:
     print(f"[e2e] {what:<{w}}  {st:<4}  {note}")

@@ -107,6 +107,8 @@ def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Valida
                     )
             dkey = "variants" if kf == "condition" else "details"
             dets = e.get("details") or []
+            infeasible = e.get("infeasible") or {}
+            with_infeasible = bool(j.get("include_infeasible"))
             if dkey in j and not (dkey == "details" and j[dkey] is None):
                 vals = as_list(j[dkey])
                 if dkey == "details" or not (len(vals) == 1 and str(vals[0]).isdigit()):
@@ -115,6 +117,13 @@ def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Valida
                             v.errors.append(
                                 f"{where}: {s} {key}: unknown {dkey[:-1]} {d!r}{suggest(d, dets)}"
                             )
+                        elif not with_infeasible:
+                            bad = sorted(int(t) for t, ids in infeasible.items() if str(d) in ids)
+                            if bad:
+                                v.warnings.append(
+                                    f"{where}: {s} {key}: variant {d!r} is marked infeasible (T002) in tasks {bad}; "
+                                    "those run only with `include_infeasible: true`"
+                                )
             for ok in OPTION_KEYS:
                 if ok in j and ok in (e.get("options") or {}) and str(j[ok]) not in e["options"][ok]:
                     v.errors.append(f"{where}: {ok} {j[ok]!r}{suggest(j[ok], e['options'][ok])}")
@@ -128,6 +137,8 @@ def validate_battery(battery: dict[str, Any], backend: str = "libero") -> Valida
                 if bad:
                     v.errors.append(f"{where}: tasks {bad} outside 0-9")
                 have = set(e.get("tasks") or range(10))
+                if with_infeasible:
+                    have |= {int(t) for t in infeasible}
                 none = [t for t in tids if 0 <= t <= 9 and t not in have]
                 if none:
                     v.warnings.append(

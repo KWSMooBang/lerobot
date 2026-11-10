@@ -27,7 +27,10 @@ class CatalogEntry(TypedDict, total=False):
     count: int | None  # selectable items in this suite (None = unknown: install missing)
     count_by_level: dict[str, int]  # optional breakdown
     count_by_detail: dict[str, int]  # optional breakdown
-    tasks: list[int]  # task ids that have this entry
+    tasks: list[int]  # task ids that have this entry (ours: with a feasible variant)
+    infeasible: dict[
+        str, list[str]
+    ]  # ours C4/C5: task id → variant ids marked feasible: false (include_infeasible)
     description: str  # one line: what it changes / which cue it removes
     options: dict[str, list[str]]  # other job fields with a closed set of values (PRO instruction_source, …)
     requires: list[str]  # what the whole entry needs (human-readable)
