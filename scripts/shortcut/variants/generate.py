@@ -36,9 +36,8 @@ import numpy as np
 
 from .bddl_io import Problem, predicate_str
 from .goals import TURNOFF_SEMANTICS, eval_predicate
-from .spec import VariantSpec, generated_dir, load_spec
+from .spec import GENERATOR_VERSION, VariantSpec, build_problems, generated_dir, load_spec
 
-GENERATOR_VERSION = "variants-v1"  # bump when generated files change meaning
 SETTLE_STEPS = 20  # no-op steps after editing a state, before it is stored
 EVAL_SETTLE_STEPS = 10  # lerobot LiberoEnv.num_steps_wait
 POS_TOL = 0.025  # m, xy distance for "is where the edit put it" / "untouched object did not move"
@@ -453,11 +452,8 @@ def build(spec: VariantSpec, variants_root: str | Path | None = None, force: boo
     mpath = out / "manifest.json"
     if mpath.exists() and not force:
         old = json.loads(mpath.read_text())
-        if (
-            old.get("spec_sha256") == spec.sha256
-            and old.get("libero_env") == lb.env_tag
-            and old.get("generator") == GENERATOR_VERSION
-        ):
+        old["_dir"] = str(out)
+        if old.get("libero_env") == lb.env_tag and not build_problems(old, spec.sha256):
             return old
     tid = base_task_id(spec)
     bt = suite_tasks(spec.suite)[tid]

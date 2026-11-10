@@ -21,7 +21,7 @@ sys.path[:0] = [str(SHORTCUT), str(SHORTCUT / "parallel")]
 import run_eval  # noqa: E402
 from variants.bddl_io import Problem, parse, parse_predicate  # noqa: E402
 from variants.fallback import fallback_rows  # noqa: E402
-from variants.spec import SpecError, list_variants, parse_spec, variant_rows  # noqa: E402
+from variants.spec import GENERATOR_VERSION, SpecError, list_variants, parse_spec, variant_rows  # noqa: E402
 
 GOAL_BDDL = """(define (problem LIBERO_Tabletop_Manipulation)
   (:domain robosuite)
@@ -131,7 +131,9 @@ def test_bddl_roundtrip_and_edits():
 # ---------------------------------------------------------------- mock: run_eval / sc-bench / report
 
 
-def write_mock_variant(root: Path, vid: str, base_task: int, instruction: str, track_instr: str) -> None:
+def write_mock_variant(
+    root: Path, vid: str, base_task: int, instruction: str, track_instr: str, source: list | None = None
+) -> None:
     """A built-looking variant for --backend mock (no LIBERO): YAML + generated/<id>/manifest.json.
     The mock policy heads to text_pos(instruction); a tracked goal named after the instruction is
     therefore reached (fallback), the new goal (label <id>:new) is not."""
@@ -144,10 +146,10 @@ def write_mock_variant(root: Path, vid: str, base_task: int, instruction: str, t
     )
     g = d / "generated" / vid
     g.mkdir(parents=True, exist_ok=True)
-    (g / f"{vid}.bddl").write_text("mock")
-    (g / "init_states.npy").write_bytes(b"mock")
+    (g / f"{vid}.bddl").write_text(f"mock {vid}")
+    (g / "init_states.npy").write_bytes(f"mock {vid}".encode())
     m = {
-        "id": vid, "suite": "libero_goal", "group": "test", "libero_env": "mock",
+        "id": vid, "suite": "libero_goal", "group": "test", "libero_env": "mock", "generator": GENERATOR_VERSION,
         "spec_sha256": hashlib.sha256(y.read_bytes()).hexdigest(),
         "instruction": instruction, "goal": [["On", "cream_cheese_1", "plate_1"]],
         "base_task": {"task_id": base_task, "goal": [["On", "akita_black_bowl_1", "plate_1"]], "goal_absent": []},
@@ -157,9 +159,24 @@ def write_mock_variant(root: Path, vid: str, base_task: int, instruction: str, t
             "gone": {"goal": [["In", "ketchup_1", "basket_1_contain_region"]], "task": None, "instruction": None, "absent": ["ketchup_1"]},
         },
         "edits": {"kinds": [], "dimension": "language"},
-        "files": {"bddl": {"path": f"{vid}.bddl", "sha256": "a" * 64}, "init_states": {"path": "init_states.npy", "sha256": "b" * 64}},
-        "init_states": {"mode": "keep", "n": 50},
+        "files": {"bddl": {"path": f"{vid}.bddl", "sha256": sha(g / f"{vid}.bddl")},
+                  "init_states": {"path": "init_states.npy", "sha256": sha(g / "init_states.npy")}},
+        # patch-like: stored state 1 came from base init 3 (base inits 1, 2 failed the build check)
+        "init_states": {"mode": "keep", "n": 50, "source": source or list(range(50))},
     }  # fmt: skip
+    (g / "manifest.json").write_text(json.dumps(m))
+
+
+def sha(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def regenerate(vdir: Path, vid: str, content: bytes) -> None:
+    """New init-state bytes under the same id, manifest updated consistently (a real rebuild)."""
+    g = vdir / "libero_goal" / "generated" / vid
+    (g / "init_states.npy").write_bytes(content)
+    m = json.loads((g / "manifest.json").read_text())
+    m["files"]["init_states"]["sha256"] = sha(g / "init_states.npy")
     (g / "manifest.json").write_text(json.dumps(m))
 
 
@@ -204,12 +221,23 @@ def test_custom_run_eval_mock_multi_goal(tmp_path):
     }
     # resume: same command adds nothing; regenerated files under the same id → refused
     assert len(run_custom(tmp_path / "run", vdir, "--variants", "cheese_plate,other")) == 4
-    mp = vdir / "libero_goal" / "generated" / "other" / "manifest.json"
-    m = json.loads(mp.read_text())
-    m["files"]["init_states"]["sha256"] = "c" * 64
-    mp.write_text(json.dumps(m))
+    regenerate(vdir, "other", b"rebuilt init states")
     with pytest.raises(SystemExit, match="other generated files"):
         run_custom(tmp_path / "run", vdir, "--variants", "cheese_plate,other")
+    # a generated file changed behind the manifest's back, or an older generator → rebuild required
+    g = vdir / "libero_goal" / "generated" / "other"
+    (g / "other.bddl").write_text("edited by hand")
+    with pytest.raises(SystemExit, match="must be rebuilt.*differs from the file the manifest recorded"):
+        run_custom(tmp_path / "run3", vdir, "--variants", "other")
+    m = json.loads((g / "manifest.json").read_text())
+    m["files"]["bddl"]["sha256"] = sha(g / "other.bddl")
+    m["generator"] = "variants-v0"
+    (g / "manifest.json").write_text(json.dumps(m))
+    with pytest.raises(SystemExit, match="must be rebuilt.*generator 'variants-v0'"):
+        run_custom(tmp_path / "run3", vdir, "--variants", "other")
+    stale = {c["details"][0]: c for c in variant_rows("libero_goal", vdir)}["other"]
+    assert stale["stale"] and "generator" in stale["requires"][0]
+    assert "other" in list_variants("libero_goal", vdir)[0]["missing_by_detail"]
     # same files, other scoring (a tracked goal changed) → refused too
     mp = vdir / "libero_goal" / "generated" / "cheese_plate" / "manifest.json"
     m = json.loads(mp.read_text())
@@ -221,8 +249,42 @@ def test_custom_run_eval_mock_multi_goal(tmp_path):
     (vdir / "libero_goal" / "cheese_plate.yaml").write_text(
         (vdir / "libero_goal" / "cheese_plate.yaml").read_text() + "notes: changed\n"
     )
-    with pytest.raises(SystemExit, match="changed since it was built"):
+    with pytest.raises(SystemExit, match="YAML changed since the last build"):
         run_custom(tmp_path / "run2", vdir, "--variants", "cheese_plate")
+
+
+def test_source_init_idx_and_c0_pairing(tmp_path):
+    vdir = tmp_path / "variants"
+    src = [0, 3, *range(4, 52)]  # stored state 1 = base init 3 (base 1, 2 dropped by the build check)
+    write_mock_variant(vdir, "patched", 8, "put the cream cheese on the plate", "t", source=src)
+    eps = run_custom(tmp_path / "run", vdir, "--variants", "patched")
+    assert [(e["init_idx"], e["source_init_idx"]) for e in eps] == [(0, 0), (1, 3)]
+    c0 = [
+        {"model": "pi05lib", "suite": "libero_goal", "task_id": 8, "init_idx": i, "repeat_idx": 0,
+         "condition": "C0", "success_orig": ok}
+        for i, ok in [(0, True), (1, True), (3, False)]
+    ]  # fmt: skip
+    [s], _ = fallback_rows(eps + c0)
+    assert s["n_paired"] == 2 and s["base_c0"] == 0.5  # init 0 ↔ C0 init 0 (ok), init 1 ↔ C0 init 3 (fail)
+
+
+def test_worker_env_cache_separates_variant_files(tmp_path):
+    pytest.importorskip("websockets")
+    sys.path.insert(0, str(SHORTCUT / "bench" / "ours"))
+    import importlib
+
+    worker = importlib.import_module("bench.ours.worker")
+    unit = {"suite": "libero_goal", "task_id": 8, "max_steps": 5, "env_hw": [32, 32], "control_mode": "relative",
+            "backend": "mock", "custom": True}  # fmt: skip
+    meta = {"base_task": 8, "variant_key": "a/b/goals-1", "bddl": "/x/v.bddl", "init_states": "/x/i.npy"}
+    v = {"condition": "custom", "variant": "same_id", "instruction": "x", "goal_bddl": None, "meta": meta}
+    e1 = worker.env_for({**unit, "variants": [v]})
+    assert worker.env_for({**unit, "variants": [v]}) is e1  # same files → reused
+    other = {
+        **v,
+        "meta": {**meta, "variant_key": "c/d/goals-2", "bddl": "/y/v.bddl", "init_states": "/y/i.npy"},
+    }
+    assert worker.env_for({**unit, "variants": [other]}) is not e1  # same id, other variants_dir → new env
 
 
 def test_fallback_rates_share_the_trained_basis():

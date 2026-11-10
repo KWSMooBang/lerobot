@@ -130,6 +130,15 @@ keeps `TurnOff`, and the manifest states this (`goal_semantics`).
 Resume key (`variant_meta.variant_key`): the BDDL and init-state hashes plus a hash of the scoring (instruction,
 goal, base task goal, tracked goals). A run dir whose episodes used another key is refused.
 
+Before a run, the planner re-hashes the generated BDDL and init-state files and checks the YAML hash and the
+generator version against the manifest. If anything differs, it requires `sc-variants build`. The catalog marks such
+variants as stale (`missing_by_detail`).
+
+`source_init_idx`: the base init that stored state i came from. It equals i for `keep`. For `patch` it can differ,
+because states that fail the build check are dropped. It is None for `resample`. The fallback table pairs each
+variant episode with the base task's C0 episode at that init: `base C0 % (paired n)`, shown when the C0 runs are
+in the report. The seed still follows i.
+
 Goals that were true at reset, and a tracked goal identical to the new goal, are left out.
 
 `--num-envs > 1` (batched in-process path) does not support `custom`. Use `sc-bench`, which supports

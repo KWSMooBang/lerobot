@@ -70,11 +70,16 @@ def wire_obs(obs: dict[str, Any]) -> dict[str, np.ndarray]:
 
 def env_for(unit: dict[str, Any]) -> Any:
     custom = unit.get("custom", False)
+    vm = (unit["variants"][0].get("meta") or {}) if custom else {}
+    # custom: the generated files themselves (two variants_dirs may hold the same id with other files)
     key = (
         unit["suite"],
         unit["task_id"],
         unit["max_steps"],
         unit["variants"][0]["variant"] if custom else None,
+        vm.get("variant_key"),
+        vm.get("bddl"),
+        vm.get("init_states"),
     )
     if key not in _ENVS:
         for env in _ENVS.values():

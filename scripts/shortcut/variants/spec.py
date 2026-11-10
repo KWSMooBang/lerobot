@@ -33,6 +33,7 @@ import yaml
 from .bddl_io import parse_predicate
 
 VARIANTS_DIR = Path(__file__).resolve().parent  # default --variants-dir (examples live here)
+GENERATOR_VERSION = "variants-v1"  # bump when generated files change meaning (generate.py writes it)
 SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
 INIT_MODES = ("keep", "patch", "resample")
 FIXTURE_STATES = ("open", "close", "on", "off")
@@ -300,6 +301,26 @@ def manifest_file(m: dict[str, Any], key: str) -> Path:
     return Path(m["_dir"]) / m["files"][key]["path"]
 
 
+def build_problems(m: dict[str, Any] | None, spec_sha256: str | None) -> list[str]:
+    """Why a built variant must be rebuilt before it may run (empty = fresh): not built, YAML changed, other
+    generator version, generated BDDL / init states missing or not the files the manifest hashed."""
+    if m is None:
+        return ["not built"]
+    out = []
+    if m.get("spec_sha256") != spec_sha256:
+        out.append("YAML changed since the last build")
+    if m.get("generator") != GENERATOR_VERSION:
+        out.append(f"built by generator {m.get('generator')!r}, current is {GENERATOR_VERSION!r}")
+    for key in ("bddl", "init_states"):
+        try:
+            f = manifest_file(m, key)
+            if hashlib.sha256(f.read_bytes()).hexdigest() != m["files"][key]["sha256"]:
+                out.append(f"{f.name} differs from the file the manifest recorded")
+        except (KeyError, OSError):
+            out.append(f"generated {key} file missing")
+    return out
+
+
 def find_spec(suite: str, vid: str, d: str | Path | None = None) -> Path:
     p = variants_dir(d) / suite / f"{vid}.yaml"
     if not p.exists():
@@ -331,12 +352,15 @@ def variant_rows(suite: str | None = None, d: str | Path | None = None) -> list[
                 continue
             mp = manifest_path(s, spec.id, d)
             m = json.loads(mp.read_text()) if mp.exists() else None
-            stale = bool(m and m.get("spec_sha256") != spec.sha256)
+            if m is not None:
+                m["_dir"] = str(mp.parent)
+            problems = build_problems(m, spec.sha256)
+            stale = bool(m is not None and problems)
             requires = []
             if m is None:
                 requires.append("sc-variants build")
             elif stale:
-                requires.append("sc-variants build (YAML changed since the last build)")
+                requires.append(f"sc-variants build ({'; '.join(problems)})")
             feas = (m or {}).get("feasibility", {}).get("status")
             goal = " ∧ ".join("(" + " ".join(g) + ")" for g in spec.goal) or "— (no achievable goal)"
             edits = ", ".join(spec.scene.kinds()) or "none"

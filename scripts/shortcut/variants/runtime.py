@@ -6,7 +6,9 @@ like C4–C6, and tracks
   new goal   = the variant goal                → success_new / t_new
   orig goal  = the base task's goal             → success_orig / t_orig (False when its objects are gone)
   track goals (default: every training goal)   → goals_reached {name: first step}, goals_final, goals_initial
-task_id = base task (seed and pairing with the base task's C0 episodes of the same init index).
+task_id = base task; the seed follows the stored init index i (seed rule unchanged). Each episode records
+source_init_idx = the base init the state came from (= i for keep; may differ for patch, None for resample), and
+the report pairs a variant episode with the base task's C0 episode at that init.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .goals import goal_cls
-from .spec import find_spec, load_manifest, load_spec, manifest_file, spec_paths
+from .spec import build_problems, find_spec, load_manifest, load_spec, manifest_file, spec_paths
 
 CUSTOM = "custom"
 
@@ -68,9 +70,11 @@ def plan_custom(
             continue
         m = load_manifest(suite, vid, variants_dir)
         spec_file = find_spec(suite, vid, variants_dir)
-        if load_spec(spec_file).sha256 != m["spec_sha256"]:
+        problems = build_problems(m, load_spec(spec_file).sha256)
+        if problems:  # re-hashes the generated files: the resume key below is only as good as these hashes
             raise SystemExit(
-                f"{spec_file} changed since it was built: run sc-variants build --suite {suite} --ids {vid}"
+                f"variant {suite}/{vid} must be rebuilt ({'; '.join(problems)}): "
+                f"run sc-variants build --suite {suite} --ids {vid}"
             )
         if backend != "mock" and env_tag is not None and m["libero_env"] != env_tag:
             raise SystemExit(
@@ -92,6 +96,9 @@ def plan_custom(
             "bddl": str(manifest_file(m, "bddl")),
             "init_states": str(manifest_file(m, "init_states")),
             "n_init": m["init_states"]["n"],
+            # base init index each stored state was made from (keep / patch; None for resample). patch drops states
+            # that fail the build check, so stored state i may come from base init j != i
+            "source_init": m["init_states"].get("source"),
             "init_mode": m["init_states"]["mode"],
             "goal": m["goal"],
             "orig_goal": m["base_task"]["goal"],

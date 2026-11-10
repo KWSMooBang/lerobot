@@ -511,7 +511,12 @@ def episode_record(
     video_file: str | None,
     wall_time_s: float,
 ) -> dict[str, Any]:
-    """One episodes.jsonl line. `run` = RunSpec.info() (model tag, checkpoint, suite, originals, scene_k)."""
+    """One episodes.jsonl line. `run` = RunSpec.info() (model tag, checkpoint, suite, originals, scene_k).
+    Custom variants also get source_init_idx (the base init the stored state came from; C0 pairing)."""
+    extra: dict[str, Any] = {}
+    if v.condition == CUSTOM:
+        src = v.meta.get("source_init")
+        extra["source_init_idx"] = src[init_idx] if src is not None and init_idx < len(src) else None
     return {
         "model": run["tag"],
         "policy": run["policy"],
@@ -534,6 +539,7 @@ def episode_record(
         "video": video_file,
         "steps_file": steps_file,
         "wall_time_s": round(wall_time_s, 2),
+        **extra,
     }
 
 
