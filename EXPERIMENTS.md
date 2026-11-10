@@ -71,3 +71,7 @@ results.tsv 원문: `bench-pi05lib-goal15_trainfmt	done	cdd3aec6d7a6	sc-bench-g1
 - 물체–목적지 조합은 목적지에 따라 갈린다: stove·cabinet top·plate 는 cream cheese 로 일반화 (90/100/50%) 되지만, rack 은 wine bottle 전용 — cheese→rack 0% (대부분 아무것도 못 함), bowl→rack 은 bowl→cabinet top 으로 100% 빠짐.
   wine bottle 은 자기 학습 목적지 (rack·cabinet top) 로 끌려간다 (g03 100%, g04·g05 30%).
 - 한계: 변형당 n=10 (예: 20% 의 95% CI ≈ 6–51%), 학습 형식 문장만, pi05lib 하나. g01·g08·g11 은 스크립트 정책 실행 가능성도 낮음. next: BDDL 형식 문장·control (goal15.yaml), Goal 후보 n01–n23, 다른 모델. 사용 0.87 GPU-h.
+**재실행 (영상 전체, 2026-11-10)**: `bench-pi05lib-goal15_trainfmt_allvid	done	cdd3aec6d7a6	sc-bench-g2xK1	1.03	2026-11-10T09:03:52+00:00	jobs=1;ours-goal-custom-goal15:n=150;sr_orig=0.253;sr_new=0.220`
+(A100×2, 영상 150개 = Mac mini goal15/runs/bench-pi05lib-goal15_trainfmt_allvid). 첫 실행과 에피소드별 일치: success_new 146/150, success_orig 148/150, outcome 144/150 (96%), 도달 목표 집합 145/150, action bit 동일 1/150.
+다른 9 ep 는 모두 300 step 까지 간 것 (g05·g07·g14×5·g15×2), 변형 수준 변화는 g05·g07·g14·g15 에서 ±10%p. action 은 대부분 step 0 부터 |Δ|≈1e-3 로 갈라짐 (같은 seed·RNG 복원; GPU/bf16 수치 차이가 closed-loop 에서 커진 것으로 추정, 원인 미확인).
+→ 결론 (서랍 문장 붕괴, rack 비일반화, cheese→stove·cabinet top 일반화) 은 재현됨. 변형당 ±1 ep 는 run 간 noise 범위로 해석. 사용 1.09 GPU-h.
