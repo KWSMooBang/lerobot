@@ -4,6 +4,6 @@
 See README.md.
 """
 
-from .spec import list_variants, load_manifest, load_spec
+from .spec import list_variants, load_manifest, load_spec, variant_rows
 
-__all__ = ["list_variants", "load_manifest", "load_spec"]
+__all__ = ["list_variants", "load_manifest", "load_spec", "variant_rows"]

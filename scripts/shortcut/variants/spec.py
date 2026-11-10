@@ -311,12 +311,10 @@ def find_spec(suite: str, vid: str, d: str | Path | None = None) -> Path:
 # ---------------------------------------------------------------- catalog
 
 
-def list_variants(suite: str | None = None, d: str | Path | None = None) -> list[dict[str, Any]]:
-    """Catalog entries (bench/core catalog format, T019): one selectable item per user variant.
-
-    benchmark, suite, key ("custom" = the ours condition), levels ([]), details ([variant id]), count
-    (init states, None until built), description, requires (what is missing before it can run), plus
-    variant-specific fields: base_task, goal, edits, init, feasibility, built, stale, path."""
+def variant_rows(suite: str | None = None, d: str | Path | None = None) -> list[dict[str, Any]]:
+    """One row per user variant (`sc-variants list`): suite, details [id], count (init states, None until
+    built), description, requires (what is missing before it can run), base_task, group, pair, phrasing,
+    goal, edits, init, feasibility, built, stale, path."""
     out: list[dict[str, Any]] = []
     for s in [suite] if suite else list(SUITES):
         for p in spec_paths(s, d):
@@ -348,8 +346,42 @@ def list_variants(suite: str | None = None, d: str | Path | None = None) -> list
                     "count": (m or {}).get("init_states", {}).get("n"),
                     "description": f"{spec.instruction!r} | goal {goal} | scene edits: {edits} | init {spec.init_mode}",
                     "requires": requires, "base_task": spec.base_task, "group": spec.group,
+                    "pair": spec.pair, "phrasing": spec.phrasing,
                     "goal": spec.goal, "edits": spec.scene.kinds(), "init": spec.init_mode,
                     "feasibility": feas, "built": m is not None, "stale": stale, "path": str(p),
                 }
             )  # fmt: skip
+    return out
+
+
+def list_variants(suite: str | None = None, d: str | Path | None = None) -> list[dict[str, Any]]:
+    """Catalog entries in the bench/core CatalogEntry format (T019): one entry per suite with user variants,
+    key_field `condition`, key `custom`; `details` = the variant ids a job may list in `variants:` (all
+    specs, built or not); `count` = built variants; `count_by_detail` = init states per built variant;
+    `options` = other closed-set job fields (`phrasing`); `requires` / `missing` = variants still to build.
+    Per-variant info: `variants` (variant_rows)."""
+    out: list[dict[str, Any]] = []
+    rows = variant_rows(suite, d)
+    for s in [suite] if suite else list(SUITES):
+        rs = [r for r in rows if r["suite"] == s]
+        if not rs:
+            continue
+        unbuilt = [r["details"][0] for r in rs if r["requires"]]
+        phr = sorted({r["phrasing"] for r in rs if r.get("phrasing")})
+        out.append(
+            {
+                "benchmark": "ours", "suite": s, "key_field": "condition", "key": "custom", "levels": [],
+                "details": [r["details"][0] for r in rs],
+                "count": sum(1 for r in rs if not r["requires"]),
+                "count_by_detail": {r["details"][0]: r["count"] for r in rs if r["count"] is not None},
+                "tasks": sorted({int(r["base_task"]) for r in rs if str(r.get("base_task", "")).isdigit()}),
+                "description": f"user-designed variants ({len(rs)}; scripts/shortcut/variants): own BDDL + init "
+                "states, runs to max_steps, tracks every training goal (fallback table)",
+                "options": {"phrasing": phr} if phr else {},
+                "requires": ["hf-libero (main venv, --extra libero)", "built variants (sc-variants build)"],
+                "missing": [f"sc-variants build --suite {s} ({len(unbuilt)} not built / stale)"] if unbuilt else [],
+                "source": f"user variant files ({variants_dir(d)})",
+                "variants": rs,
+            }
+        )  # fmt: skip
     return out

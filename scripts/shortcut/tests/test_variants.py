@@ -21,7 +21,7 @@ sys.path[:0] = [str(SHORTCUT), str(SHORTCUT / "parallel")]
 import run_eval  # noqa: E402
 from variants.bddl_io import Problem, parse, parse_predicate  # noqa: E402
 from variants.fallback import fallback_rows  # noqa: E402
-from variants.spec import SpecError, list_variants, parse_spec  # noqa: E402
+from variants.spec import SpecError, list_variants, parse_spec, variant_rows  # noqa: E402
 
 GOAL_BDDL = """(define (problem LIBERO_Tabletop_Manipulation)
   (:domain robosuite)
@@ -83,7 +83,7 @@ def test_spec_validation():
 
 
 def test_shipped_example_specs_are_valid():
-    cat = list_variants(None)
+    cat = variant_rows(None)
     assert len(cat) >= 53
     assert not [c for c in cat if c["description"].startswith("INVALID")]
     ids = {(c["suite"], c["details"][0]) for c in cat}
@@ -225,7 +225,7 @@ def test_custom_catalog(tmp_path):
         "suite: libero_goal\nbase_task: 8\nid: unbuilt\ninstruction: x\ngoal: []\n"
     )
     (vdir / "libero_goal" / "broken.yaml").write_text("suite: libero_goal\nid: broken\n")
-    cat = {c["details"][0]: c for c in list_variants("libero_goal", vdir)}
+    cat = {c["details"][0]: c for c in variant_rows("libero_goal", vdir)}
     assert (
         cat["cheese_plate"]["built"]
         and cat["cheese_plate"]["count"] == 50
@@ -233,6 +233,11 @@ def test_custom_catalog(tmp_path):
     )
     assert cat["unbuilt"]["requires"] == ["sc-variants build"] and cat["unbuilt"]["count"] is None
     assert cat["broken"]["description"].startswith("INVALID")
+    # bench/core CatalogEntry format (T019): one `condition: custom` entry per suite
+    [e] = list_variants("libero_goal", vdir)
+    assert (e["benchmark"], e["key_field"], e["key"]) == ("ours", "condition", "custom")
+    assert set(e["details"]) == {"cheese_plate", "unbuilt", "broken"} and e["count"] == 1
+    assert e["count_by_detail"] == {"cheese_plate": 50} and e["missing"]
 
 
 def test_custom_job_through_sc_bench_and_report(tmp_path):

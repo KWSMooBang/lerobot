@@ -22,9 +22,9 @@ from variants import preview as preview_mod  # noqa: E402  (sets CPU EGL before 
 from variants.spec import (  # noqa: E402
     SUITES,
     find_spec,
-    list_variants,
     load_manifest,
     spec_paths,
+    variant_rows,
     variants_dir,
 )
 
@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.cmd == "list":
-        cat = list_variants(args.suite, args.variants_dir)
+        cat = variant_rows(args.suite, args.variants_dir)
         if args.json:
             print(json.dumps(cat, indent=1))
         else:
