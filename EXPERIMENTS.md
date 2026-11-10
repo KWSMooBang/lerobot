@@ -41,3 +41,33 @@ pi05base 는 모든 조건 0% — shortcut 수치 비교는 불가, 행동 차�
 hook 정의는 맞다 (pg17 = final norm 입력 = block 출력, T015 hook 검사). 가설 (미검증): action expert 는 각 PG 층의 K/V (그 층 입력에서 계산) 만 읽으므로
 pg17 출력은 action 생성에 쓰이지 않고 표현이 소수 방향에 몰렸다. pg16 도 약하게 같은 경향. next: pg17 (·pg16) activation 의 유효 rank·norm 분포 확인 후
 제외하거나 작은 dictionary 로 다시 학습. 사용 GPU-h ≈ 11.2 (승인 14; smoke·설치 1.7, idle 낭비 0.5 포함).
+
+## goal15 — LIBERO-Goal 새 task instruction 15개 (T020 custom, kubectl A100×1, 2026-11-10)
+사람이 만든 LIBERO-Goal 변형 15개 (학습 task 와 같은 g06·g12 제외) 를 학습 데이터 형식 문장으로, 학습과 같은 장면·init (0–9) 에서 평가. 다중 목표 추적으로 학습 10개 목표 도달도 기록.
+results.tsv 원문: `bench-pi05lib-goal15_trainfmt	done	cdd3aec6d7a6	sc-bench-g1xK1	0.84	2026-11-10T02:56:30+00:00	jobs=1;ours-goal-custom-goal15:n=150;sr_orig=0.253;sr_new=0.220`
+(bench_version ours-v1/instr-866b36d5/hf-libero-0.1.4/fix-fix1-d18559ff, exec single). 데이터: Mac mini ~/workspace/baccus/VLA-shortcut-exps/goal15/ (서버 같은 경로).
+
+| variant | instruction (학습 형식) | 실행 가능성 | new % | trained % | nothing % | 빠진 학습 task |
+|---|---|---|---|---|---|---|
+| g17 | put the cream cheese on top of the cabinet | 3/3 | **100** | 0 | 0 | — |
+| g15 | put the cream cheese on the stove | 3/3 | **90** | 10 | 0 | t6 10, t7 10 |
+| g05 | put the wine bottle on the stove | 3/3 | 50 | 30 | 20 | wine→rack 30 |
+| g14 | put the cream cheese on the plate | 2/3 | 50 | 20 | 30 | cheese→bowl 20 |
+| g02 | open the top drawer of the cabinet | 3/3 | 20 | 70 | 10 | **open middle drawer 70**, top drawer+bowl 20 |
+| g04 | put the wine bottle on the plate | 3/3 | 20 | 30 | 50 | wine→rack 30 |
+| g01 | open the bottom drawer of the cabinet | 0/3 | 0 | 100 | 0 | **open middle drawer 100** |
+| g03 | put the wine bottle in the bowl | 3/3 | 0 | 100 | 0 | wine→rack 70, wine→cabinet top 30 |
+| g07 | open the top drawer and put the wine bottle inside | 3/3 | 0 | 90 | 10 | **top drawer+bowl 80** |
+| g08 | open the top drawer and put the cream cheese inside | 1/3 | 0 | 90 | 10 | **top drawer+bowl 90** |
+| g09 | open the middle drawer and put the bowl inside | 3/3 | 0 | 100 | 0 | **open middle drawer 90** |
+| g10 | open the middle drawer and put the wine bottle inside | 3/3 | 0 | 90 | 10 | **open middle drawer 90** |
+| g11 | open the middle drawer and put the cream cheese inside | 1/3 | 0 | 100 | 0 | **open middle drawer 100** |
+| g13 | put the bowl on the rack | 3/3 | 0 | 100 | 0 | **bowl→cabinet top 100** |
+| g16 | put the cream cheese on the rack | 3/3 | 0 | 10 | 90 | cheese→bowl 10 |
+
+**판단 (2026-11-10)**: keep. 새 지시 성공 22% (150 ep), 학습 task 로 빠짐이 대부분 → Goal 에서도 지시를 '가장 가까운 학습 문장' 으로 바꿔 실행하는 shortcut 이 강하다.
+- 서랍 문장은 전부 학습 task 로 붕괴: 'open the middle drawer and put X inside' → X 와 무관하게 가운데 서랍만 열고 멈춤 (학습 t0, 90–100%), 'open the top drawer and put X inside' → X 대신 bowl 을 넣음 (학습 t3, 80–90%),
+  'open the top/bottom drawer' → 가운데 서랍 (70/100%). 서랍 위치 단어와 문장 틀이 학습 task 를 고르고, 물체 이름은 무시된다.
+- 물체–목적지 조합은 목적지에 따라 갈린다: stove·cabinet top·plate 는 cream cheese 로 일반화 (90/100/50%) 되지만, rack 은 wine bottle 전용 — cheese→rack 0% (대부분 아무것도 못 함), bowl→rack 은 bowl→cabinet top 으로 100% 빠짐.
+  wine bottle 은 자기 학습 목적지 (rack·cabinet top) 로 끌려간다 (g03 100%, g04·g05 30%).
+- 한계: 변형당 n=10 (예: 20% 의 95% CI ≈ 6–51%), 학습 형식 문장만, pi05lib 하나. g01·g08·g11 은 스크립트 정책 실행 가능성도 낮음. next: BDDL 형식 문장·control (goal15.yaml), Goal 후보 n01–n23, 다른 모델. 사용 0.87 GPU-h.
