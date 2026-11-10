@@ -1,0 +1,11 @@
+# goal15 control: training task 6 (bddl sentence)
+suite: libero_goal
+base_task: 6
+id: ctl_t06_bddl
+group: goal15-control
+pair: ctl_t06
+phrasing: bddl
+instruction: Put the cream cheese on the bowl
+goal:
+- On cream_cheese_1 akita_black_bowl_1
+init: keep

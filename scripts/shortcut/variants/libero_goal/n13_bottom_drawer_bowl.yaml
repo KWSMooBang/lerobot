@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #13 (N2)
+suite: libero_goal
+base_task: 3
+id: n13_bottom_drawer_bowl
+group: N2
+instruction: open the bottom drawer and put the bowl inside
+goal:
+- In akita_black_bowl_1 wooden_cabinet_1_bottom_region
+init: keep

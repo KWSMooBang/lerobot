@@ -1,0 +1,11 @@
+# goal15 #2 (train sentence)
+suite: libero_goal
+base_task: 0
+id: g02_train
+group: goal15
+pair: g02
+phrasing: train
+instruction: open the top drawer of the cabinet
+goal:
+- Open wooden_cabinet_1_top_region
+init: keep

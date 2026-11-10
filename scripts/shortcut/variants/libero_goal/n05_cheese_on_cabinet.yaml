@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #5 (N1)
+suite: libero_goal
+base_task: 4
+id: n05_cheese_on_cabinet
+group: N1
+instruction: put the cream cheese on top of the cabinet
+goal:
+- On cream_cheese_1 wooden_cabinet_1_top_side
+init: keep

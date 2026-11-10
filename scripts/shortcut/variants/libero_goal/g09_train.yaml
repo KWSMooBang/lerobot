@@ -1,0 +1,11 @@
+# goal15 #9 (train sentence)
+suite: libero_goal
+base_task: 3
+id: g09_train
+group: goal15
+pair: g09
+phrasing: train
+instruction: open the middle drawer and put the bowl inside
+goal:
+- In akita_black_bowl_1 wooden_cabinet_1_middle_region
+init: keep

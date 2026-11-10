@@ -1,0 +1,12 @@
+# goal15 #7 (train sentence)
+suite: libero_goal
+base_task: 3
+id: g07_train
+group: goal15
+pair: g07
+phrasing: train
+instruction: open the top drawer and put the wine bottle inside
+goal:
+- In wine_bottle_1 wooden_cabinet_1_top_region
+init: keep
+notes: may be physically infeasible (bottle in a drawer)

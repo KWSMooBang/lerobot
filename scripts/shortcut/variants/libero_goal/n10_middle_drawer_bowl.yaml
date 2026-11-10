@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #10 (N1)
+suite: libero_goal
+base_task: 3
+id: n10_middle_drawer_bowl
+group: N1
+instruction: open the middle drawer and put the bowl inside
+goal:
+- In akita_black_bowl_1 wooden_cabinet_1_middle_region
+init: keep

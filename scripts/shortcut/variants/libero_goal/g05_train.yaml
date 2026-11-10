@@ -1,0 +1,11 @@
+# goal15 #5 (train sentence)
+suite: libero_goal
+base_task: 2
+id: g05_train
+group: goal15
+pair: g05
+phrasing: train
+instruction: put the wine bottle on the stove
+goal:
+- On wine_bottle_1 flat_stove_1_cook_region
+init: keep

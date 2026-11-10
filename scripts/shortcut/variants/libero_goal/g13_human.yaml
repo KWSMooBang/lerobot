@@ -1,0 +1,12 @@
+# goal15 #13 (bddl sentence)
+suite: libero_goal
+base_task: 9
+id: g13_human
+group: goal15
+pair: g13
+phrasing: bddl
+instruction: Put the bowl on the rack
+goal:
+- On akita_black_bowl_1 wine_rack_1_top_region
+init: keep
+notes: may be physically infeasible

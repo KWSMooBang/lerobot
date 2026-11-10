@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #17 (N3)
+suite: libero_goal
+base_task: 1
+id: n17_plate_on_stove
+group: N3
+instruction: put the plate on the stove
+goal:
+- On plate_1 flat_stove_1_cook_region
+init: keep

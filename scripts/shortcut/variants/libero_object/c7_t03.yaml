@@ -1,0 +1,14 @@
+# T014 C7: the two target spots swap objects; original instruction and goal
+suite: libero_object
+base_task: 3
+id: c7_t03
+group: C7
+instruction: pick up the bbq sauce and place it in the basket
+goal:
+- In bbq_sauce_1 basket_1_contain_region
+scene:
+  swap:
+  - - bbq_sauce_1
+    - chocolate_pudding_1
+init: patch
+notes: bbq_sauce_1 and chocolate_pudding_1 (the other target spot) swap places

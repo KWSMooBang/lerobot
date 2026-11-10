@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #12 (N2)
+suite: libero_goal
+base_task: 0
+id: n12_open_bottom_drawer
+group: N2
+instruction: open the bottom drawer of the cabinet
+goal:
+- Open wooden_cabinet_1_bottom_region
+init: keep

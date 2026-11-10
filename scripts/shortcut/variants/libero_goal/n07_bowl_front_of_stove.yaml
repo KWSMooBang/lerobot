@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #7 (N1)
+suite: libero_goal
+base_task: 5
+id: n07_bowl_front_of_stove
+group: N1
+instruction: put the bowl in front of the stove
+goal:
+- On akita_black_bowl_1 main_table_stove_front_region
+init: keep

@@ -1,0 +1,335 @@
+{
+ "id": "ctl_t05_train",
+ "suite": "libero_goal",
+ "group": "goal15-control",
+ "generator": "variants-v1",
+ "generated_at": "2026-11-10T01:49:36.138291+00:00",
+ "git_sha": "99c688c9183f1a35f66f408414cb448aaaca89bf",
+ "libero_env": "fix-fix1-d18559ff",
+ "spec_path": "../../ctl_t05_train.yaml",
+ "spec_sha256": "1ef90b1967e9e8dc11bb4cfd4773e8cdc2c037791eda7c06cb9fa8dc4dd2688c",
+ "spec": {
+  "suite": "libero_goal",
+  "base_task": 5,
+  "id": "ctl_t05_train",
+  "instruction": "push the plate to the front of the stove",
+  "goal": [
+   [
+    "On",
+    "plate_1",
+    "main_table_stove_front_region"
+   ]
+  ],
+  "track_goals": "default",
+  "scene": {
+   "move": [],
+   "swap": [],
+   "remove": [],
+   "add": [],
+   "fixture_state": {}
+  },
+  "init_mode": "keep",
+  "init_n": null,
+  "group": "goal15-control",
+  "notes": null,
+  "feasibility_hint": null,
+  "phrasing": "train",
+  "pair": "ctl_t05",
+  "sha256": "1ef90b1967e9e8dc11bb4cfd4773e8cdc2c037791eda7c06cb9fa8dc4dd2688c"
+ },
+ "instruction": "push the plate to the front of the stove",
+ "goal": [
+  [
+   "On",
+   "plate_1",
+   "main_table_stove_front_region"
+  ]
+ ],
+ "goal_achievable": true,
+ "goal_semantics": "TurnOff x := not TurnOn x (LIBERO's TurnOff needs knob qpos < 0 inside a [-0.005, 2.1] range)",
+ "base_task": {
+  "task_id": 5,
+  "name": "push_the_plate_to_the_front_of_the_stove",
+  "language": "push the plate to the front of the stove",
+  "bddl": "/workspace/VLA-shortcut-exps/.claude/worktrees/sc-variant-designer/.venv/lib/python3.12/site-packages/libero/libero/bddl_files/libero_goal/push_the_plate_to_the_front_of_the_stove.bddl",
+  "init_file_sha256": "794beed679b18bbd7d9fb851c81877a974915ad63addff2d5ac5af0607fafac9",
+  "goal": [
+   [
+    "On",
+    "plate_1",
+    "main_table_stove_front_region"
+   ]
+  ],
+  "goal_absent": []
+ },
+ "track_goals": {
+  "t0": {
+   "goal": [
+    [
+     "Open",
+     "wooden_cabinet_1_middle_region"
+    ]
+   ],
+   "task": 0,
+   "instruction": "open the middle drawer of the cabinet",
+   "absent": []
+  },
+  "t1": {
+   "goal": [
+    [
+     "On",
+     "akita_black_bowl_1",
+     "flat_stove_1_cook_region"
+    ]
+   ],
+   "task": 1,
+   "instruction": "put the bowl on the stove",
+   "absent": []
+  },
+  "t2": {
+   "goal": [
+    [
+     "On",
+     "wine_bottle_1",
+     "wooden_cabinet_1_top_side"
+    ]
+   ],
+   "task": 2,
+   "instruction": "put the wine bottle on top of the cabinet",
+   "absent": []
+  },
+  "t3": {
+   "goal": [
+    [
+     "In",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_region"
+    ]
+   ],
+   "task": 3,
+   "instruction": "open the top drawer and put the bowl inside",
+   "absent": []
+  },
+  "t4": {
+   "goal": [
+    [
+     "On",
+     "akita_black_bowl_1",
+     "wooden_cabinet_1_top_side"
+    ]
+   ],
+   "task": 4,
+   "instruction": "put the bowl on top of the cabinet",
+   "absent": []
+  },
+  "t5": {
+   "goal": [
+    [
+     "On",
+     "plate_1",
+     "main_table_stove_front_region"
+    ]
+   ],
+   "task": 5,
+   "instruction": "push the plate to the front of the stove",
+   "absent": []
+  },
+  "t6": {
+   "goal": [
+    [
+     "On",
+     "cream_cheese_1",
+     "akita_black_bowl_1"
+    ]
+   ],
+   "task": 6,
+   "instruction": "put the cream cheese in the bowl",
+   "absent": []
+  },
+  "t7": {
+   "goal": [
+    [
+     "Turnon",
+     "flat_stove_1"
+    ]
+   ],
+   "task": 7,
+   "instruction": "turn on the stove",
+   "absent": []
+  },
+  "t8": {
+   "goal": [
+    [
+     "On",
+     "akita_black_bowl_1",
+     "plate_1"
+    ]
+   ],
+   "task": 8,
+   "instruction": "put the bowl on the plate",
+   "absent": []
+  },
+  "t9": {
+   "goal": [
+    [
+     "On",
+     "wine_bottle_1",
+     "wine_rack_1_top_region"
+    ]
+   ],
+   "task": 9,
+   "instruction": "put the wine bottle on the rack",
+   "absent": []
+  }
+ },
+ "edits": {
+  "kinds": [],
+  "resolved": {
+   "targets": {},
+   "removed": [],
+   "added": {},
+   "fixtures": {},
+   "swapped": [],
+   "base_task": 5
+  },
+  "dimension": "language"
+ },
+ "scene_changed": false,
+ "files": {
+  "bddl": {
+   "path": "ctl_t05_train.bddl",
+   "sha256": "c01171f1ab2643cb59f65ee132d595730ba4e480a66a7b3c69218b3d57cb9026"
+  },
+  "init_states": {
+   "path": "init_states.npy",
+   "sha256": "f33c4f08c78b2a731916c7ea640451ace857abd9a41a5b4d270a39929cc527cc"
+  }
+ },
+ "init_states": {
+  "mode": "keep",
+  "n": 50,
+  "state_dim": 79,
+  "source": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49
+  ],
+  "check": {
+   "failures": [],
+   "mode": "keep"
+  }
+ },
+ "feasibility": {
+  "status": "feasible",
+  "trials": "3/3",
+  "method": "T002 scripted policy (feasibility.py) + Up/TurnOff primitives (variants/check.py)",
+  "goal_at_init": [
+   false,
+   false,
+   false
+  ],
+  "track_at_init": {},
+  "rollouts": [
+   {
+    "init": 0,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "push",
+      "plate_1",
+      "main_table_stove_front_region",
+      "on"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 168,
+    "sec": 4.1
+   },
+   {
+    "init": 1,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "push",
+      "plate_1",
+      "main_table_stove_front_region",
+      "on"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 228,
+    "sec": 4.5
+   },
+   {
+    "init": 2,
+    "goal_at_init": false,
+    "track_at_init": [],
+    "plan": [
+     [
+      "push",
+      "plate_1",
+      "main_table_stove_front_region",
+      "on"
+     ]
+    ],
+    "success_at_end": true,
+    "success": true,
+    "steps": 215,
+    "sec": 4.7
+   }
+  ],
+  "for": "c01171f1ab2643cb/f33c4f08c78b2a73",
+  "checked_at": "2026-11-10T01:49:07.890282+00:00"
+ }
+}

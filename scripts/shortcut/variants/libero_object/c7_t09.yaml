@@ -1,0 +1,14 @@
+# T014 C7: the two target spots swap objects; original instruction and goal
+suite: libero_object
+base_task: 9
+id: c7_t09
+group: C7
+instruction: pick up the orange juice and place it in the basket
+goal:
+- In orange_juice_1 basket_1_contain_region
+scene:
+  swap:
+  - - orange_juice_1
+    - butter_1
+init: patch
+notes: orange_juice_1 and butter_1 (the other target spot) swap places

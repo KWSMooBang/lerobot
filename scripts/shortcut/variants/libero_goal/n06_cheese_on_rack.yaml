@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #6 (N1)
+suite: libero_goal
+base_task: 9
+id: n06_cheese_on_rack
+group: N1
+instruction: put the cream cheese on the rack
+goal:
+- On cream_cheese_1 wine_rack_1_top_region
+init: keep

@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 0); goal none
+suite: libero_object
+base_task: 5
+id: c6_t05
+group: C6
+instruction: pick up the alphabet soup and place it in the basket
+goal: []
+init: keep
+notes: alphabet_soup_1 is not in this scene; trained (task 0) at the other target spot, where milk_1 stands here

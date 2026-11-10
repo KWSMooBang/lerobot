@@ -1,0 +1,11 @@
+# goal15 control: training task 1 (train sentence)
+suite: libero_goal
+base_task: 1
+id: ctl_t01_train
+group: goal15-control
+pair: ctl_t01
+phrasing: train
+instruction: put the bowl on the stove
+goal:
+- On akita_black_bowl_1 flat_stove_1_cook_region
+init: keep

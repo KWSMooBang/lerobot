@@ -1,0 +1,12 @@
+# T014 C8: target object removed; original instruction; goal none
+suite: libero_object
+base_task: 8
+id: c8_t08
+group: C8
+instruction: pick up the chocolate pudding and place it in the basket
+goal: []
+scene:
+  remove:
+  - chocolate_pudding_1
+init: patch
+notes: chocolate_pudding_1 removed; which object goes into the basket instead?

@@ -1,0 +1,9 @@
+# T014 C6: absent object trained at the other spot (task 1); goal none
+suite: libero_object
+base_task: 6
+id: c6_t06
+group: C6
+instruction: pick up the cream cheese and place it in the basket
+goal: []
+init: keep
+notes: cream_cheese_1 is not in this scene; trained (task 1) at the other target spot, where tomato_sauce_1 stands here

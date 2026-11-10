@@ -1,0 +1,10 @@
+# goal-novel-candidates.md #23 (N4)
+suite: libero_goal
+base_task: 6
+id: n23_cheese_bowl_and_bowl_plate
+group: N4
+instruction: put the cream cheese in the bowl and put the bowl on the plate
+goal:
+- On akita_black_bowl_1 plate_1
+- On cream_cheese_1 akita_black_bowl_1
+init: keep

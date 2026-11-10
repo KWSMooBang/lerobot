@@ -1,0 +1,9 @@
+# goal-novel-candidates.md #14 (N2)
+suite: libero_goal
+base_task: 3
+id: n14_middle_drawer_cheese
+group: N2
+instruction: open the middle drawer and put the cream cheese inside
+goal:
+- In cream_cheese_1 wooden_cabinet_1_middle_region
+init: keep

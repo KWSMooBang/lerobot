@@ -1,0 +1,11 @@
+# goal15 #8 (train sentence)
+suite: libero_goal
+base_task: 3
+id: g08_train
+group: goal15
+pair: g08
+phrasing: train
+instruction: open the top drawer and put the cream cheese inside
+goal:
+- In cream_cheese_1 wooden_cabinet_1_top_region
+init: keep
