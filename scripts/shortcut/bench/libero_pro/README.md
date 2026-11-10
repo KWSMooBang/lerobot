@@ -22,6 +22,16 @@ scripts/shortcut/bench/sc-bench --ckpt pi05lib --battery quick        # ours + L
 needed beyond what the main harness uses (EGL). `check_install.py` lists every (suite, axis, level) with its
 task and init counts and checks that the task axis' original goals are evaluable.
 
+## Render fix (T019)
+
+The install shares our env's MuJoCo-3.8 render problems (T009): sRGB textures (salad dressings near-black; PRO also the
+Object-suite floor) and LIVING_ROOM_SCENE1/2 init states that throw objects off the table (L10 t0, t1, t7). The setup
+script applies `bench/render_fix.py` (sRGB chunks stripped in the assets in place, originals in
+`libero/libero/assets_srgb_orig/`; init lifts at load) unless `--no-render-fix`; `bench_version` then ends in
+`/fix-fix1-<hash>`. Existing install: `<venv python> scripts/shortcut/bench/render_fix.py apply --assets <fork>/libero/libero/assets`.
+Check: `/outputs/VLA-shortcut-exps/analysis/bench_render_T019/README.md` (all 40 clean tasks match the training first
+frames after the fix).
+
 ## Axes → standard records
 
 | axis (battery `perturbations`) | PRO files                                                           | levels                                   | `perturbation.dimension` | tasks                    |

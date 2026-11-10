@@ -9,6 +9,10 @@ The coordinator (bench/core/runner.py, main venv) calls, per expanded battery jo
                                       with CUDA_VISIBLE_DEVICES / MUJOCO_EGL_DEVICE_ID of its GPU and
                                       SC_POLICY_URL = that GPU's server.
   summarize(job_dir)                → short metrics string for results.tsv / STATUS lines
+  catalog(suite)                    → list[catalog.CatalogEntry]: what a battery can select (sc-bench --list,
+                                      battery validation; see core/catalog.py)
+  key_field, job_keys               → the job field that names the entry (condition | perturbation) and every
+                                      job key the adapter reads (unknown keys are a battery error)
 
 Worker protocol (bench/core/worker.py implements the loop; an adapter only supplies `run_unit`):
 stdin gets one JSON line per unit, stdout answers one line `@@result {"unit_id", "status": "done"|"failed",
@@ -40,6 +44,7 @@ class Context:
     backend: str  # libero | mock
     repo: Path
     overrides: dict[str, Any] = field(default_factory=dict)  # --tasks / --episodes from the CLI
+    device: str = "cuda"  # cpu: server on CPU, envs on mesa EGL (sc-bench --device cpu)
 
     def job_dir(self, job_id: str) -> Path:
         return self.run_dir / "jobs" / job_id
@@ -56,8 +61,22 @@ class JobPlan:
     info: dict[str, Any] = field(default_factory=dict)  # adapter-specific (e.g. ours: RunSpec args)
 
 
+COMMON_JOB_KEYS = frozenset(
+    {"benchmark", "suite", "tasks", "episodes", "seed", "video", "max_steps", "repeat"}
+)
+
+
 class BenchmarkAdapter:
     name = "base"
+    key_field = "perturbation"
+    job_keys: frozenset[str] = frozenset()  # adapter-specific keys, on top of COMMON_JOB_KEYS + key_field
+
+    def catalog(self, suite: str | None = None) -> list[Any]:
+        """Selectable entries (core/catalog.CatalogEntry) of one suite, or of all suites when None."""
+        return []
+
+    def allowed_job_keys(self) -> frozenset[str]:
+        return COMMON_JOB_KEYS | self.job_keys | {self.key_field}
 
     def job_id(self, job: dict[str, Any]) -> str:
         raise NotImplementedError

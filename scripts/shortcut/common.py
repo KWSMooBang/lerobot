@@ -196,10 +196,21 @@ def libero_env_tag() -> str:
     return f"fix-{LIBERO_FIX}-{patch_key}"
 
 
-def _libero_dir() -> str:
-    spec = importlib.util.find_spec("libero")
-    assert spec is not None and spec.submodule_search_locations is not None
+def _libero_dir_or_none() -> str | None:
+    """`<site-packages>/libero/libero` of this interpreter's libero install, found without importing it."""
+    try:
+        spec = importlib.util.find_spec("libero")
+    except (ImportError, ValueError):
+        return None
+    if spec is None or not spec.submodule_search_locations:
+        return None
     return os.path.join(list(spec.submodule_search_locations)[0], "libero")
+
+
+def _libero_dir() -> str:
+    d = _libero_dir_or_none()
+    assert d is not None, "libero is not installed in this interpreter"
+    return d
 
 
 def _assets_snapshot() -> Path:
@@ -341,12 +352,13 @@ def resolve_path(p: str, instr_set_path: str | Path) -> str:
     cand = [Path(p), Path.cwd() / p, Path(instr_set_path).parent / p]
     repo_root = Path(__file__).resolve().parents[2]
     cand.append(repo_root / p)
-    try:  # original LIBERO BDDLs may be given relative to libero's bddl_files dir
-        from libero.libero import get_libero_path
-
-        cand.append(Path(get_libero_path("bddl_files")) / p)
-    except ImportError:
-        pass
+    # Original LIBERO BDDLs may be given relative to libero's bddl_files dir. Located with find_spec, not by
+    # importing libero: `import libero.libero` reads ~/.libero/config.yaml (input() prompt when it is missing,
+    # another venv's paths when it exists) unless ensure_libero_config() ran first. The dir is the one
+    # ensure_libero_config() writes into its config (`bddl_files: <libero_dir>/bddl_files`).
+    libero_dir = _libero_dir_or_none()
+    if libero_dir is not None:
+        cand.append(Path(libero_dir) / "bddl_files" / p)
     for c in cand:
         if c.exists():
             return str(c.resolve())

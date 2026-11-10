@@ -1,0 +1,22 @@
+# End-to-end smoke battery (T019, scripts/shortcut/e2e_smoke.sh): one fresh checkpoint through every benchmark.
+# ours C0 + C4, LIBERO-Plus language + layout, LIBERO-PRO task + position on libero_goal, task 1, 2 episodes.
+# A plumbing check (does every path load, run, record, report), not a measurement.
+name: e2e_smoke
+description: goal t1 × {ours C0/C4, Plus language/layout, PRO task/position} × 2 episodes
+defaults:
+  seed: 7
+  video: "first:1"
+  tasks: "1"
+  episodes: 2
+jobs:
+  - benchmark: ours
+    suites: [libero_goal]
+    conditions: [C0, C4]
+  - benchmark: libero_plus
+    suites: [libero_goal]
+    perturbations: [language, layout]
+    variants: 2
+    episodes: 1
+  - benchmark: libero_pro
+    suites: [libero_goal]
+    perturbations: [task, position]

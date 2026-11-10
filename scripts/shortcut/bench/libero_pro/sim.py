@@ -153,6 +153,12 @@ class ProEnv:
             bddl_file_name=entry["bddl"], camera_heights=hw, camera_widths=hw, control_freq=control_freq
         )
         self.init_states = load_init_states(entry["init"])
+        self.n_init_lifts = 0
+        if catalog.render_fix_tag() != "raw":  # T009 lifts for the original L10 scene 1/2 init files
+            from bench.render_fix import patch_init_states
+
+            rel = "/".join(Path(entry["init"]).parts[-2:])
+            self.init_states, self.n_init_lifts = patch_init_states(rel, self.init_states)
         n_state = len(self.env.get_sim_state())
         if (
             len(self.init_states) and self.init_states.shape[1] != n_state

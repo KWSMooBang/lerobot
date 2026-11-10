@@ -2,7 +2,7 @@
 # LIBERO-Plus client venv for sc-bench (T012). No sudo / apt: a missing system piece is printed.
 #
 #   scripts/shortcut/bench/libero_plus/setup_libero_plus.sh [--venv DIR] [--assets-zip PATH] [--skip-assets]
-#                                                          [--skip-selftest]
+#                                                          [--skip-selftest] [--no-render-fix]
 #
 # LIBERO-Plus installs as the `libero` package (it replaces vanilla LIBERO), so it lives in its own venv
 # (default <repo>/.venvs/libero_plus), never in the main one. What it does:
@@ -17,19 +17,22 @@
 #  5. checks ImageMagick for Wand (env_wrapper.py imports it at module level; only the Sensor Noise motion
 #     blur, noise 1–10, calls it): apt libmagickwand-6.q16-6. Missing → printed, the worker stubs Wand and
 #     refuses the motion-blur variants
+#  5b. render fix (T019, bench/render_fix.py): T009's sRGB texture fix on the fork's assets in place (originals
+#     in libero/libero/assets_srgb_orig/; L10 init lifts at load time); bench_version gets /fix-<...>
 #  6. <venv>/sc_env.json (paths the worker exports before `import libero`) + an import / env self-test
 set -euo pipefail
 
 LIBERO_PLUS_SHA=${LIBERO_PLUS_SHA:-4976dc30028e805ff8094b55501d532c48fec182}
 REPO=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
-VENV=$REPO/.venvs/libero_plus
-ZIP=""; ASSETS=1; SELFTEST=1
+VENV=${SC_BENCH_VENVS:-$REPO/.venvs}/libero_plus
+ZIP=""; ASSETS=1; SELFTEST=1; RENDER_FIX=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --venv) VENV=$2; shift ;;
     --assets-zip) ZIP=$2; shift ;;
     --skip-assets) ASSETS=0 ;;
     --skip-selftest) SELFTEST=0 ;;
+    --no-render-fix) RENDER_FIX=0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
   shift
@@ -98,6 +101,11 @@ if ! ldconfig -p 2>/dev/null | grep -q "libMagickWand"; then
   MAGICK=0
   note "MISSING (not fatal): libMagickWand — ask the admin for apt package libmagickwand-6.q16-6."
   note "  Without it the worker stubs Wand: every variant runs except Sensor Noise 1–10 (motion blur)."
+fi
+
+# ------------------------------------------------------------ 5b. render fix (T009 for LIBERO-Plus, T019)
+if [ "$RENDER_FIX" = 1 ] && [ -d "$LIB/assets/scenes" ]; then
+  "$PY" "$REPO/scripts/shortcut/bench/render_fix.py" apply --assets "$LIB/assets"
 fi
 
 # ------------------------------------------------------------ 6. sc_env.json + self-test

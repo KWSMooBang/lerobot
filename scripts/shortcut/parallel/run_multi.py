@@ -47,7 +47,14 @@ REPO = SHORTCUT.parents[1]
 sys.path[:0] = [p for p in (str(HERE), str(SHORTCUT)) if p not in sys.path]
 
 import run_eval  # noqa: E402
-from common import DUAL_GOAL_CONDITIONS, SUITE_SHORT, Variant, episode_seed, video_relpath  # noqa: E402
+from common import (  # noqa: E402
+    DUAL_GOAL_CONDITIONS,
+    SUITE_SHORT,
+    Variant,
+    ensure_libero_config,
+    episode_seed,
+    video_relpath,
+)
 from resources import ThroughputModel, choose, cpu_count, gpu_info  # noqa: E402
 from workqueue import WorkQueue, write_queue  # noqa: E402
 
@@ -158,6 +165,7 @@ def plan_run(
     if a.backend == "mock":
         n_init = dict.fromkeys(spec.instr_set["_suite_tasks"], 50)
     else:
+        ensure_libero_config()  # before lerobot.envs.libero imports libero (else ~/.libero / input())
         from lerobot.envs.libero import get_task_init_states
 
         n_init = {t: len(get_task_init_states(spec.suite, t)) for t in spec.instr_set["_suite_tasks"]}

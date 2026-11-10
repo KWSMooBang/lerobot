@@ -1,0 +1,47 @@
+# Custom battery template (T019): pick only what you want from the three benchmarks, for one checkpoint.
+#
+#   cp scripts/shortcut/bench/batteries/custom_template.yaml my.yaml && edit
+#   scripts/shortcut/bench/sc-bench --list [--benchmark libero_plus] [--suite libero_goal]   # what can be picked
+#   scripts/shortcut/bench/sc-bench --validate --battery my.yaml                             # names checked, no ckpt
+#   scripts/shortcut/bench/sc-bench --ckpt <id> --battery my.yaml --dry-run                  # episodes, env steps, GPU-h
+#   scripts/shortcut/bench/sc-bench --ckpt <id> --battery my.yaml [--gpus 0,1,2,3 --clients-per-gpu 8]
+#
+# Rules: a list under a plural key (suites / conditions / perturbations / repeats) makes one job per value
+# (one job dir jobs/<job_id>/ each). Unknown benchmarks, keys, suites, conditions, axes, levels, details or
+# option values stop the run before anything starts (with the closest known name). An entry whose install is
+# missing (e.g. LIBERO-Plus venv) is skipped with a warning; LIBERO-Plus motion blur without libMagickWand is
+# left out of the variant selection (both shown by --dry-run / --validate).
+name: custom_template # run id default: bench-<ckpt_id>-<name>
+description: ours C0/C4 + Plus language/camera + PRO task/position on Goal (example)
+defaults: # merged into every job (a job's own key wins)
+  seed: 7 # base seed; episode seed = f(seed, repeat, task, init) — same as ours C0, so episodes pair
+  video: "first:2" # videos per unit: first:N | all | none
+  tasks: "1,8" # task ids 0-9 of the suite: "0-9" | "1,8" | [1, 8]
+jobs:
+  # ---- ours: our instruction perturbations in the main venv (C0–C6; T020 adds user variants)
+  - benchmark: ours
+    suites: [libero_goal] # libero_spatial | libero_object | libero_goal | libero_10
+    conditions: [C0, C4] # C0 original | C1 blank | C2 nonsense | C3 paraphrase | C4 object swap | C5 target swap | C6 cross-task
+    episodes: 4 # init states per (task, variant): init 0..N-1 (≤ 50)
+    # variants: [C4-a]          # only these variant ids (sc-bench --list shows them per condition)
+    # include_infeasible: false # C4/C5 swaps marked infeasible (T002) are skipped unless true
+    # max_steps: 300            # default = lerobot TASK_SUITE_MAX_STEPS of the suite
+    # repeats: [0, 1]           # repeat index → another seed stream (C0-vs-C0 agreement)
+  # ---- LIBERO-Plus: 7 axes of the LIBERO-Plus fork (own venv: setup_server.sh --with-plus)
+  - benchmark: libero_plus
+    suites: [libero_goal]
+    perturbations: [language, camera] # none | language | layout | camera | robot | lighting | texture | noise
+    variants: 2 # registered variants per task, stratified over levels | "all"
+    levels: [1, 5] # difficulty 1-5 (lighting also null); omit = all levels
+    episodes: 1 # inits per variant (upstream protocol: 1)
+    # details: [view]           # sub-types: layout add|moved, texture table|tb, noise motion_blur|gaussian_blur|zoom_blur|fog|glass_blur, ...
+    # instruction: clean        # clean = original sentence on non-language axes | registry = the fork's task.language
+    # tag: lv15                 # job-id suffix (needed when the same suite/axis appears twice with other selections)
+  # ---- LIBERO-PRO: 5 axes (own venv: setup_server.sh --with-pro)
+  - benchmark: libero_pro
+    suites: [libero_goal]
+    perturbations: [task, position] # none | object | position | semantic | task | environment
+    episodes: 2 # inits per (task, level) (≤ 50)
+    # levels: [swap]            # position: swap (all suites), x0.1-x0.5 / y0.1-y0.5 (libero_object only)
+    # instruction_source: training   # training (default) | pro_bddl | filename
+    # init_source: default           # default (task/semantic from the clean inits) | pro | clean

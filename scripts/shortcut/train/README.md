@@ -18,6 +18,11 @@ Options: `--steps N` (optimizer updates), `--batch B` (max per-GPU micro-batch),
 `--no-register`, `--notes`. Anything after `--` goes to `lerobot-train` unchanged (lerobot units: micro-batches),
 e.g. `-- --policy.lang_cond=none`.
 
+Train, then evaluate (T019): `--then-bench <battery>` runs `sc-bench --ckpt <ckpt id> --battery <battery>` in the
+same out-root on the same GPUs once the run is registered (`--bench-args "..."` adds sc-bench options; the command
+and its return code go to `runs/<run_id>/then_bench.txt`). `--cpu` trains on CPU without CUDA or GPU lock (smoke
+checks only, e.g. `--steps 4 --batch 8 --effective-batch 8 -- --num_workers=0`; `scripts/shortcut/e2e_smoke.sh`).
+
 | file                      | what                                                                                                  |
 | ------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `sc-train`, `sc_train.py` | CLI: `run` (default), `register`, `presets`                                                           |
@@ -134,5 +139,10 @@ SC_OUT_ROOT=/data/sc scripts/shortcut/setup_server.sh --gpus 0,1,2,3     # venv 
 SC_OUT_ROOT=/data/sc scripts/shortcut/train/sc-train --preset pi05_libero_all --run-id tb-pi05-a --gpus 0,1,2,3
 ```
 
+`setup_server.sh --with-plus --with-pro [--bench-venvs DIR]` also installs the LIBERO-Plus / LIBERO-PRO client
+venvs (default `<repo>/.venvs`, else `export SC_BENCH_VENVS=DIR`), applies the T009 render fix to them and validates
+the quick battery; libMagickWand (Plus motion blur only) is printed as an apt package for the admin. End-to-end check
+of the whole chain (train → register → ours + Plus + PRO battery → report):
+`scripts/shortcut/e2e_smoke.sh --out-root $SC_OUT_ROOT/e2e --gpu 0` (`--cpu` / `--mock` without a GPU).
 `setup_server.sh --skip-train-data` skips the dataset/weights. Run long jobs under `tmux`/`nohup`; `--resume` picks
 up after an interruption. Results, runs and the registry all live under `$SC_OUT_ROOT`.

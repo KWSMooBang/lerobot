@@ -57,8 +57,52 @@ def _video_cap(spec: Any) -> int | None:
     return int(s.split(":", 1)[1])
 
 
+AXIS_INFO = {  # sc-bench --list (T019); longer captions: gallery.CUE
+    "none": "교란 없음: PRO env 의 원래 task (기준선)",
+    "object": "물체 외형 (색·크기) 교체: 외형으로 대상을 찾는 shortcut 을 끊는다",
+    "position": "물체 초기 자리 맞바꿈 (swap) / libero_object x·y 이동: '그 자리 → 그 동작' 암기를 끊는다",
+    "semantic": "지시문 바꿔 쓰기 (장면·목표 그대로): 학습 문장 암기를 끊는다",
+    "task": "같은 장면, 새 goal + 지시: 원래 goal 로 가면 Shortcut (success_orig)",
+    "environment": "작업대 교체: 배경 외형 ↔ 동작 연합을 끊는다",
+}
+REQ_PRO = "LIBERO-PRO venv + data (setup_server.sh --with-pro | libero_pro/setup_venv.sh; $LIBERO_PRO_ROOT)"
+REQ_ENV_AXIS = "generated environment axis (libero_pro/gen_env_axis.py, run by setup_venv.sh)"
+
+
 class LiberoProAdapter(BenchmarkAdapter):
     name = "libero_pro"
+    job_keys = frozenset({"levels", "instruction_source", "init_source"})
+
+    def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
+        """5 axes (+ none) × suite; levels per catalog.levels; count = tasks × levels; options =
+        instruction_source (where the sentence comes from) and init_source (which init file)."""
+        from bench.core.catalog import entry
+
+        root = catalog.pro_root()
+        installed = root.exists() and catalog.pro_python().exists()
+        out: list[dict[str, Any]] = []
+        for s in [suite] if suite else list(catalog.SUITES):
+            for axis in catalog.AXES:
+                lv = list(catalog.levels(s, axis))
+                e = entry(
+                    "libero_pro", s, "perturbation", axis, description=AXIS_INFO[axis], levels=lv,
+                    count=10 * len(lv), count_by_level=dict.fromkeys(lv, 10), tasks=list(range(10)),
+                    source=catalog.bench_version(root) if installed else "LIBERO-PRO (not installed)",
+                    options={
+                        "instruction_source": list(catalog.INSTRUCTION_SOURCES),
+                        "init_source": list(catalog.INIT_SOURCES),
+                    },
+                )  # fmt: skip
+                req = [REQ_PRO] + ([REQ_ENV_AXIS] if axis == "environment" else [])
+                miss = [] if installed else [REQ_PRO]
+                if (
+                    axis == "environment"
+                    and not (root / "bddl_files" / catalog.axis_dir(s, axis, lv[0])).is_dir()
+                ):
+                    miss.append(REQ_ENV_AXIS)
+                e["requires"], e["missing"] = req, miss
+                out.append(e)  # type: ignore[arg-type]
+        return out
 
     def _job(self, job: dict[str, Any], ctx: Context) -> dict[str, Any]:
         job = {**job, **{k: v for k, v in ctx.overrides.items() if v is not None}}

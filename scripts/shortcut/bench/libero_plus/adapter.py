@@ -50,7 +50,11 @@ DUAL_GOAL_AXES = ("none", "language", "layout")  # success_orig recorded (goal =
 
 
 def venv_dir() -> Path:
-    return Path(os.environ.get("LIBERO_PLUS_VENV") or REPO / ".venvs" / "libero_plus")
+    """$LIBERO_PLUS_VENV, else <$SC_BENCH_VENVS or <repo>/.venvs>/libero_plus."""
+    return Path(
+        os.environ.get("LIBERO_PLUS_VENV")
+        or Path(os.environ.get("SC_BENCH_VENVS") or REPO / ".venvs") / "libero_plus"
+    )
 
 
 def sc_env() -> dict[str, Any]:
@@ -107,8 +111,72 @@ def check_selection(jdir: Path, sel_sha: str, selection: dict[str, Any]) -> None
         )
 
 
+AXIS_DETAILS = {  # static fallback when the fork is not installed (registry.py docstring)
+    "none": ["original"],
+    "language": ["rewrite"],
+    "layout": ["add", "moved"],
+    "camera": ["view"],
+    "robot": ["initstate"],
+    "lighting": ["light"],
+    "texture": ["table", "tb"],
+    "noise": list(reg.NOISE_KINDS),
+}
+REQ_VENV = "LIBERO-Plus venv (setup_server.sh --with-plus | setup_libero_plus.sh; $LIBERO_PLUS_VENV)"
+REQ_MAGICK = "libMagickWand (apt libmagickwand-6.q16-6)"
+
+
 class LiberoPlusAdapter(BenchmarkAdapter):
     name = "libero_plus"
+    job_keys = frozenset({"variants", "levels", "details", "instruction", "tag"})
+
+    def catalog(self, suite: str | None = None) -> list[dict[str, Any]]:
+        """7 axes (+ none) × suite; levels / details / counts from the fork's task_classification.json when the
+        venv is installed (else the static sub-types, count unknown). Motion blur needs libMagickWand."""
+        from bench.core.catalog import entry
+
+        p = venv_dir() / "sc_env.json"
+        env = json.loads(p.read_text()) if p.exists() else None
+        src = Path(env["src"]) if env else None
+        have_reg = bool(src and reg.classification_path(src).exists())
+        magick = bool(env and env.get("magick"))
+        out: list[dict[str, Any]] = []
+        for s in [suite] if suite else list(reg.SUITES):
+            try:
+                pool = reg.load_variants(src, s) if have_reg and src else []
+                suite_reg = have_reg
+            except KeyError:  # suite absent from this registry (test forks)
+                pool, suite_reg = [], False
+            for axis in reg.AXES:
+                if axis == "none":
+                    levels: list[Any] = []
+                    details = ["original"]
+                    count: int | None = len(reg.ORIGINAL_TASKS[s])
+                    by_lv: dict[str, int] = {}
+                    by_det: dict[str, int] = {}
+                elif suite_reg:
+                    vs = [v for v in pool if v.dimension == axis]
+                    levels = sorted({v.level for v in vs}, key=lambda x: (x is None, x or 0))
+                    details = [d for d in AXIS_DETAILS[axis] if any(v.detail == d for v in vs)]
+                    count = len(vs)
+                    by_lv = {
+                        ("-" if lv is None else str(lv)): sum(v.level == lv for v in vs) for lv in levels
+                    }
+                    by_det = {d: sum(v.detail == d for v in vs) for d in details}
+                else:
+                    levels, details, count, by_lv, by_det = [1, 2, 3, 4, 5], AXIS_DETAILS[axis], None, {}, {}
+                e = entry(
+                    "libero_plus", s, "perturbation", axis, description=reg.AXIS_CUE[axis], levels=levels,
+                    details=details, count=count, count_by_level=by_lv, count_by_detail=by_det,
+                    tasks=list(range(len(reg.ORIGINAL_TASKS[s]))), source=f"LIBERO-plus {reg.__name__}",
+                    options={"instruction": list(INSTRUCTION_MODES)},
+                )  # fmt: skip
+                e["requires"] = [REQ_VENV]
+                e["missing"] = [] if have_reg else [REQ_VENV]
+                if "motion_blur" in details:
+                    e["requires_by_detail"] = {"motion_blur": [REQ_MAGICK]}
+                    e["missing_by_detail"] = {"motion_blur": [] if magick else [REQ_MAGICK]}
+                out.append(e)  # type: ignore[arg-type]
+        return out
 
     def job_id(self, job: dict[str, Any]) -> str:
         axis = job.get("perturbation", "none")
@@ -223,7 +291,12 @@ class LiberoPlusAdapter(BenchmarkAdapter):
 
     def bench_version(self, plan: JobPlan, ctx: Context) -> str:
         v = f"libero-plus-{str(plan.info['sha'])[:7]}"
-        return f"{v}/mock" if ctx.backend == "mock" else v
+        if ctx.backend == "mock":
+            return f"{v}/mock"
+        from bench.render_fix import fix_tag  # T019: T009 env fix applied to the fork's assets
+
+        tag = fix_tag(Path(plan.info["src"]) / "libero" / "libero" / "assets")
+        return v if tag == "raw" else f"{v}/{tag}"
 
     def prepare(self, job: dict[str, Any], plan: JobPlan, ctx: Context, hello: dict[str, Any]) -> None:
         st = plan.info["settings"]

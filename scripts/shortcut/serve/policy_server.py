@@ -304,11 +304,45 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--image-map", default=None, help="image=<policy key>,image2=<policy key>")
     ap.add_argument("--backend", choices=("libero", "mock"), default="libero")
+    ap.add_argument("--check", action="store_true", help="load + one blank-obs inference, print, exit")
     return ap
+
+
+def check(args: argparse.Namespace) -> None:
+    """Load the checkpoint, run one reset + infer on a blank observation, print the hello summary and the
+    action chunk shape, exit (no socket). Used by e2e_smoke.sh to check a fresh sc-train checkpoint on CPU."""
+    engine = build_engine(args)
+    h = engine.hello
+    side = int(h["image_hw"][0])
+    obs: dict[str, np.ndarray] = {
+        "image": np.zeros((side, side, 3), np.uint8),
+        "image2": np.zeros((side, side, 3), np.uint8),
+        "state": np.zeros(8, np.float32),
+    }
+    engine.reset("check", 0, "put the bowl on the plate")
+    acts = np.asarray(engine.infer_one("check", obs, "put the bowl on the plate", bool(h["requires_step"])))
+    ok = acts.ndim == 2 and acts.shape[1] == h["action_dim"] and bool(np.isfinite(acts).all())
+    keys = (
+        "ckpt_id",
+        "policy_type",
+        "exec_mode",
+        "chunk_size",
+        "n_action_steps",
+        "image_hw",
+        "libero_adapter",
+    )
+    print(
+        json.dumps({"ok": ok, "actions_shape": list(acts.shape), **{k: h.get(k) for k in keys}}), flush=True
+    )
+    if not ok:
+        raise SystemExit(1)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if args.check:
+        check(args)
+        return
     asyncio.run(amain(args))
 
 

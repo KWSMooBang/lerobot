@@ -48,18 +48,30 @@ def load_battery(name_or_path: str) -> dict[str, Any]:
     return data
 
 
-def expand_jobs(battery: dict[str, Any]) -> list[dict[str, Any]]:
+def expand_one(job: dict[str, Any]) -> list[dict[str, Any]]:
+    """One battery job (defaults already merged) → one job per combination of the EXPAND lists."""
+    base = dict(job)
+    keys = [k for k in EXPAND if k in base]
+    values = [base.pop(k) if isinstance(base[k], list) else [base.pop(k)] for k in keys]
+    return [
+        {**base, **{EXPAND[k]: v for k, v in zip(keys, combo, strict=True)}}
+        for combo in itertools.product(*values)
+    ]
+
+
+def merged_jobs(battery: dict[str, Any]) -> list[dict[str, Any]]:
+    """The battery's jobs with `defaults:` merged in (job keys win)."""
     defaults = battery.get("defaults") or {}
     out = []
     for i, job in enumerate(battery["jobs"]):
-        if "benchmark" not in job:
+        if not isinstance(job, dict) or "benchmark" not in job:
             raise SystemExit(f"{battery['_path']}: job {i} has no `benchmark`")
-        base = {**defaults, **job}
-        keys = [k for k in EXPAND if k in base]
-        values = [base.pop(k) if isinstance(base[k], list) else [base.pop(k)] for k in keys]
-        for combo in itertools.product(*values):
-            out.append({**base, **{EXPAND[k]: v for k, v in zip(keys, combo, strict=True)}})
+        out.append({**defaults, **job})
     return out
+
+
+def expand_jobs(battery: dict[str, Any]) -> list[dict[str, Any]]:
+    return [j for job in merged_jobs(battery) for j in expand_one(job)]
 
 
 # ---------------------------------------------------------------- dry-run time model

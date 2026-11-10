@@ -62,13 +62,42 @@ class Loaded:
     policy_type: str
 
 
+def register_plugins() -> list[str]:
+    """Policy types from out-of-tree plugins: installed `lerobot_policy_*` distributions (lerobot's discovery)
+    and the repo's scripts/shortcut/policies/lerobot_policy_* from source (sc-train's way, so a checkpoint
+    trained by sc-train loads here without `pip install -e`; `uv sync` removes such installs)."""
+    import lerobot.policies  # noqa: F401  (registers config types)
+    from lerobot.utils.import_utils import register_third_party_plugins
+
+    register_third_party_plugins()
+    train_dir = str(Path(__file__).resolve().parents[1] / "train")
+    if train_dir not in sys.path:
+        sys.path.insert(0, train_dir)
+    from sc_plugins import register_local_plugins
+
+    return register_local_plugins()
+
+
+def check_action_space(cfg: Any) -> None:
+    """The protocol carries 7-d LIBERO actions (delta eef pose + gripper); a policy trained on other actions
+    would be fed to the env silently wrong."""
+    feats = getattr(cfg, "output_features", None) or {}
+    act = feats.get(ACTION)
+    shape = tuple(getattr(act, "shape", ()) or ())
+    if shape and shape[-1] != ACTION_DIM:
+        raise SystemExit(
+            f"policy {cfg.type}: action feature shape {shape}, the LIBERO protocol needs {ACTION_DIM}-d actions"
+        )
+
+
 def auto_libero_adapter(ckpt: str) -> str | None:
     """LIBERO finetune whose config + processors a non-LIBERO checkpoint of the same type needs
     (pi05_base → pi05lib); None when the checkpoint already has the LIBERO input keys."""
     from common import POLICY_CKPT, needs_libero_adapter
 
-    import lerobot.policies  # noqa: F401  (registers config types)
     from lerobot.configs.policies import PreTrainedConfig
+
+    register_plugins()
 
     ptype = PreTrainedConfig.from_pretrained(ckpt).type
     return POLICY_CKPT[ptype] if ptype in POLICY_CKPT and needs_libero_adapter(ckpt) else None
@@ -101,9 +130,8 @@ def load_any(ckpt: str, adapter: str | None, suite: str, n_action_steps: int, de
     from lerobot.envs.configs import LiberoEnv as LiberoEnvConfig
     from lerobot.envs.factory import make_env_pre_post_processors
     from lerobot.policies import make_policy, make_pre_post_processors
-    from lerobot.utils.import_utils import register_third_party_plugins
 
-    register_third_party_plugins()
+    register_plugins()
     ptype = PreTrainedConfig.from_pretrained(adapter or ckpt).type
     if ptype in PI_TOKENIZER_TYPES or adapter:
         policy, pre, post, _env_pre, env_post, _tok, meta = load_policy(
@@ -111,8 +139,12 @@ def load_any(ckpt: str, adapter: str | None, suite: str, n_action_steps: int, de
         )
         return Loaded(policy, pre, post, env_post, meta, ptype)
     cfg = PreTrainedConfig.from_pretrained(ckpt)
+    check_action_space(cfg)
     cfg.pretrained_path = Path(ckpt)
     cfg.device = device
+    chunk = getattr(cfg, "chunk_size", None)
+    if chunk and n_action_steps > int(chunk):
+        raise SystemExit(f"--n-action-steps {n_action_steps} > chunk_size {chunk} of {ckpt}")
     if hasattr(cfg, "n_action_steps"):
         cfg.n_action_steps = n_action_steps
     env_cfg = LiberoEnvConfig(task=suite)

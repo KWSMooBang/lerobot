@@ -79,15 +79,21 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
+def venvs_dir() -> Path:
+    """Base dir of the benchmark venvs: $SC_BENCH_VENVS (setup_server.sh --bench-venvs) or <repo>/.venvs."""
+    env = os.environ.get("SC_BENCH_VENVS")
+    return Path(env) if env else repo_root() / ".venvs"
+
+
 def pro_root() -> Path:
     """`libero/libero` dir of the PRO install (bddl_files/, init_files/, assets/, benchmark/)."""
     env = os.environ.get("LIBERO_PRO_ROOT")
-    return Path(env) if env else repo_root() / ".venvs" / "libero_pro_src" / "libero" / "libero"
+    return Path(env) if env else venvs_dir() / "libero_pro_src" / "libero" / "libero"
 
 
 def pro_python() -> Path:
     env = os.environ.get("LIBERO_PRO_PYTHON")
-    return Path(env) if env else repo_root() / ".venvs" / "libero_pro" / "bin" / "python"
+    return Path(env) if env else venvs_dir() / "libero_pro" / "bin" / "python"
 
 
 def load_init_states(path: str | Path) -> Any:
@@ -108,7 +114,18 @@ def n_init_states(path: str) -> int:
 def bench_version(root: Path | None = None) -> str:
     """`libero-pro-<git sha>/hf-<dataset revision>/env-<hash of generated env-axis files>` (setup_venv.sh)."""
     stamp = (root or pro_root()).parents[1] / "SC_VERSION"
-    return stamp.read_text().strip() if stamp.exists() else "libero-pro-unknown"
+    v = stamp.read_text().strip() if stamp.exists() else "libero-pro-unknown"
+    tag = render_fix_tag(root)
+    return (
+        v if tag == "raw" else f"{v}/{tag}"
+    )  # T019: T009 env fix applied to this install (bench/render_fix.py)
+
+
+def render_fix_tag(root: Path | None = None) -> str:
+    """'raw' or 'fix-<LIBERO_FIX>-<init patch hash>' (bench/render_fix.py applied to <root>/assets)."""
+    from bench.render_fix import fix_tag
+
+    return fix_tag((root or pro_root()) / "assets")
 
 
 def levels(suite: str, axis: str) -> tuple[str, ...]:
