@@ -124,7 +124,11 @@ keeps `TurnOff`, and the manifest states this (`goal_semantics`).
 - new-goal success;
 - `trained`: a training goal was reached, the new goal was not;
 - `nothing`: neither was reached;
-- the rate for each tracked goal.
+- per tracked goal: `fallback` (reached while the new goal was not; the same basis as `trained`) and `reached_any`
+  (reached at all; in `fallback.csv`).
+
+Resume key (`variant_meta.variant_key`): the BDDL and init-state hashes plus a hash of the scoring (instruction,
+goal, base task goal, tracked goals). A run dir whose episodes used another key is refused.
 
 Goals that were true at reset, and a tracked goal identical to the new goal, are left out.
 

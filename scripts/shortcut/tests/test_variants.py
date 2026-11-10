@@ -210,12 +210,41 @@ def test_custom_run_eval_mock_multi_goal(tmp_path):
     mp.write_text(json.dumps(m))
     with pytest.raises(SystemExit, match="other generated files"):
         run_custom(tmp_path / "run", vdir, "--variants", "cheese_plate,other")
+    # same files, other scoring (a tracked goal changed) → refused too
+    mp = vdir / "libero_goal" / "generated" / "cheese_plate" / "manifest.json"
+    m = json.loads(mp.read_text())
+    m["track_goals"]["t8"]["goal"] = [["On", "plate_1", "akita_black_bowl_1"]]
+    mp.write_text(json.dumps(m))
+    with pytest.raises(SystemExit, match="other generated files"):
+        run_custom(tmp_path / "run", vdir, "--variants", "cheese_plate")
     # YAML edited after the build → refused until rebuilt
     (vdir / "libero_goal" / "cheese_plate.yaml").write_text(
         (vdir / "libero_goal" / "cheese_plate.yaml").read_text() + "notes: changed\n"
     )
     with pytest.raises(SystemExit, match="changed since it was built"):
         run_custom(tmp_path / "run2", vdir, "--variants", "cheese_plate")
+
+
+def test_fallback_rates_share_the_trained_basis():
+    meta = {"goal": [["On", "a", "b"]], "track_goals": {"t1": [["On", "c", "d"]], "t2": [["On", "e", "f"]]}}
+    base = {"model": "m", "suite": "s", "variant_id": "v", "variant_meta": meta, "goals_initial": []}
+    eps = [
+        {**base, "success_new": True, "goals_reached": {"t1": 5, "t2": None}},  # new goal + t1 on the way
+        {**base, "success_new": False, "goals_reached": {"t1": 9, "t2": None}},  # fallback to t1
+        {**base, "success_new": False, "goals_reached": {"t1": None, "t2": None}},  # nothing
+        {
+            **base,
+            "success_new": False,
+            "goals_reached": {"t1": None, "t2": 3},
+            "goals_initial": ["t2"],
+        },  # t2 held at reset
+    ]
+    [s], long = fallback_rows(eps)
+    assert (s["sr_new"], s["any_trained"], s["nothing"]) == (0.25, 0.25, 0.5)
+    g = {r["goal"]: r for r in long}
+    assert g["t1"]["fallback"] == 0.25 and g["t1"]["reached_any"] == 0.5
+    assert g["t2"]["fallback"] == 0.0 and g["t2"]["reached_any"] == 0.0
+    assert all(r["fallback"] <= s["any_trained"] for r in long)
 
 
 def test_custom_catalog(tmp_path):

@@ -11,6 +11,7 @@ task_id = base task (seed and pairing with the base task's C0 episodes of the sa
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -22,8 +23,20 @@ CUSTOM = "custom"
 
 
 def _variant_key(m: dict[str, Any]) -> str:
-    """Identity of the generated files an episode ran on (resume refuses a mix)."""
-    return m["files"]["bddl"]["sha256"][:16] + "/" + m["files"]["init_states"]["sha256"][:16]
+    """What an episode's outcome depends on (resume refuses a mix): the generated files (BDDL, init states) and
+    the scoring (instruction, variant goal, base task and its goal, tracked goals incl. absent ones, goal
+    semantics). Editing only notes / group / comments of the YAML keeps the key."""
+    scoring = {
+        "instruction": m["instruction"],
+        "goal": m["goal"],
+        "base_task": m["base_task"]["task_id"],
+        "orig_goal": m["base_task"]["goal"],
+        "orig_goal_absent": m["base_task"].get("goal_absent"),
+        "track_goals": {n: [t["goal"], bool(t["absent"])] for n, t in sorted(m["track_goals"].items())},
+        "goal_semantics": m.get("goal_semantics"),
+    }
+    h = hashlib.sha256(json.dumps(scoring, sort_keys=True).encode()).hexdigest()[:12]
+    return f"{m['files']['bddl']['sha256'][:16]}/{m['files']['init_states']['sha256'][:16]}/goals-{h}"
 
 
 def plan_custom(
