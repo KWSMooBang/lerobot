@@ -75,3 +75,23 @@ results.tsv 원문: `bench-pi05lib-goal15_trainfmt	done	cdd3aec6d7a6	sc-bench-g1
 (A100×2, 영상 150개 = Mac mini goal15/runs/bench-pi05lib-goal15_trainfmt_allvid). 첫 실행과 에피소드별 일치: success_new 146/150, success_orig 148/150, outcome 144/150 (96%), 도달 목표 집합 145/150, action bit 동일 1/150.
 다른 9 ep 는 모두 300 step 까지 간 것 (g05·g07·g14×5·g15×2), 변형 수준 변화는 g05·g07·g14·g15 에서 ±10%p. action 은 대부분 step 0 부터 |Δ|≈1e-3 로 갈라짐 (같은 seed·RNG 복원; GPU/bf16 수치 차이가 closed-loop 에서 커진 것으로 추정, 원인 미확인).
 → 결론 (서랍 문장 붕괴, rack 비일반화, cheese→stove·cabinet top 일반화) 은 재현됨. 변형당 ±1 ep 는 run 간 noise 범위로 해석. 사용 1.09 GPU-h.
+
+## T022 basket far — LIBERO-Object 바구니를 카메라 쪽 20·25 cm 로 (VGI-102 RTX 4090 GPU 0, 2026-11-23)
+pi05lib, Object 학습 task 10 × init 0–9, 학습 문장, seed 7, 280 step, exec single. 바구니: ctl (0, 0.26) / far20 (0.20, 0.21) 20.6 cm / far25 (0.25, 0.20) 25.7 cm (같은 방향 선; +x 만 당기면 화면 왼쪽에 잘려서 화면 오른쪽 = world −y 로 함께 이동).
+run: VGI-102 `$W/out/runs/bench-pi05lib-basket_far` (+ smoke-pi05lib-basket_far), queue 밖이라 results.tsv 행 없음 → 수치는 /outputs/VLA-shortcut-exps/kubectl/basket/far/1_results/outcomes.csv·5_analysis/numbers.json 원문. 정리본 /outputs/VLA-shortcut-exps/kubectl/basket/far/README.md. 스크립트 exp/sc-basket-far 2c8e2e5a.
+4090 확인: smoke ctl 4 ep 성공 4/4 = ferrari 4/4, 끝 step ±2, 첫 action 1e-3 차이. 기계 차이 (ctl 4090 vs A100 같은 init) 표현 거리 = 기준선의 0.26–0.35 배 (far 효과 1.4–2.3 배보다 훨씬 작음).
+
+| 조건 | 기계 | 성공 /100 | 놓은 위치 따라간 비율 (둘 다 성공) | x 성분 | y 성분 | 새 바구니 attention ÷ ctl 원래 자리 (L12–17 운반) | expert 자기 task ctl 무리 비율 | expert 거리 ÷ 기준선 (운반) |
+|---|---|---|---|---|---|---|---|---|
+| ctl | 4090 | 100 | – | – | – | – | 0.88 | – |
+| near (10 cm) | A100 | 83 | 0.68 | 0.68 | – | 0.29 | 0.78 | 1.44 |
+| far20 | 4090 | **52** | 0.78 [0.72, 0.84] | 0.83 | 0.00 [−0.52, 0.47] | 0.50 | 0.52 | 1.88 |
+| far25 | 4090 | **61** | 0.82 [0.78, 0.86] | 0.86 | 0.02 [−0.36, 0.31] | 0.71 | 0.52 | 1.92 |
+| opp (반대편 59 cm) | A100 | 72 | 0.94 | – | 0.94 | 0.79 | 0.23 | 2.80 |
+
+**판단 (2026-11-23)**: keep.
+- attention·내부 표현·놓는 위치는 거리에 따라 단조롭게 바구니를 따라간다 (0.29→0.50→0.71→0.79; 0.78→0.52→0.52→0.23). far20 의 표현 이동은 far25 이동 방향의 λ 0.79 [0.73, 0.84] = 기하 비율 0.80 → 표현이 바구니 위치를 연속적으로 반영.
+- 그러나 끝까지 원래 자리 쪽으로 4–4.5 cm 모자라게 놓고, 옆 방향 5–6 cm 이동은 전혀 따라가지 않는다 (y 0.00–0.02, 바구니 안쪽 폭 안이라 성공에는 영향 작음) → 보이는 바구니를 따르되 학습 위치로 끌리는 힘이 남는다.
+- 성공률은 단조롭지 않다: 20–26 cm 에서 52–61 (opp 72 보다 낮음, far20 vs far25 McNemar p=0.14). 실패 대부분 '바구니 밖' (41/34) 이고 팔·물체가 바구니를 밀거나 넘어뜨림, 특히 키 큰 물체 (O8 milk·O10 orange juice far20 0/10) → 위치 shortcut 이 아니라 새 위치에서의 운반·놓기 정밀도 문제.
+- 갈라지는 시점: SigLIP·patch attention 은 첫 호출/호출 5 (보는 것은 일찍 바뀜), expert·action 은 운반 시작 (호출 10–11) — near 와 같고 opp (호출 3) 와 다름.
+- 한계: near·opp 는 A100, far 는 y 도 5–6 cm 바뀜, attention 마스크 크기 조건별 상이. next 후보: 순수 옆 방향 (y) 이동만 하는 조건으로 '옆 방향 무시' 확인, 키 큰 물체 실패 원인 (충돌) 분리. 사용 1.33 GPU-h.
