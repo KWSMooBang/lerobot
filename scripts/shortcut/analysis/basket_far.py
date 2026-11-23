@@ -301,6 +301,27 @@ def behaviour(eps, C, out, res):
                         continue
                     fr.append(float(np.dot(e["release_xy"] - p["release_xy"], sv) / np.dot(sv, sv)))
                 s[f"follow_{subset}"] = ci(fr) + [len(fr)] if fr else None
+            # per axis (x = toward the camera, y = lateral): release shift ÷ basket shift on that axis, paired
+            for ax_i, ax_n in ((0, "x"), (1, "y")):
+                if abs(sv[ax_i]) < 0.02:
+                    continue
+                for subset in ("both_success", "both_released"):
+                    fr = [float((e["release_xy"][ax_i] - p["release_xy"][ax_i]) / sv[ax_i]) for e, p in zip(E, P_)
+                          if e["release_xy"] is not None and p["release_xy"] is not None
+                          and (subset == "both_released" or (e["success"] and p["success"]))]
+                    s[f"follow_{ax_n}_{subset}"] = ci(fr) + [len(fr)] if fr else None
+            # failed releases: which side of the new basket's walls the gripper let go (eef xy one step before release)
+            cx, cy = C[k]["xy"]
+            side = defaultdict(int)
+            for e in E:
+                if e["failure"] != "released outside" or e["release_xy"] is None:
+                    continue
+                x, y = e["release_xy"]
+                tags = [n for n, c_ in (("x<wall (toward old spot)", x < cx - HALF), ("x>wall (toward camera)", x > cx + HALF),
+                                        ("y>wall (left in view, toward old y)", y > cy + HALF),
+                                        ("y<wall (right in view)", y < cy - HALF)) if c_]
+                side[" & ".join(tags) or "inside walls (rim / bounced)"] += 1
+            s["released_outside_side"] = dict(side)
             # perpendicular error and distance from the new basket centre (success)
             s["release_dist_to_new_centre_cm_success"] = ci(
                 [np.linalg.norm(e["release_xy"] - np.array(C[k]["xy"])) * 100 for e in ok]) if ok else None
@@ -368,6 +389,27 @@ def behaviour(eps, C, out, res):
     plt.close(fig)
 
 
+def fail_frames(eps, C, out):
+    """1_results/fail_last_frames_<k>.png: last recorded policy frame (step 270, agentview) of every failed episode."""
+    for k in ("far20", "farM"):
+        E = [eps[k, t, i] for t, i in keyorder() if not eps[k, t, i]["success"]]
+        n = len(E)
+        if not n:
+            continue
+        cols = 8
+        rows = (n + cols - 1) // cols
+        fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, rows * 2.25), facecolor=SURFACE)
+        for ax in np.atleast_1d(axes).flat:
+            ax.axis("off")
+        for ax, e in zip(np.atleast_1d(axes).flat, E):
+            ax.imshow(np.load(e["obs"])["image"][-1])
+            ax.set_title(f"O{e['task'] + 1} i{e['init']}: {e['failure']}", fontsize=6.5)
+        fig.suptitle(f"{C[k]['label']}: last frame of the {n} failed episodes (policy view, step 270)", fontsize=9)
+        fig.tight_layout()
+        fig.savefig(out / "1_results" / f"fail_last_frames_{k}.png", dpi=90, facecolor=SURFACE)
+        plt.close(fig)
+
+
 # ---------------------------------------------------------------- 2. attention on the basket spots
 
 
@@ -381,16 +423,30 @@ def first_frame(e):
     return np.load(e["obs"])["image"][0]
 
 
-def basket_masks(eps, C):
+def sink_patches(eps):
+    """content-independent attention sinks: patches with > 3% of the late-layer agentview attention on average over all
+    calls of both ctl runs (6 patches, the same on A100 and 4090: (0,1) (2,15) (3,0) (12,1) (14,1) (15,3)). (12,1) and
+    (14,1) lie in the bottom-left where the far baskets are, so they are left out of every basket mask."""
+    ms = []
+    for k in ("ctl", "ctlF"):
+        for t, i in keyorder():
+            a = eps[k, t, i]["attn_img"][:, 2, : P * P].astype(np.float32)
+            ms.append((a / a.sum(1, keepdims=True)).mean(0))
+    return (np.mean(ms, 0) > 0.03).reshape(P, P)
+
+
+def basket_masks(eps, C, sink):
     """old spot / new basket patch masks per moved episode. Reference without a basket on the left = the opp frame of
-    the same task·init (ferrari). opp: as in bsk_analysis.py (left / right halves of changed(ctlF, opp))."""
+    the same task·init (ferrari). opp: as in bsk_analysis.py (left / right halves of changed(ctlF, opp)). Sink patches
+    removed (bsk_analysis.py did not; for opp / near they are outside the masks, so those numbers are unchanged)."""
     left = np.zeros((P, P), bool)
     left[:, : P // 2] = True
+    left &= ~sink
     M = {}
     for t, i in keyorder():
         O = first_frame(eps["opp", t, i])
         ch = {k: changed(first_frame(eps[k, t, i]), O) for k in ("ctlF", "ctl", "near", "far20", "farM")}
-        M["opp", t, i] = dict(old=ch["ctlF"] & left, new=ch["ctlF"] & ~left)
+        M["opp", t, i] = dict(old=ch["ctlF"] & left, new=ch["ctlF"] & ~left & ~sink)
         for k in ("near", "far20", "farM"):
             old, new = ch[C[k]["ctl"]] & left, ch[k] & left
             M[k, t, i] = dict(old=old & ~new, new=new & ~old)
@@ -404,7 +460,8 @@ def agent_map(e, call, g):
 def basket_attention(eps, C, out, res):
     d = out / "2_attention"
     d.mkdir(parents=True, exist_ok=True)
-    M = basket_masks(eps, C)
+    sink = sink_patches(eps)
+    M = basket_masks(eps, C, sink)
     PH = ["approach", "carry", "after release"]
     share = defaultdict(list)
     for k in MOVED:
@@ -423,6 +480,7 @@ def basket_attention(eps, C, out, res):
                         share[k, who, reg, ph, g].append(np.mean(v))
     npatch = {k: [float(np.mean([M[k, t, i][r].sum() for t, i in keyorder()])) for r in ("old", "new")] for k in MOVED}
     res["basket_attention"] = dict(
+        sink_patches=[list(map(int, x)) for x in np.argwhere(sink)],
         mean_patches_old_new={k: [round(x, 1) for x in v] for k, v in npatch.items()},
         share_pct={f"{k}|{who}|{reg}|{ph}|{GROUPS[g]}": ci(np.array(v) * 100) for (k, who, reg, ph, g), v in share.items()})
     fig, axes = plt.subplots(len(MOVED), 3, figsize=(12, 3.1 * len(MOVED)), sharey="row", facecolor=SURFACE)
@@ -786,6 +844,7 @@ def main():
     print("loaded", len(eps), flush=True)
     res = {"conditions": {k: {kk: (str(v) if isinstance(v, Path) else v) for kk, v in c.items()} for k, c in C.items()}}
     behaviour(eps, C, out, res)
+    fail_frames(eps, C, out)
     print(json.dumps({k: (v["success"], v.get("follow_both_success")) for k, v in res["behaviour"].items()}), flush=True)
     basket_attention(eps, C, out, res)
     attention_by_type(eps, C, out, res)
