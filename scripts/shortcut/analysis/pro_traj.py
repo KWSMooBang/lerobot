@@ -22,6 +22,8 @@ Stages (all CPU; outputs under --out, default /outputs/VLA-shortcut-exps/analysi
             10 denoising steps
   manifold  5_manifold/: Gallego 2018 — per-condition top-k PCA manifold, principal angles to none with random
             and split-half baselines, CCA-aligned latent correlations vs unaligned and vs other-task pairs
+  traj      7_trajectories/: example trajectories (none PCA-2 plane; colour depth = time, call numbers every 5,
+            × first grasp, ■ first release) and distance to the paired none episode aligned on the first grasp
   attractor 6_attractor/: Inagaki 2019 — task / position axes: projection of each episode on the axis between two
             reference trajectories (own trained task → task named by the new sentence, or → successful
             perturbed episodes); bimodality (BC, GMM ΔBIC, dip test) over time; endpoint vs outcome
@@ -74,9 +76,22 @@ HUE = {
     "task": "#e34948",
     "environment": "#6250d6",
 }
-HUES10 = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948", "#7a5c3e", "#3aa6b9"]
+HUES10 = [
+    "#2a78d6",
+    "#eb6834",
+    "#1baf7a",
+    "#eda100",
+    "#e87ba4",
+    "#008300",
+    "#6250d6",
+    "#e34948",
+    "#7a5c3e",
+    "#3aa6b9",
+]
 MUTED, INK, INK2, SURFACE, GRID = "#898781", "#0b0b0b", "#52514e", "#fcfcfb", "#e4e3df"
-K_TRIAL = 12  # calls (t = 0..110) per trial vector for trial maps: every episode has ≥ 12 calls or holds its last
+K_TRIAL = (
+    12  # calls (t = 0..110) per trial vector for trial maps: every episode has ≥ 12 calls or holds its last
+)
 RNG = np.random.default_rng(0)
 NBOOT = 1000
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -118,7 +133,9 @@ def clean(ax: Any) -> None:
 
 def cond_of(e: dict) -> str:
     """condition label: axis, or position:<level> for libero_object's 11 position levels."""
-    return f"position:{e['level']}" if e["axis"] == "position" and e["suite"] == "libero_object" else e["axis"]
+    return (
+        f"position:{e['level']}" if e["axis"] == "position" and e["suite"] == "libero_object" else e["axis"]
+    )
 
 
 # ---------------------------------------------------------------- load
@@ -136,8 +153,22 @@ def read_episodes(run: Path) -> list[dict]:
             if key in seen:
                 continue
             seen.add(key)
+            r["steps_path"] = str(f.parent / r["steps_file"])
             eps.append(r)
     return eps
+
+
+def release_t(steps_path: str, grasp_t: int | None) -> int | None:
+    """first release after the first grasp: first env step (1-based, like first_grasp_t) after it where no
+    object is held between both fingers while the gripper is commanded open; None if never."""
+    if not grasp_t:
+        return None
+    d = np.load(steps_path)
+    g, a = d["grasped"], d["action"][:, 6]
+    for i in range(int(grasp_t), len(g)):
+        if g[i] == "" and a[i] < 0:
+            return i + 1
+    return None
 
 
 def episode_features(path: str) -> dict[str, np.ndarray]:
@@ -169,6 +200,16 @@ def stage_load(run: Path, out: Path, workers: int) -> None:
             continue
         with ProcessPoolExecutor(workers) as ex:
             feats = list(ex.map(episode_features, [e["activations"] for e in se], chunksize=8))
+            rel = list(
+                ex.map(
+                    release_t,
+                    [e["steps_path"] for e in se],
+                    [e.get("first_grasp_t") for e in se],
+                    chunksize=16,
+                )
+            )
+        for e, r in zip(se, rel, strict=True):
+            e["first_release_t"] = r
         arrays: dict[str, Any] = {}
         lens = np.array([len(f["action"]) for f in feats])
         arrays["calls"] = lens
@@ -190,6 +231,7 @@ def stage_load(run: Path, out: Path, workers: int) -> None:
                     "n_steps",
                     "first_grasp_object",
                     "first_grasp_t",
+                    "first_release_t",
                     "instruction",
                     "original_instruction",
                     "t_orig",
@@ -204,6 +246,11 @@ def stage_load(run: Path, out: Path, workers: int) -> None:
         (cache / f"{suite}.json").write_text(json.dumps(meta))
         print(f"[load] {suite}: {len(se)} episodes, {int(lens.sum())} calls", flush=True)
     (cache / "episodes_all.json").write_text(json.dumps(eps))
+
+
+def present(out: Path) -> list[str]:
+    """suites with cached episodes (a partial run may lack some)."""
+    return [s for s in SUITES if (out / "_cache" / f"{s}.json").exists()]
 
 
 class Suite:
@@ -243,7 +290,11 @@ class Suite:
         return [m["i"] for m in self.meta if all(m.get(k) == v for k, v in kw.items())]
 
     def conds(self) -> list[str]:
-        order = ["none", "object"] + [f"position:{lv}" for lv in POS_LEVELS] + ["position", "semantic", "task", "environment"]
+        order = (
+            ["none", "object"]
+            + [f"position:{lv}" for lv in POS_LEVELS]
+            + ["position", "semantic", "task", "environment"]
+        )
         have = {m["cond"] for m in self.meta}
         return [c for c in order if c in have]
 
@@ -272,7 +323,23 @@ def _rsvd(x: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def target_tokens(instr: str) -> set[str]:
-    stop = {"the", "and", "put", "pick", "place", "it", "on", "in", "of", "to", "up", "both", "top", "inside", "into"}
+    stop = {
+        "the",
+        "and",
+        "put",
+        "pick",
+        "place",
+        "it",
+        "on",
+        "in",
+        "of",
+        "to",
+        "up",
+        "both",
+        "top",
+        "inside",
+        "into",
+    }
     return {w for w in re.findall(r"[a-z]+", instr.lower()) if w not in stop and len(w) > 2}
 
 
@@ -289,7 +356,11 @@ def failure_type(e: dict) -> str:
     if not g:
         return "no grasp"
     toks = {t for t in g.lower().split("_") if t.isalpha() and t not in ("akita", "obj")}
-    return "grasped a named object, not done" if toks & target_tokens(e.get("instruction_original") or e["instruction"]) else "grasped another object"
+    return (
+        "grasped a named object, not done"
+        if toks & target_tokens(e.get("instruction_original") or e["instruction"])
+        else "grasped another object"
+    )
 
 
 def stage_perf(out: Path, res: dict) -> None:
@@ -309,17 +380,29 @@ def stage_perf(out: Path, res: dict) -> None:
             r["failure_types"] = dict(Counter(failure_type(e) for e in se))
             # paired vs none (same task · init)
             none = {(e["task_id"], e["init_idx"]): e for e in eps if e["suite"] == s and e["axis"] == "none"}
-            pairs = [(none[(e["task_id"], e["init_idx"])]["success"], e["success"]) for e in se if (e["task_id"], e["init_idx"]) in none]
+            pairs = [
+                (none[(e["task_id"], e["init_idx"])]["success"], e["success"])
+                for e in se
+                if (e["task_id"], e["init_idx"]) in none
+            ]
             r["paired_none_success_to_fail"] = int(sum(bool(x) and not y for x, y in pairs))
             r["paired_none_fail_to_success"] = int(sum((not x) and bool(y) for x, y in pairs))
             if a == "position" and s == "libero_object":
                 r["by_level"] = {
-                    lv: wilson(sum(bool(e["success"]) for e in se if e["level"] == lv), sum(e["level"] == lv for e in se))
-                   
+                    lv: wilson(
+                        sum(bool(e["success"]) for e in se if e["level"] == lv),
+                        sum(e["level"] == lv for e in se),
+                    )
                     for lv in POS_LEVELS
                 }
                 r["by_level_n"] = {lv: sum(e["level"] == lv for e in se) for lv in POS_LEVELS}
-            r["by_task"] = {t: wilson(sum(bool(e["success"]) for e in se if e["task_id"] == t), sum(e["task_id"] == t for e in se)) for t in range(10)}
+            r["by_task"] = {
+                t: wilson(
+                    sum(bool(e["success"]) for e in se if e["task_id"] == t),
+                    sum(e["task_id"] == t for e in se),
+                )
+                for t in range(10)
+            }
             tab[f"{s}|{a}"] = r
     res["perf"] = tab
     # table csv
@@ -328,9 +411,13 @@ def stage_perf(out: Path, res: dict) -> None:
         for key, r in tab.items():
             s, a = key.split("|")
             so = r.get("success_orig", ["", "", ""])
-            f.write(f"{s},{a},{r['n']},{r['success'][0]},{r['success'][1]},{r['success'][2]},{so[0]},{so[1]},{so[2]}\n")
+            f.write(
+                f"{s},{a},{r['n']},{r['success'][0]},{r['success'][1]},{r['success'][2]},{so[0]},{so[1]},{so[2]}\n"
+            )
     with open(od / "episodes.csv", "w") as f:
-        f.write("suite,axis,level,task,init,success,success_orig,success_new,failure_type,n_steps,first_grasp,video\n")
+        f.write(
+            "suite,axis,level,task,init,success,success_orig,success_new,failure_type,n_steps,first_grasp,video\n"
+        )
         for e in eps:
             f.write(
                 f"{e['suite']},{e['axis']},{e['level']},{e['task_id']},{e['init_idx']},{int(bool(e['success']))},"
@@ -339,7 +426,9 @@ def stage_perf(out: Path, res: dict) -> None:
                 f"{e['n_steps']},{e.get('first_grasp_object') or ''},{e.get('video') or ''}\n"
             )
     # figure: grouped bars suite × axis
-    fig, axes = plt.subplots(1, 3, figsize=(17, 4.4), facecolor=SURFACE, gridspec_kw={"width_ratios": [2.3, 1.4, 1.2]})
+    fig, axes = plt.subplots(
+        1, 3, figsize=(17, 4.4), facecolor=SURFACE, gridspec_kw={"width_ratios": [2.3, 1.4, 1.2]}
+    )
     ax = axes[0]
     w = 0.13
     for j, a in enumerate(AXES):
@@ -361,7 +450,11 @@ def stage_perf(out: Path, res: dict) -> None:
     ax.set_xticks(range(4), [SHORT[s] for s in SUITES])
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("success rate (PRO goal), Wilson 95% CI", fontsize=8)
-    ax.set_title("success by suite × perturbation (black tick on task = original goal reached: shortcut rate)", fontsize=8.5, loc="left")
+    ax.set_title(
+        "success by suite × perturbation (black tick on task = original goal reached: shortcut rate)",
+        fontsize=8.5,
+        loc="left",
+    )
     ax.legend(fontsize=7, frameon=False, ncol=6, loc="upper center", bbox_to_anchor=(0.5, -0.08))
     clean(ax)
     ax = axes[1]
@@ -387,7 +480,14 @@ def stage_perf(out: Path, res: dict) -> None:
     cols = ["#1baf7a", "#e34948", "#cfcdc6"]
     bottom = np.zeros(4)
     for c, col in zip(cats, cols, strict=True):
-        v = np.array([tab[f"{s}|task"]["failure_types"].get(c, 0) / tab[f"{s}|task"]["n"] if f"{s}|task" in tab else 0 for s in SUITES])
+        v = np.array(
+            [
+                tab[f"{s}|task"]["failure_types"].get(c, 0) / tab[f"{s}|task"]["n"]
+                if f"{s}|task" in tab
+                else 0
+                for s in SUITES
+            ]
+        )
         ax.bar(range(4), v, bottom=bottom, color=col, label=c, width=0.6)
         bottom += v
     ax.set_xticks(range(4), [SHORT[s] for s in SUITES])
@@ -405,14 +505,24 @@ def stage_perf(out: Path, res: dict) -> None:
         bottom = np.zeros(5)
         ax_list = [a for a in AXES if a != "task"]
         for c, col in zip(ftypes, fcol, strict=True):
-            v = np.array([tab[f"{s}|{a}"]["failure_types"].get(c, 0) / tab[f"{s}|{a}"]["n"] if f"{s}|{a}" in tab else 0 for a in ax_list])
+            v = np.array(
+                [
+                    tab[f"{s}|{a}"]["failure_types"].get(c, 0) / tab[f"{s}|{a}"]["n"]
+                    if f"{s}|{a}" in tab
+                    else 0
+                    for a in ax_list
+                ]
+            )
             ax.bar(range(5), v, bottom=bottom, color=col, label=c, width=0.65)
             bottom += v
         ax.set_xticks(range(5), ax_list, rotation=30, fontsize=7)
         ax.set_title(SHORT[s], fontsize=9)
         clean(ax)
     axes[0].legend(fontsize=7, frameon=False, loc="lower left")
-    fig.suptitle("outcome types (first grasped object vs objects named in the original sentence; heuristic)", fontsize=9)
+    fig.suptitle(
+        "outcome types (first grasped object vs objects named in the original sentence; heuristic)",
+        fontsize=9,
+    )
     fig.tight_layout()
     fig.savefig(od / "failure_types.png", dpi=130, facecolor=SURFACE)
     plt.close(fig)
@@ -423,8 +533,15 @@ def stage_perf(out: Path, res: dict) -> None:
 
 
 def norm_sentence(s: str) -> list[str]:
-    s = s.lower().replace("akita ", "").replace("pick the", "pick up the").replace("on the top of the", "on the")
-    s = s.replace("top layer of the drawer", "top drawer").replace("the top of the drawer", "top of the cabinet")
+    s = (
+        s.lower()
+        .replace("akita ", "")
+        .replace("pick the", "pick up the")
+        .replace("on the top of the", "on the")
+    )
+    s = s.replace("top layer of the drawer", "top drawer").replace(
+        "the top of the drawer", "top of the cabinet"
+    )
     return re.findall(r"[a-z]+", s)
 
 
@@ -454,7 +571,7 @@ def stage_t021(out: Path, res: dict) -> None:
     dd = out / "3_divergence"
     od.mkdir(parents=True, exist_ok=True)
     dd.mkdir(parents=True, exist_ok=True)
-    for suite in SUITES:
+    for suite in present(out):
         S = Suite(out, suite)
         train = [None] * 10
         for m in S.meta:
@@ -465,7 +582,14 @@ def stage_t021(out: Path, res: dict) -> None:
             P = PCA(n_components=min(50, Z.shape[0] - 1), random_state=0).fit_transform(Z)
             task = np.array([m["task_id"] for m in S.meta])
             isnone = np.array([m["axis"] == "none" for m in S.meta])
-            cent = np.stack([P[isnone & (task == t)].mean(0) if (isnone & (task == t)).any() else np.full(P.shape[1], np.inf) for t in range(10)])
+            cent = np.stack(
+                [
+                    P[isnone & (task == t)].mean(0)
+                    if (isnone & (task == t)).any()
+                    else np.full(P.shape[1], np.inf)
+                    for t in range(10)
+                ]
+            )
             own = defaultdict(list)
             named = defaultdict(list)
             for m in S.meta:
@@ -480,7 +604,11 @@ def stage_t021(out: Path, res: dict) -> None:
                     nt = named_task(m["instruction"], train, m["task_id"])
                     if nt is not None:
                         named["task"].append(
-                            {"own": nearest == m["task_id"], "named": nearest == nt, "other": nearest not in (nt, m["task_id"])}
+                            {
+                                "own": nearest == m["task_id"],
+                                "named": nearest == nt,
+                                "other": nearest not in (nt, m["task_id"]),
+                            }
                         )
             rf = {c: boot_ci(np.array(v)) for c, v in own.items()}
             if named["task"]:
@@ -489,27 +617,60 @@ def stage_t021(out: Path, res: dict) -> None:
                 } | {"n": len(named["task"])}
             rs[f] = {"nearest_none_centroid_is_own_task": rf}
             # map
-            T = TSNE(n_components=2, perplexity=min(30, (S.n - 1) // 3), init="pca", learning_rate="auto", random_state=0).fit_transform(P)
+            T = TSNE(
+                n_components=2,
+                perplexity=min(30, (S.n - 1) // 3),
+                init="pca",
+                learning_rate="auto",
+                random_state=0,
+            ).fit_transform(P)
             fig, axes = plt.subplots(1, 2, figsize=(16, 7.5), facecolor=SURFACE)
-            mk = {"none": "o", "object": "s", "position": "^", "semantic": "D", "task": "X", "environment": "P"}
+            mk = {
+                "none": "o",
+                "object": "s",
+                "position": "^",
+                "semantic": "D",
+                "task": "X",
+                "environment": "P",
+            }
             for ax, by in zip(axes, ("task", "perturbation"), strict=True):
                 for m in S.meta:
                     i = m["i"]
                     col = HUES10[m["task_id"]] if by == "task" else HUE[m["axis"]]
-                    ax.scatter(T[i, 0], T[i, 1], s=16 if m["axis"] != "none" else 30, marker=mk[m["axis"]], color=col,
-                               edgecolors=SURFACE if m["success"] else INK, linewidths=0.3 if m["success"] else 0.9, alpha=0.85)
+                    ax.scatter(
+                        T[i, 0],
+                        T[i, 1],
+                        s=16 if m["axis"] != "none" else 30,
+                        marker=mk[m["axis"]],
+                        color=col,
+                        edgecolors=SURFACE if m["success"] else INK,
+                        linewidths=0.3 if m["success"] else 0.9,
+                        alpha=0.85,
+                    )
                 for t in range(10):
                     if not (isnone & (task == t)).any():
                         continue
                     x, y = np.median(T[isnone & (task == t)], 0)
-                    ax.text(x, y, f"t{t}", fontsize=8, ha="center", va="center",
-                            bbox=dict(boxstyle="round,pad=0.12", fc=SURFACE, ec="none", alpha=0.8))
+                    ax.text(
+                        x,
+                        y,
+                        f"t{t}",
+                        fontsize=8,
+                        ha="center",
+                        va="center",
+                        bbox=dict(boxstyle="round,pad=0.12", fc=SURFACE, ec="none", alpha=0.8),
+                    )
                 ax.set_xticks([])
                 ax.set_yticks([])
-                ax.set_title(f"colour = {by}; label = none median of the task; dark edge = failed", fontsize=8.5)
+                ax.set_title(
+                    f"colour = {by}; label = none median of the task; dark edge = failed", fontsize=8.5
+                )
             h = [plt.Line2D([], [], ls="", marker=mk[a], ms=7, color=HUE[a], label=a) for a in AXES]
             fig.legend(handles=h, loc="lower center", ncol=6, fontsize=8, frameon=False)
-            fig.suptitle(f"{SHORT[suite]} — {TITLE[f]}: one point per episode (first {K_TRIAL} calls, PCA-50 → t-SNE)", fontsize=10)
+            fig.suptitle(
+                f"{SHORT[suite]} — {TITLE[f]}: one point per episode (first {K_TRIAL} calls, PCA-50 → t-SNE)",
+                fontsize=10,
+            )
             fig.tight_layout(rect=(0, 0.04, 1, 0.96))
             (od / f).mkdir(exist_ok=True)
             fig.savefig(od / f / f"trialmap_{suite}.png", dpi=105, facecolor=SURFACE)
@@ -552,8 +713,13 @@ def stage_t021(out: Path, res: dict) -> None:
                     first.append(int(above[0]) if len(above) else np.nan)
                 m_ = np.nanmean(D, 0)
                 if ":" not in c or c in ("position:swap", "position:x0.5", "position:y0.5"):
-                    ax.plot(m_, color=HUE[c.split(":")[0]], lw=1.6 if ":" not in c else 1.0,
-                            ls="-" if ":" not in c or c.endswith("swap") else ":", label=c)
+                    ax.plot(
+                        m_,
+                        color=HUE[c.split(":")[0]],
+                        lw=1.6 if ":" not in c else 1.0,
+                        ls="-" if ":" not in c or c.endswith("swap") else ":",
+                        label=c,
+                    )
                 ratio = m_ / bm
                 grp_first = next((k for k in range(kmax) if np.isfinite(ratio[k]) and ratio[k] > 1.5), None)
                 div[f][c] = {
@@ -568,13 +734,23 @@ def stage_t021(out: Path, res: dict) -> None:
             ax.set_ylabel("RMS distance to paired none (z)", fontsize=7)
             clean(ax)
         axes[0, 0].legend(fontsize=6.5, frameon=False)
-        fig.suptitle(f"{SHORT[suite]}: distance to the none episode of the same task · init, by call (mean over episodes)", fontsize=10)
+        fig.suptitle(
+            f"{SHORT[suite]}: distance to the none episode of the same task · init, by call (mean over episodes)",
+            fontsize=10,
+        )
         fig.tight_layout()
         fig.savefig(dd / f"divergence_{suite}.png", dpi=110, facecolor=SURFACE)
         plt.close(fig)
         res["t021"][suite] = {"trial_map": rs, "divergence": div}
-        print(f"[t021] {suite}: expert own-task " + " ".join(
-            f"{c}={v[0]}" for c, v in rs["expert"]["nearest_none_centroid_is_own_task"].items() if isinstance(v, list)), flush=True)
+        print(
+            f"[t021] {suite}: expert own-task "
+            + " ".join(
+                f"{c}={v[0]}"
+                for c, v in rs["expert"]["nearest_none_centroid_is_own_task"].items()
+                if isinstance(v, list)
+            ),
+            flush=True,
+        )
     # summary figure: own-task share per feature × axis (suite-pooled means)
     fig, axes = plt.subplots(1, 4, figsize=(18, 3.8), facecolor=SURFACE, sharey=True)
     for ax, suite in zip(axes, SUITES, strict=True):
@@ -591,7 +767,9 @@ def stage_t021(out: Path, res: dict) -> None:
         clean(ax)
     axes[0].set_ylabel("nearest none task centroid = own task", fontsize=8)
     axes[0].legend(fontsize=6.5, frameon=False, ncol=2)
-    fig.suptitle("do perturbed episodes stay with their own task's none cluster? (first 12 calls, PCA-50)", fontsize=10)
+    fig.suptitle(
+        "do perturbed episodes stay with their own task's none cluster? (first 12 calls, PCA-50)", fontsize=10
+    )
     fig.tight_layout()
     fig.savefig(od / "task_identity.png", dpi=120, facecolor=SURFACE)
     plt.close(fig)
@@ -643,7 +821,9 @@ def plane_angle(p: np.ndarray, q: np.ndarray) -> float:
     return float(np.degrees(np.arccos(np.clip(s.min(), -1, 1))))
 
 
-def jpca_data(S: Suite, feat: str, pcs: np.ndarray, mu: np.ndarray, cmean: np.ndarray, idx: list[int]) -> tuple:
+def jpca_data(
+    S: Suite, feat: str, pcs: np.ndarray, mu: np.ndarray, cmean: np.ndarray, idx: list[int]
+) -> tuple:
     xs, dxs = [], []
     for i in idx:
         x = S.ep(feat, i, z=False)
@@ -661,7 +841,7 @@ def stage_jpca(out: Path, res: dict) -> None:
     od.mkdir(parents=True, exist_ok=True)
     res["jpca"] = {}
     k = 6
-    for suite in SUITES:
+    for suite in present(out):
         S = Suite(out, suite)
         rs: dict = {}
         for feat in VEC:
@@ -717,14 +897,18 @@ def stage_jpca(out: Path, res: dict) -> None:
         for c in S.conds():
             idx = [m["i"] for m in S.meta if m["cond"] == c]
             rows = np.concatenate([np.arange(S.off[i], S.off[i + 1]) for i in idx])
-            y = ((E[rows] - dm - mu) @ pcs.T)  # (n, 10, k)
+            y = (E[rows] - dm - mu) @ pcs.T  # (n, 10, k)
             x = 0.5 * (y[:, 1:] + y[:, :-1])
             dx = y[:, 1:] - y[:, :-1]
             x, dx = x.reshape(-1, k), dx.reshape(-1, k)
             _, r_unc = fit_lin(x, dx)
             m_sk, r_sk = fit_skew(x, dx)
-            rd[c] = {"r2_unconstrained": r3(r_unc), "r2_skew": r3(r_sk), "skew_over_unc": r3(r_sk / r_unc) if r_unc > 0 else None,
-                     "rotation_freq_rad_per_step": r3(rot_plane(m_sk)[1])}
+            rd[c] = {
+                "r2_unconstrained": r3(r_unc),
+                "r2_skew": r3(r_sk),
+                "skew_over_unc": r3(r_sk / r_unc) if r_unc > 0 else None,
+                "rotation_freq_rad_per_step": r3(rot_plane(m_sk)[1]),
+            }
         rs["expert_denoise"] = rd
         res["jpca"][suite] = rs
         # example figure: none + task + position episodes in the none jPCA plane (gemma and expert)
@@ -770,9 +954,12 @@ def stage_jpca(out: Path, res: dict) -> None:
         fig.tight_layout()
         fig.savefig(od / f"jpca_{suite}.png", dpi=110, facecolor=SURFACE)
         plt.close(fig)
-        print(f"[jpca] {suite}: expert none skew/unc={rs['expert_vec']['none']['r2_skew']}/{rs['expert_vec']['none']['r2_unconstrained']} "
-              f"gemma none {rs['gemma_vec']['none']['r2_skew']}/{rs['gemma_vec']['none']['r2_unconstrained']} "
-              f"denoise none {rd['none']['r2_skew']}/{rd['none']['r2_unconstrained']}", flush=True)
+        print(
+            f"[jpca] {suite}: expert none skew/unc={rs['expert_vec']['none']['r2_skew']}/{rs['expert_vec']['none']['r2_unconstrained']} "
+            f"gemma none {rs['gemma_vec']['none']['r2_skew']}/{rs['gemma_vec']['none']['r2_unconstrained']} "
+            f"denoise none {rd['none']['r2_skew']}/{rd['none']['r2_unconstrained']}",
+            flush=True,
+        )
 
 
 # ---------------------------------------------------------------- manifold (Gallego 2018)
@@ -797,7 +984,7 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
     od = out / "5_manifold"
     od.mkdir(parents=True, exist_ok=True)
     res["manifold"] = {"k": kdim}
-    for suite in SUITES:
+    for suite in present(out):
         S = Suite(out, suite)
         rs: dict = {}
         for feat in VEC:
@@ -805,7 +992,12 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
             # global reduction first (PCA-50 on the whole suite), manifolds inside it, like Gallego's 'neural space'
             mu0, P0, _ = pca_fit(X, 50)
             R = (X - mu0) @ P0.T
-            rows = {c: np.concatenate([np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in S.meta if m["cond"] == c]) for c in S.conds()}
+            rows = {
+                c: np.concatenate(
+                    [np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in S.meta if m["cond"] == c]
+                )
+                for c in S.conds()
+            }
 
             def man(r: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
                 m = R[r].mean(0)
@@ -816,8 +1008,12 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
             mn, Un = mans["none"]
             # baselines: none split by init halves; isotropic random; data-covariance random
             none_eps = [m for m in S.meta if m["axis"] == "none"]
-            h1 = np.concatenate([np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in none_eps if m["init_idx"] % 2 == 0])
-            h2 = np.concatenate([np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in none_eps if m["init_idx"] % 2 == 1])
+            h1 = np.concatenate(
+                [np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in none_eps if m["init_idx"] % 2 == 0]
+            )
+            h2 = np.concatenate(
+                [np.arange(S.off[m["i"]], S.off[m["i"] + 1]) for m in none_eps if m["init_idx"] % 2 == 1]
+            )
             split = principal_angles(man(h1)[1], man(h2)[1])
             rnd = []
             cov_rnd = []
@@ -867,7 +1063,11 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
                 lc_, ln_ = np.concatenate(lc), np.concatenate(ln)
                 cc = cca_corr(lc_, ln_)
                 unal = [abs(np.corrcoef(lc_[:, i], ln_[:, i])[0, 1]) for i in range(kdim)]
-                cc_other = cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo])) if lo else np.full(kdim, np.nan)
+                cc_other = (
+                    cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo]))
+                    if lo
+                    else np.full(kdim, np.nan)
+                )
                 shift = float(np.linalg.norm(mc - mn) / sd_none)
                 r[c] = {
                     "principal_angles_deg": [r3(v) for v in ang],
@@ -889,7 +1089,13 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
                 n = min(len(a), len(b))
                 lo.append(((a[:n] - mn) @ Un.T, (b[:n] - mn) @ Un.T))
             r["none_vs_none_other_task_cca_top4"] = (
-                r3(cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo]))[:4].mean()) if lo else None
+                r3(
+                    cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo]))[
+                        :4
+                    ].mean()
+                )
+                if lo
+                else None
             )
             lo = []
             for (t, i0), j in S.none.items():
@@ -900,7 +1106,13 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
                 n = min(len(a), len(b))
                 lo.append(((a[:n] - mn) @ Un.T, (b[:n] - mn) @ Un.T))
             r["none_vs_none_other_init_cca_top4"] = (
-                r3(cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo]))[:4].mean()) if lo else None
+                r3(
+                    cca_corr(np.concatenate([x for x, _ in lo]), np.concatenate([y for _, y in lo]))[
+                        :4
+                    ].mean()
+                )
+                if lo
+                else None
             )
             rs[feat] = r
         res["manifold"][suite] = rs
@@ -908,14 +1120,40 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
         fig, axes = plt.subplots(1, 3, figsize=(17, 4.5), facecolor=SURFACE)
         for ax, feat in zip(axes[:2], VEC, strict=True):
             r = rs[feat]
-            ax.plot(range(1, kdim + 1), r["baseline_random_deg_mean"], color=MUTED, ls="--", lw=1.5, label="random subspace")
-            ax.plot(range(1, kdim + 1), r["baseline_cov_random_deg_p1"], color=MUTED, ls=":", lw=1.5, label="cov-matched random (1st pct)")
-            ax.plot(range(1, len(r["baseline_none_split_half_deg"]) + 1), r["baseline_none_split_half_deg"], color=INK, lw=2, label="none split-half (floor)")
+            ax.plot(
+                range(1, kdim + 1),
+                r["baseline_random_deg_mean"],
+                color=MUTED,
+                ls="--",
+                lw=1.5,
+                label="random subspace",
+            )
+            ax.plot(
+                range(1, kdim + 1),
+                r["baseline_cov_random_deg_p1"],
+                color=MUTED,
+                ls=":",
+                lw=1.5,
+                label="cov-matched random (1st pct)",
+            )
+            ax.plot(
+                range(1, len(r["baseline_none_split_half_deg"]) + 1),
+                r["baseline_none_split_half_deg"],
+                color=INK,
+                lw=2,
+                label="none split-half (floor)",
+            )
             for c in S.conds():
                 if c == "none" or c not in r:
                     continue
-                ax.plot(range(1, len(r[c]["principal_angles_deg"]) + 1), r[c]["principal_angles_deg"], color=HUE[c.split(":")[0]],
-                        lw=1.4 if ":" not in c else 0.7, alpha=1 if ":" not in c else 0.6, label=c if ":" not in c or c.endswith("swap") else None)
+                ax.plot(
+                    range(1, len(r[c]["principal_angles_deg"]) + 1),
+                    r[c]["principal_angles_deg"],
+                    color=HUE[c.split(":")[0]],
+                    lw=1.4 if ":" not in c else 0.7,
+                    alpha=1 if ":" not in c else 0.6,
+                    label=c if ":" not in c or c.endswith("swap") else None,
+                )
             ax.set_xlabel("principal angle #", fontsize=8)
             ax.set_ylabel("degrees (vs none manifold)", fontsize=8)
             ax.set_title(f"{TITLE[feat]}: top-{kdim} manifolds", fontsize=9)
@@ -926,23 +1164,45 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
         x = np.arange(len(cl))
         for off_, feat, col in ((-0.2, "expert_vec", "#2a78d6"), (0.2, "gemma_vec", "#eb6834")):
             r = rs[feat]
-            ax.bar(x + off_, [r[c]["cca_top4_mean"] for c in cl], 0.18, color=col, label=f"{feat} CCA-aligned")
-            ax.scatter(x + off_, [r[c]["unaligned_corr_top4_mean"] for c in cl], marker="_", s=90, color=INK, zorder=4)
-            ax.scatter(x + off_, [r[c]["cca_top4_mean_vs_other_task_none"] for c in cl], marker="x", s=18, color=col, zorder=4)
+            ax.bar(
+                x + off_, [r[c]["cca_top4_mean"] for c in cl], 0.18, color=col, label=f"{feat} CCA-aligned"
+            )
+            ax.scatter(
+                x + off_,
+                [r[c]["unaligned_corr_top4_mean"] for c in cl],
+                marker="_",
+                s=90,
+                color=INK,
+                zorder=4,
+            )
+            ax.scatter(
+                x + off_,
+                [r[c]["cca_top4_mean_vs_other_task_none"] for c in cl],
+                marker="x",
+                s=18,
+                color=col,
+                zorder=4,
+            )
             if r["none_vs_none_other_init_cca_top4"] is not None:
                 ax.axhline(r["none_vs_none_other_init_cca_top4"], color=col, ls=":", lw=1)
         ax.set_xticks(x, cl, rotation=60, fontsize=6.5)
         ax.set_ylim(0, 1.02)
-        ax.set_title("latent dynamics vs paired none: CCA top-4 (bar), unaligned (—), other-task pair (x), none other-init (⋯)", fontsize=7.5)
+        ax.set_title(
+            "latent dynamics vs paired none: CCA top-4 (bar), unaligned (—), other-task pair (x), none other-init (⋯)",
+            fontsize=7.5,
+        )
         ax.legend(fontsize=6.5, frameon=False, loc="lower left")
         clean(ax)
         fig.suptitle(f"{SHORT[suite]}: preserved manifold? (Gallego 2018)", fontsize=10)
         fig.tight_layout()
         fig.savefig(od / f"manifold_{suite}.png", dpi=110, facecolor=SURFACE)
         plt.close(fig)
-        print(f"[manifold] {suite}: expert task angle {rs['expert_vec'].get('task', {}).get('mean_angle_deg')} "
-              f"split {np.mean(rs['expert_vec']['baseline_none_split_half_deg']):.1f} "
-              f"rand {np.mean(rs['expert_vec']['baseline_random_deg_mean']):.1f}", flush=True)
+        print(
+            f"[manifold] {suite}: expert task angle {rs['expert_vec'].get('task', {}).get('mean_angle_deg')} "
+            f"split {np.mean(rs['expert_vec']['baseline_none_split_half_deg']):.1f} "
+            f"rand {np.mean(rs['expert_vec']['baseline_random_deg_mean']):.1f}",
+            flush=True,
+        )
 
 
 # ---------------------------------------------------------------- attractor (Inagaki 2019)
@@ -964,8 +1224,12 @@ def bimodality(x: np.ndarray) -> dict:
     b1 = GaussianMixture(1, random_state=0).fit(xx).bic(xx)
     gm2 = GaussianMixture(2, random_state=0, n_init=3).fit(xx)
     b2 = gm2.bic(xx)
-    out = {"n": n, "bimodality_coef": r3(bc), "gmm_delta_bic_1_minus_2": r3(b1 - b2),
-           "gmm2_means": sorted(r3(v) for v in gm2.means_.ravel())}
+    out = {
+        "n": n,
+        "bimodality_coef": r3(bc),
+        "gmm_delta_bic_1_minus_2": r3(b1 - b2),
+        "gmm2_means": sorted(r3(v) for v in gm2.means_.ravel()),
+    }
     try:
         import diptest
 
@@ -982,7 +1246,7 @@ def stage_attractor(out: Path, res: dict) -> None:
     res["attractor"] = {}
     feats = ["expert_vec", "gemma_vec", "action"]
     kmax = 52
-    for suite in SUITES:
+    for suite in present(out):
         S = Suite(out, suite)
         train = [None] * 10
         for m in S.meta:
@@ -1004,15 +1268,23 @@ def stage_attractor(out: Path, res: dict) -> None:
                 proj, outc, info = [], [], []
                 for t in range(10):
                     a_ids = [S.none[(t, i)] for i in range(10) if (t, i) in S.none]
-                    lv_list = ["task"] if axis == "task" else (POS_LEVELS if suite == "libero_object" else ["swap"])
+                    lv_list = (
+                        ["task"] if axis == "task" else (POS_LEVELS if suite == "libero_object" else ["swap"])
+                    )
                     for lv in lv_list:
-                        ids = [m["i"] for m in S.meta if m["axis"] == axis and m["level"] == lv and m["task_id"] == t]
+                        ids = [
+                            m["i"]
+                            for m in S.meta
+                            if m["axis"] == axis and m["level"] == lv and m["task_id"] == t
+                        ]
                         if not ids or not a_ids:
                             continue
                         ref_kind = None
                         nt = named_task(S.meta[ids[0]]["instruction"], train, t) if axis == "task" else None
                         if nt is not None:
-                            b_ids_fn = lambda _i, nt=nt: [S.none[(nt, i)] for i in range(10) if (nt, i) in S.none]  # noqa: E731
+                            b_ids_fn = lambda _i, nt=nt: [
+                                S.none[(nt, i)] for i in range(10) if (nt, i) in S.none
+                            ]  # noqa: E731
                             ref_kind = f"none of task {nt} (named by the new sentence)"
                         else:
                             good = [i for i in ids if S.meta[i]["success"]]
@@ -1031,7 +1303,13 @@ def stage_attractor(out: Path, res: dict) -> None:
                             proj.append(p)
                             m = S.meta[i]
                             if axis == "task":
-                                o = "new goal" if m["success_new"] else "original goal (shortcut)" if m["success_orig"] else "neither"
+                                o = (
+                                    "new goal"
+                                    if m["success_new"]
+                                    else "original goal (shortcut)"
+                                    if m["success_orig"]
+                                    else "neither"
+                                )
                             else:
                                 o = "success" if m["success"] else "failure"
                             outc.append(o)
@@ -1040,7 +1318,12 @@ def stage_attractor(out: Path, res: dict) -> None:
                     continue
                 Pm = np.array(proj)
                 end = np.array([np.nanmean(p[np.isfinite(p)][-3:]) for p in Pm])
-                windows = {"calls_0_2": (0, 3), "calls_5_7": (5, 8), "calls_10_12": (10, 13), "calls_20_22": (20, 23)}
+                windows = {
+                    "calls_0_2": (0, 3),
+                    "calls_5_7": (5, 8),
+                    "calls_10_12": (10, 13),
+                    "calls_20_22": (20, 23),
+                }
                 r = {
                     "n": len(Pm),
                     "references": dict(Counter(x["ref"] for x in info)),
@@ -1053,7 +1336,13 @@ def stage_attractor(out: Path, res: dict) -> None:
                 rf[axis] = r
                 # figure
                 fig, axes = plt.subplots(1, 2, figsize=(13, 4.2), facecolor=SURFACE)
-                ocol = {"new goal": "#1baf7a", "original goal (shortcut)": "#e34948", "neither": MUTED, "success": "#1baf7a", "failure": "#e34948"}
+                ocol = {
+                    "new goal": "#1baf7a",
+                    "original goal (shortcut)": "#e34948",
+                    "neither": MUTED,
+                    "success": "#1baf7a",
+                    "failure": "#e34948",
+                }
                 for p, o in zip(Pm, outc, strict=True):
                     axes[0].plot(p, color=ocol[o], lw=0.6, alpha=0.5)
                 for o in sorted(set(outc)):
@@ -1068,12 +1357,24 @@ def stage_attractor(out: Path, res: dict) -> None:
                 clean(axes[0])
                 bins = np.linspace(-1.5, 2.5, 33)
                 for o in sorted(set(outc)):
-                    axes[1].hist(np.clip(end[np.array(outc) == o], -1.5, 2.5), bins=bins, color=ocol[o], alpha=0.6, label=o)
+                    axes[1].hist(
+                        np.clip(end[np.array(outc) == o], -1.5, 2.5),
+                        bins=bins,
+                        color=ocol[o],
+                        alpha=0.6,
+                        label=o,
+                    )
                 axes[1].set_xlabel("endpoint (mean of the last 3 calls)", fontsize=8)
                 b = r["endpoint_last3"]
-                axes[1].set_title(f"BC {b.get('bimodality_coef')} · GMM ΔBIC {b.get('gmm_delta_bic_1_minus_2')} · dip p {b.get('dip_p')}", fontsize=8)
+                axes[1].set_title(
+                    f"BC {b.get('bimodality_coef')} · GMM ΔBIC {b.get('gmm_delta_bic_1_minus_2')} · dip p {b.get('dip_p')}",
+                    fontsize=8,
+                )
                 clean(axes[1])
-                fig.suptitle(f"{SHORT[suite]} · {axis} axis · {TITLE[feat]}: coding-direction projection (Inagaki 2019)", fontsize=9.5)
+                fig.suptitle(
+                    f"{SHORT[suite]} · {axis} axis · {TITLE[feat]}: coding-direction projection (Inagaki 2019)",
+                    fontsize=9.5,
+                )
                 fig.tight_layout()
                 (od / feat).mkdir(exist_ok=True)
                 fig.savefig(od / feat / f"{axis}_{suite}.png", dpi=110, facecolor=SURFACE)
@@ -1081,8 +1382,200 @@ def stage_attractor(out: Path, res: dict) -> None:
             rs[feat] = rf
         res["attractor"][suite] = rs
         t = rs.get("expert_vec", {}).get("task", {})
-        print(f"[attractor] {suite}: task expert endpoint BC={t.get('endpoint_last3', {}).get('bimodality_coef')} "
-              f"by outcome={ {k: v[0] for k, v in t.get('endpoint_by_outcome', {}).items()} }", flush=True)
+        print(
+            f"[attractor] {suite}: task expert endpoint BC={t.get('endpoint_last3', {}).get('bimodality_coef')} "
+            f"by outcome={ {k: v[0] for k, v in t.get('endpoint_by_outcome', {}).items()} }",
+            flush=True,
+        )
+
+
+# ---------------------------------------------------------------- trajectories with time, grasp / release
+
+
+def call_of(t: int | None) -> int | None:
+    """env step (1-based) → index of the policy call whose chunk executed it (calls at steps 0, 10, 20, …)."""
+    return None if not t else (int(t) - 1) // 10
+
+
+def grad_line(ax: Any, y: np.ndarray, color: str, ls: str = "-", lw: float = 1.4) -> None:
+    """trajectory with time as colour depth (light = early, dark = late)."""
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import to_rgb
+
+    rgb = np.array(to_rgb(color))
+    n = len(y)
+    if n < 2:
+        return
+    seg = np.stack([y[:-1], y[1:]], 1)
+    w = np.linspace(0.12, 1.0, n - 1)[:, None]
+    cols = np.concatenate([1 - w * (1 - rgb), np.ones((n - 1, 1))], 1)  # blend white → colour
+    ax.add_collection(LineCollection(seg, colors=cols, linewidths=lw, linestyles=ls))
+
+
+def mark_traj(ax: Any, y: np.ndarray, m: dict, color: str) -> None:
+    ax.plot(y[0, 0], y[0, 1], "o", ms=3.5, color=color, mfc="white", zorder=4)
+    for k in range(5, len(y), 5):
+        ax.text(y[k, 0], y[k, 1], str(k), fontsize=5, color=color, ha="left", va="bottom", zorder=5)
+    g, r = call_of(m.get("first_grasp_t")), call_of(m.get("first_release_t"))
+    if g is not None and g < len(y):
+        ax.plot(y[g, 0], y[g, 1], "x", ms=8, mew=2.2, color=color, zorder=6)
+    if r is not None and r < len(y):
+        ax.plot(y[r, 0], y[r, 1], "s", ms=6, color=color, mec=INK, mew=0.8, zorder=6)
+
+
+def stage_traj(out: Path, res: dict) -> None:
+    td = out / "7_trajectories"
+    td.mkdir(parents=True, exist_ok=True)
+    res["traj"] = {}
+    pert_axes = ["object", "position", "semantic", "task", "environment"]
+    for suite in present(out):
+        S = Suite(out, suite)
+        rs: dict = {}
+        # ---- example trajectories in the none PCA-2 plane, time as colour depth, × grasp, ■ release
+        for feat in ("expert_vec", "gemma_vec", "action"):
+            X = S.raw[feat] if feat != "action" else S.z["action"]
+            rows = np.concatenate([np.arange(S.off[i], S.off[i + 1]) for i in S.where(axis="none")])
+            mu, pcs, evr = pca_fit(X[rows], 2)
+            fig, axes = plt.subplots(2, 5, figsize=(22, 8.6), facecolor=SURFACE)
+            for col, axis in enumerate(pert_axes):
+                lv = "swap" if axis == "position" else None
+                for row, t in enumerate((0, 5)):
+                    ax = axes[row, col]
+                    for init in (0, 1):
+                        j = S.none.get((t, init))
+                        cand = [
+                            m
+                            for m in S.meta
+                            if m["axis"] == axis
+                            and m["task_id"] == t
+                            and m["init_idx"] == init
+                            and (lv is None or m["level"] == lv)
+                        ]
+                        pair = []
+                        if j is not None:
+                            pair.append((S.meta[j], HUE["none"]))
+                        if cand:
+                            pair.append((cand[0], HUE[axis]))
+                        for m, c in pair:
+                            y = (
+                                S.ep(feat, m["i"], z=False) if feat != "action" else S.ep("action", m["i"])
+                            ) - mu
+                            y = y @ pcs.T
+                            grad_line(ax, y, c, ls="-" if m["success"] else "--")
+                            mark_traj(ax, y, m, c)
+                    ax.autoscale()
+                    ax.set_title(f"{axis} · t{t} · inits 0–1", fontsize=8.5)
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                    for s in ("top", "right"):
+                        ax.spines[s].set_visible(False)
+            h = [
+                plt.Line2D([], [], color=HUE["none"], lw=2, label="paired none episode"),
+                *[plt.Line2D([], [], color=HUE[a], lw=2, label=a) for a in pert_axes],
+                plt.Line2D([], [], color=MUTED, lw=1.5, ls="--", label="failed episode"),
+                plt.Line2D([], [], ls="", marker="x", ms=7, mew=1.8, color=INK, label="first grasp"),
+                plt.Line2D([], [], ls="", marker="s", ms=5, color=INK, label="first release"),
+                plt.Line2D(
+                    [],
+                    [],
+                    ls="",
+                    marker="o",
+                    ms=4,
+                    mfc="white",
+                    color=INK,
+                    label="call 0 (numbers: every 5 calls)",
+                ),
+            ]
+            fig.legend(handles=h, loc="lower center", ncol=10, fontsize=7.5, frameon=False)
+            fig.suptitle(
+                f"{SHORT[suite]} — {TITLE[feat]}: trajectories in the none PCA-2 plane ({evr.sum():.0%} var); "
+                "colour light → dark = early → late",
+                fontsize=10,
+            )
+            fig.tight_layout(rect=(0, 0.04, 1, 0.96))
+            (td / feat).mkdir(exist_ok=True)
+            fig.savefig(td / feat / f"traj_{suite}.png", dpi=105, facecolor=SURFACE)
+            plt.close(fig)
+        # ---- grasp-aligned distance to the paired none episode (both aligned on their own first grasp)
+        ks = np.arange(-8, 16)
+        fig, axes = plt.subplots(2, 3, figsize=(15, 7.2), facecolor=SURFACE)
+        for ax, f in zip(axes.flat, FEATS6, strict=True):
+
+            def aligned(i: int, j: int, f: str = f) -> np.ndarray:
+                gi, gj = call_of(S.meta[i]["first_grasp_t"]), call_of(S.meta[j]["first_grasp_t"])
+                a, b = S.ep(f, i), S.ep(f, j)
+                d = np.full(len(ks), np.nan)
+                for n, k in enumerate(ks):
+                    if 0 <= gi + k < len(a) and 0 <= gj + k < len(b):
+                        d[n] = np.sqrt(((a[gi + k] - b[gj + k]) ** 2).mean())
+                return d
+
+            base = []
+            for (t, i0), j in S.none.items():
+                if not S.meta[j]["first_grasp_t"]:
+                    continue
+                for i1 in range(10):
+                    j2 = S.none.get((t, i1))
+                    if i1 != i0 and j2 is not None and S.meta[j2]["first_grasp_t"]:
+                        base.append(aligned(j, j2))
+            if base:
+                ax.plot(
+                    ks, np.nanmean(base, 0), color=MUTED, ls="--", lw=1.5, label="none vs none, other init"
+                )
+            rf: dict = {}
+            for axis in pert_axes:
+                D, rel = [], []
+                for m in S.meta:
+                    if m["axis"] != axis or not m["first_grasp_t"]:
+                        continue
+                    j = S.none.get((m["task_id"], m["init_idx"]))
+                    if j is None or not S.meta[j]["first_grasp_t"]:
+                        continue
+                    D.append(aligned(m["i"], j))
+                    if m.get("first_release_t"):
+                        rel.append(call_of(m["first_release_t"]) - call_of(m["first_grasp_t"]))
+                if len(D) < 3:
+                    continue
+                mD = np.nanmean(D, 0)
+                mD[np.isfinite(np.array(D)).sum(0) < 5] = np.nan  # too few episodes at this offset
+                ax.plot(ks, mD, color=HUE[axis], lw=1.6, label=f"{axis} (n={len(D)})")
+                if rel:
+                    rk = int(np.median(rel))
+                    if ks[0] <= rk <= ks[-1]:
+                        ax.plot(rk, mD[rk - ks[0]], "s", ms=6, color=HUE[axis], mec=INK, zorder=5)
+                pre, post = (ks >= -5) & (ks < 0), (ks > 0) & (ks <= 5)
+                bm = np.nanmean(base, 0) if base else np.full(len(ks), np.nan)
+                rf[axis] = {
+                    "n": len(D),
+                    "pre_grasp_5_calls": r3(np.nanmean(mD[pre])),
+                    "post_grasp_5_calls": r3(np.nanmean(mD[post])),
+                    "pre_over_base": r3(np.nanmean(mD[pre]) / np.nanmean(bm[pre])),
+                    "post_over_base": r3(np.nanmean(mD[post]) / np.nanmean(bm[post])),
+                    "median_release_minus_grasp_calls": int(np.median(rel)) if rel else None,
+                }
+            ax.axvline(0, color=INK, lw=0.8)
+            ax.plot(0, ax.get_ylim()[0], "x", ms=8, mew=2, color=INK, clip_on=False)
+            ax.set_title(TITLE[f], fontsize=9)
+            ax.set_xlabel(
+                "policy call relative to the first grasp (× = grasp, ■ = median first release)", fontsize=7
+            )
+            ax.set_ylabel("RMS distance to paired none (z)", fontsize=7)
+            clean(ax)
+            rs[f] = rf
+        axes[0, 0].legend(fontsize=6.5, frameon=False)
+        fig.suptitle(
+            f"{SHORT[suite]}: distance to the paired none episode, both aligned on their own first grasp",
+            fontsize=10,
+        )
+        fig.tight_layout()
+        fig.savefig(td / f"grasp_aligned_{suite}.png", dpi=110, facecolor=SURFACE)
+        plt.close(fig)
+        res["traj"][suite] = rs
+        print(
+            f"[traj] {suite}: expert post/base "
+            + " ".join(f"{a}={v['post_over_base']}" for a, v in rs.get("expert", {}).items()),
+            flush=True,
+        )
 
 
 # ---------------------------------------------------------------- main
@@ -1092,7 +1585,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", type=Path, default=RUN)
     ap.add_argument("--out", type=Path, default=OUT)
-    ap.add_argument("--stages", default="load,perf,t021,jpca,manifold,attractor")
+    ap.add_argument("--stages", default="load,perf,t021,jpca,manifold,attractor,traj")
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
@@ -1102,8 +1595,14 @@ def main() -> None:
     if "load" in stages:
         stage_load(a.run, a.out, a.workers)
         res["source_run"] = str(a.run)
-    for name, fn in (("perf", stage_perf), ("t021", stage_t021), ("jpca", stage_jpca), ("manifold", stage_manifold),
-                     ("attractor", stage_attractor)):
+    for name, fn in (
+        ("perf", stage_perf),
+        ("t021", stage_t021),
+        ("jpca", stage_jpca),
+        ("manifold", stage_manifold),
+        ("attractor", stage_attractor),
+        ("traj", stage_traj),
+    ):
         if name in stages:
             fn(a.out, res)
             num.write_text(json.dumps(res, indent=1, default=str))
