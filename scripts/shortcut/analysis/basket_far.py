@@ -124,13 +124,28 @@ def ci(x):
     return [r3(m[0]), r3(lo[0]), r3(hi[0])]
 
 
-def boot_ratio(a, b, n=NBOOT):
+def boot_ratio_raw(a, b, n=NBOOT):
+    """ratio of means mean(a)/mean(b) over rows where both exist; a and b are resampled with the same row indices
+    (paired bootstrap). Unrounded (mean, lo, hi, n)."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     ok = ~(np.isnan(a) | np.isnan(b))
     a, b = a[ok], b[ok]
     idx = RNG.integers(0, len(a), (n, len(a)))
     r = a[idx].mean(1) / b[idx].mean(1)
-    return [r3(a.mean() / b.mean()), r3(np.percentile(r, 2.5)), r3(np.percentile(r, 97.5))]
+    return float(a.mean() / b.mean()), float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5)), int(len(a))
+
+
+def boot_ratio(a, b, n=NBOOT):
+    m, lo, hi, _ = boot_ratio_raw(a, b, n)
+    return [r3(m), r3(lo), r3(hi)]
+
+
+def mcnemar_exact(b, c):
+    """two-sided exact McNemar p for discordant counts b, c."""
+    from math import comb
+
+    n = b + c
+    return min(1.0, 2 * sum(comb(n, j) for j in range(min(b, c) + 1)) / 2 ** n) if n else 1.0
 
 
 def nanmean(x, axis):
@@ -227,7 +242,15 @@ def call_phase(e):
         for p in PHASES:
             if b[p] is not None and b[p][0] <= s < b[p][1]:
                 lab = p
-        out.append(lab or ("after" if b["after"] else "carry" if b["carry"] else "approach"))
+        if lab is None:  # calls in no window: place them by the episode's own events, not a fixed fallback
+            g, r = e["grasp"], e["release"]
+            if g is None or s < g:
+                lab = "approach"
+            elif r is not None and s >= r:
+                lab = "after"  # e.g. release at 250 → call 270 (after-window too short to exist)
+            else:
+                lab = "carry" if b["carry"] else "grasp"
+        out.append(lab)
     return out
 
 
@@ -301,6 +324,17 @@ def behaviour(eps, C, out, res):
                         continue
                     fr.append(float(np.dot(e["release_xy"] - p["release_xy"], sv) / np.dot(sv, sv)))
                 s[f"follow_{subset}"] = ci(fr) + [len(fr)] if fr else None
+            # second definition: relative to the ORIGINAL basket centre instead of the paired ctl release point:
+            # (release − original centre)·Δ/|Δ|²; and how far successful releases stop short of the new centre along Δ
+            c0 = np.array(C[C[k]["ctl"]]["xy"])
+            for subset in ("success", "released"):
+                fr = [float(np.dot(e["release_xy"] - c0, sv) / np.dot(sv, sv)) for e in E
+                      if e["release_xy"] is not None and (subset == "released" or e["success"])]
+                s[f"follow_centre_{subset}"] = ci(fr) + [len(fr)] if fr else None
+            s["ctl_release_vs_centre_along_shift"] = ci([float(np.dot(p["release_xy"] - c0, sv) / np.dot(sv, sv))
+                                                         for p in P_ if p["success"] and p["release_xy"] is not None])
+            s["success_short_of_new_centre_along_shift_cm"] = ci(
+                [float(np.dot(np.array(C[k]["xy"]) - e["release_xy"], sv) / np.linalg.norm(sv)) * 100 for e in ok]) if ok else None
             # per axis (x = toward the camera, y = lateral): release shift ÷ basket shift on that axis, paired
             for ax_i, ax_n in ((0, "x"), (1, "y")):
                 if abs(sv[ax_i]) < 0.02:
@@ -326,6 +360,9 @@ def behaviour(eps, C, out, res):
             s["release_dist_to_new_centre_cm_success"] = ci(
                 [np.linalg.norm(e["release_xy"] - np.array(C[k]["xy"])) * 100 for e in ok]) if ok else None
         S[k] = s
+    a_ = sum(eps["far20", t, i]["success"] and not eps["farM", t, i]["success"] for t, i in keyorder())
+    b_ = sum(eps["farM", t, i]["success"] and not eps["far20", t, i]["success"] for t, i in keyorder())
+    S["far20_vs_farM_mcnemar"] = dict(far20_only=a_, farM_only=b_, p_exact=r3(mcnemar_exact(a_, b_)))
     res["behaviour"] = S
     (d / "summary.json").write_text(json.dumps(S, indent=1))
 
@@ -443,13 +480,29 @@ def basket_masks(eps, C, sink):
     left[:, : P // 2] = True
     left &= ~sink
     M = {}
+    rd = dict(max_abs=[], frac_px_gt40=[], patches_changed=[])  # 4090 vs A100 render difference, same init, ctl
     for t, i in keyorder():
         O = first_frame(eps["opp", t, i])
-        ch = {k: changed(first_frame(eps[k, t, i]), O) for k in ("ctlF", "ctl", "near", "far20", "farM")}
+        fr = {k: first_frame(eps[k, t, i]) for k in ("ctlF", "ctl", "near", "far20", "farM")}
+        ch = {k: changed(f, O) for k, f in fr.items()}
+        # the 4090 masks use the A100 opp frame as the no-basket reference; any patch where the two machines' ctl
+        # first frames already differ by the change criterion is left out of the 4090 masks
+        dmach = np.abs(fr["ctl"].astype(np.int16) - fr["ctlF"].astype(np.int16)).max(-1)
+        mach = changed(fr["ctl"], fr["ctlF"])
+        rd["max_abs"].append(int(dmach.max()))
+        rd["frac_px_gt40"].append(float((dmach > 40).mean()))
+        rd["patches_changed"].append(int(mach.sum()))
         M["opp", t, i] = dict(old=ch["ctlF"] & left, new=ch["ctlF"] & ~left & ~sink)
         for k in ("near", "far20", "farM"):
             old, new = ch[C[k]["ctl"]] & left, ch[k] & left
+            if C[k]["machine"] == "4090":
+                old, new = old & ~mach, new & ~mach
             M[k, t, i] = dict(old=old & ~new, new=new & ~old)
+    M["_render_diff"] = dict(max_abs_pixel_diff_max=int(max(rd["max_abs"])),
+                             max_abs_pixel_diff_median=float(np.median(rd["max_abs"])),
+                             frac_pixels_over_40_max=float(max(rd["frac_px_gt40"])),
+                             patches_meeting_change_criterion_total=int(sum(rd["patches_changed"])),
+                             criterion="pixel max|d| over RGB > 40, patch changed if > 25% of its pixels")
     return M
 
 
@@ -464,8 +517,9 @@ def basket_attention(eps, C, out, res):
     M = basket_masks(eps, C, sink)
     PH = ["approach", "carry", "after release"]
     share = defaultdict(list)
+    pv = defaultdict(lambda: np.full(100, np.nan))  # per task·init (index j), NaN where the episode has no such phase
     for k in MOVED:
-        for t, i in keyorder():
+        for j, (t, i) in enumerate(keyorder()):
             m = M[k, t, i]
             for who, ee in (("ctl", eps[C[k]["ctl"], t, i]), ("moved", eps[k, t, i])):
                 for g in range(3):
@@ -478,8 +532,26 @@ def basket_attention(eps, C, out, res):
                         acc[ph, "new"].append(a[m["new"]].sum())
                     for (ph, reg), v in acc.items():
                         share[k, who, reg, ph, g].append(np.mean(v))
+                        pv[k, who, reg, ph, g][j] = np.mean(v)
     npatch = {k: [float(np.mean([M[k, t, i][r].sum() for t, i in keyorder()])) for r in ("old", "new")] for k in MOVED}
+    # main numbers: paired ratios over task·inits where BOTH the ctl and the moved episode have the phase
+    paired = {}
+    for k in MOVED:
+        for ph in PH:
+            for g in range(3):
+                key = f"{k}|{ph}|{GROUPS[g]}"
+                co, cn = pv[k, "ctl", "old", ph, g], pv[k, "ctl", "new", ph, g]
+                mo, mn = pv[k, "moved", "old", ph, g], pv[k, "moved", "new", ph, g]
+                rn, rnl, rnh, n = boot_ratio_raw(mn, co)
+                ro, rol, roh, _ = boot_ratio_raw(mo, co)
+                both = ~(np.isnan(co) | np.isnan(mn))
+                paired[key] = dict(n_pairs=n, moved_new_over_ctl_old=[r3(rn), r3(rnl), r3(rnh)],
+                                   moved_old_over_ctl_old=[r3(ro), r3(rol), r3(roh)],
+                                   pct_on_pairs={nm: r3(np.mean(v[both]) * 100) for nm, v in
+                                                 (("ctl_old", co), ("ctl_new", cn), ("moved_old", mo), ("moved_new", mn))})
     res["basket_attention"] = dict(
+        render_diff_4090_vs_A100=M.pop("_render_diff"),
+        paired=paired,
         sink_patches=[list(map(int, x)) for x in np.argwhere(sink)],
         mean_patches_old_new={k: [round(x, 1) for x in v] for k, v in npatch.items()},
         share_pct={f"{k}|{who}|{reg}|{ph}|{GROUPS[g]}": ci(np.array(v) * 100) for (k, who, reg, ph, g), v in share.items()})
@@ -608,11 +680,12 @@ def rms(a, b):
     return np.sqrt(np.mean((a - b) ** 2, -1))
 
 
-def feature_arrays(eps):
+def feature_arrays(eps, fit=None):
+    """z-score per dimension; statistics from the conditions in `fit` (default: all, like T021)."""
     F = {}
     for f, fn in FEATS.items():
         raw = {k: np.stack([fn(eps[k, t, i]) for t, i in keyorder()]).astype(np.float32) for k in KINDS}
-        flat = np.concatenate([raw[k].reshape(-1, raw[k].shape[-1]) for k in KINDS])
+        flat = np.concatenate([raw[k].reshape(-1, raw[k].shape[-1]) for k in (fit or KINDS)])
         mu, sd = flat.mean(0), flat.std(0)
         keep = sd > 1e-6
         F[f] = {k: ((raw[k] - mu) / np.where(keep, sd, 1))[..., keep] for k in KINDS}
@@ -636,6 +709,7 @@ def representation(eps, C, out, res):
     d = out / "5_analysis"
     d.mkdir(parents=True, exist_ok=True)
     F = feature_arrays(eps)
+    Fc = feature_arrays(eps, fit=["ctl", "ctlF"])
     ko = keyorder()
     PI = {f: {k: np.stack([phase_interp(F[f][k][j], eps[k, t, i]) for j, (t, i) in enumerate(ko)]) for k in KINDS}
           for f in FEATS}
@@ -644,20 +718,29 @@ def representation(eps, C, out, res):
     for f in FEATS:
         # Q1 task identity: PCA-50 of whole trials (all 600); nearest centroid among the 10 ctl task centroids of the
         # same machine (leave-one-out for ctl itself); ctl(4090) is also scored against the A100 centroids.
-        Z = np.concatenate([F[f][k].reshape(100, -1) for k in KINDS])
-        Pz = PCA(n_components=50, random_state=0).fit_transform(Z)
-        Pk = {k: Pz[j * 100:(j + 1) * 100] for j, k in enumerate(KINDS)}
-        r = {}
-        for k in KINDS + ["ctl_vs_A100"]:
-            src, cref = ("ctl", "ctlF") if k == "ctl_vs_A100" else (k, C[k]["ctl"])
-            own = []
-            for j in range(100):
-                cent = np.stack([Pk[cref][task == t].mean(0) for t in range(10)])
-                if src == cref:
-                    cent[task[j]] = Pk[cref][(task == task[j]) & (np.arange(100) != j)].mean(0)
-                own.append(float(np.argmin(np.linalg.norm(cent - Pk[src][j], axis=1)) == task[j]))
-            r[k] = ci(own)
+        def own_task(FF, fit_kinds):
+            Z = {k: FF[f][k].reshape(100, -1) for k in KINDS}
+            pca = PCA(n_components=50, random_state=0).fit(np.concatenate([Z[k] for k in fit_kinds]))
+            Pk = {k: pca.transform(Z[k]) for k in KINDS}
+            out = {}
+            for k in KINDS + ["ctl_vs_A100"]:
+                src, cref = ("ctl", "ctlF") if k == "ctl_vs_A100" else (k, C[k]["ctl"])
+                own = []
+                for j in range(100):
+                    cent = np.stack([Pk[cref][task == t].mean(0) for t in range(10)])
+                    if src == cref:
+                        cent[task[j]] = Pk[cref][(task == task[j]) & (np.arange(100) != j)].mean(0)
+                    own.append(float(np.argmin(np.linalg.norm(cent - Pk[src][j], axis=1)) == task[j]))
+                out[k] = ci(own)
+            return out
+
+        r = own_task(F, KINDS)
         R["task_identity"][f] = r
+        # robustness: z-score and PCA fitted on the two ctl runs only (moved trials projected afterwards)
+        rc = own_task(Fc, ["ctl", "ctlF"])
+        R.setdefault("task_identity_fit_ctl_only", {})[f] = {
+            k: dict(value=rc[k], change_vs_fit_all=r3(rc[k][0] - r[k][0]), changed_by_0p05_or_more=bool(abs(rc[k][0] - r[k][0]) >= 0.05))
+            for k in rc}
         # Q2 divergence: distance to the same machine's ctl at the same task·init, by call and phase-aligned;
         # baseline = that ctl vs its other inits (same task)
         rr = {}
@@ -671,7 +754,7 @@ def representation(eps, C, out, res):
             ref = "ctl" if k == "machine" else C[k]["ctl"]
             first = None
             for c in range(NC):
-                if boot_ratio(Dc[k][:, c], Bc[ref][:, c])[1] > 1:
+                if boot_ratio_raw(Dc[k][:, c], Bc[ref][:, c])[1] > 1:  # unrounded lower bound, paired resampling
                     first = c
                     break
             ph = {}
@@ -791,6 +874,7 @@ def distance_summary(C, out, res):
                    follow_success=b["follow_both_success"], carry_steps=b.get("carry_steps_success_mean"),
                    att_late_carry={f"{who}|{reg}": Ra.get(f"{k}|{who}|{reg}|carry|late L12–17")
                                    for who in ("ctl", "moved") for reg in ("old", "new")},
+                   att_paired_late_carry=res["basket_attention"]["paired"][f"{k}|carry|late L12–17"],
                    expert_own=Rr["task_identity"]["expert"][k],
                    expert_carry_over_base=Rr["divergence"]["expert"][k]["phase_over_base"]["carry"],
                    expert_first_call=Rr["divergence"]["expert"][k]["first_call_above_base"],
@@ -806,13 +890,15 @@ def distance_summary(C, out, res):
             if val:
                 ax.errorbar(x, val[0], yerr=[[val[0] - val[1]], [val[2] - val[0]]], fmt=mk, color=col, ms=7, capsize=3)
                 ax.annotate(k, (x, val[0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
-        a = r["att_late_carry"]
-        if a["moved|new"]:
-            axes[1].scatter(x, a["moved|new"][0], marker=mk, color=col, s=45)
-            axes[1].scatter(x, a["moved|old"][0], marker=mk, facecolor="white", edgecolor=col, s=45)
-            axes[1].annotate(k, (x, a["moved|new"][0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
+        a = r["att_paired_late_carry"]
+        for key, filled in (("moved_new_over_ctl_old", True), ("moved_old_over_ctl_old", False)):
+            m_, lo_, hi_ = a[key]
+            axes[1].errorbar(x, m_, yerr=[[m_ - lo_], [hi_ - m_]], fmt=mk, color=col, mfc=col if filled else "white",
+                             ms=7, capsize=3)
+        axes[1].annotate(k, (x, a["moved_new_over_ctl_old"][0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
     axes[0].set_title("release follows the basket (fraction)", fontsize=9)
-    axes[1].set_title("late-layer carry attention, moved episode:\nfilled = new basket, open = old spot (%)", fontsize=9)
+    axes[1].set_title("late-layer carry attention ÷ ctl attention on the basket (paired):\nfilled = new basket, open = "
+                      "empty old spot", fontsize=9)
     axes[2].set_title("expert: nearest ctl centroid = own task", fontsize=9)
     axes[3].set_title("expert distance to own-init ctl ÷ baseline, carry", fontsize=9)
     for ax in axes:
@@ -845,7 +931,7 @@ def main():
     res = {"conditions": {k: {kk: (str(v) if isinstance(v, Path) else v) for kk, v in c.items()} for k, c in C.items()}}
     behaviour(eps, C, out, res)
     fail_frames(eps, C, out)
-    print(json.dumps({k: (v["success"], v.get("follow_both_success")) for k, v in res["behaviour"].items()}), flush=True)
+    print(json.dumps({k: (v["success"], v.get("follow_both_success")) for k, v in res["behaviour"].items() if k in KINDS}), flush=True)
     basket_attention(eps, C, out, res)
     attention_by_type(eps, C, out, res)
     representation(eps, C, out, res)
