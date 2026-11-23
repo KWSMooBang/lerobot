@@ -51,7 +51,25 @@ def run_episode(
     instr = entry["instruction_given"]
     eid = f"{unit['unit_id']}/i{init_idx}"
     label = f"{unit['model']}  PRO {entry['axis']}/{entry['level']}  init {init_idx:02d}"
-    client.reset(eid, seed, instr)
+    rel = video_rel(
+        unit["suite"],
+        unit["task_id"],
+        entry["axis"],
+        entry["level"],
+        init_idx,
+        int(unit.get("repeat_idx", 0)),
+    )
+    record_meta = {
+        "benchmark": "libero_pro",
+        "job_id": unit["job_id"],
+        "unit_id": unit["unit_id"],
+        "suite": unit["suite"],
+        "task_id": unit["task_id"],
+        "axis": entry["axis"],
+        "level": entry["level"],
+        "init_idx": init_idx,
+    }
+    client.reset(eid, seed, instr, record_key=f"{unit['job_id']}/{rel}", record_meta=record_meta)
     obs = env.reset(init_idx, seed)
     t_orig = t_new = None
     frames: list[np.ndarray] = []
@@ -95,7 +113,7 @@ def run_episode(
             frame(t)
         if pro and not dual:
             break
-    client.end(eid)
+    activations = client.end(eid)
     if video:  # hold the last frame ~1 s with the verdict
         frame(t)
         frames.extend([frames[-1]] * sim.VIDEO_FPS)
@@ -123,6 +141,7 @@ def run_episode(
         "n_steps": t,
         "time_policy_s": round(t_policy, 2),
         "time_env_s": round(t_env, 2),
+        "activations": activations,
     }
 
 
@@ -143,7 +162,15 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
     out = Path(unit["job_dir"])
     ep_path = out / "episodes.jsonl"
     rep = int(unit.get("repeat_idx", 0))
-    done = {episode_key(r) for r in read_jsonl(ep_path)}
+    prev = read_jsonl(ep_path)
+    done = {episode_key(r) for r in prev}
+    succ_cap = unit.get("video_success_cap")  # video `failed+N`
+    unit_key = (unit["task_id"], unit["axis"], unit["level"], rep)
+    succ_videos = sum(
+        1
+        for r in prev
+        if episode_key(r)[:3] + (r.get("repeat_idx", 0),) == unit_key and r["success"] and r.get("video")
+    )
     root = Path(unit["pro_root"])
     entry = catalog.task_entry(
         root,
@@ -166,9 +193,12 @@ def run_unit(unit: dict[str, Any], client: PolicyClient) -> int:
             if unit["episodes"] > len(env.init_states):
                 raise ValueError(f"{entry['init']}: only {len(env.init_states)} init states")
         seed = episode_seed(int(unit["seed"]), rep, unit["task_id"], init_idx)
-        video = cap is None or init_idx < cap
+        video = cap is None or init_idx < cap  # failed+N: frames always kept, written below if needed
         t0 = time.time()
         res = run_episode(client, env, entry, unit, init_idx, seed, video)
+        if succ_cap is not None and res["success_pro"]:
+            video = succ_videos < succ_cap
+            succ_videos += int(video)
         rel = video_rel(unit["suite"], unit["task_id"], unit["axis"], unit["level"], init_idx, rep)
         steps_file = out / "steps" / f"{rel}.npz"
         steps_file.parent.mkdir(parents=True, exist_ok=True)

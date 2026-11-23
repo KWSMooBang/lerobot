@@ -80,6 +80,16 @@ frames after the fix).
 - Observation convention: `robosuite_obs_to_wire`; for the clean suite the wire obs (both images, state) is
   bit-identical to the main harness' lerobot `LiberoEnv` path at the same init (`compare_obs.py`).
 
+## Render-fixed view of an older install (T023)
+
+An install made before T019 (no `assets/.sc_render_fix.json`, bench_version without `/fix-…`) can be used fixed without
+touching it: `fixed_mirror.sh <its .venvs> <new dir>` builds a symlink-farm copy of `libero/libero` (`render_fix.py
+mirror`), fixes the copy (`render_fix.py apply`) and writes `<new dir>/python`, the PRO venv python with the copy first
+on `PYTHONPATH`. Then `export SC_BENCH_VENVS=<its .venvs> LIBERO_PRO_ROOT=<new dir>/src/libero/libero
+LIBERO_PRO_PYTHON=<new dir>/python`; bench_version ends in `/fix-fix1-<hash>`.
+
+Battery key `video: failed+N` = every failed episode gets a video, successes only the first N per unit (task × level).
+
 ## Batteries
 
 - `quick`: none (5 inits), task (10), position swap (10) × 4 suites, libero_object x/y 0.1 / 0.3 / 0.5 (5) =

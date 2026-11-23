@@ -50,6 +50,8 @@ class Episode:
     rng: tuple[torch.Tensor, torch.Tensor | None] | None = None  # single: (cpu, cuda) global RNG state
     gen: torch.Generator | None = None  # batched: per-episode generator
     calls: int = 0
+    record_key: str | None = None  # --record-activations: npz name (client's key, default the episode id)
+    record_meta: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -192,6 +194,7 @@ class Engine:
         batch: int,
         info: dict[str, Any],
         image_map: dict[str, str] | None = None,
+        record_dir: str | None = None,
     ):
         self.l = loaded
         self.device = device
@@ -241,11 +244,30 @@ class Engine:
             "inference": loaded.inf_meta,
             **info,
         }
+        self.recorder: Any = None
+        if record_dir:
+            if self.exec_mode == "step":
+                raise SystemExit("--record-activations: not supported for stateful (step) policies")
+            from activations import ActivationRecorder
+
+            self.recorder = ActivationRecorder(policy, pre, record_dir, self.n)
+            self.hello["record_activations"] = self.recorder.info()
 
     # ------------------------------------------------------------ episodes
 
-    def reset(self, eid: str, seed: int, instruction: str) -> None:
-        ep = Episode(int(seed), instruction)
+    def reset(
+        self,
+        eid: str,
+        seed: int,
+        instruction: str,
+        record_key: str | None = None,
+        record_meta: dict[str, Any] | None = None,
+    ) -> None:
+        ep = Episode(
+            int(seed), instruction, record_key=record_key or eid, record_meta=dict(record_meta or {})
+        )
+        if self.recorder is not None:
+            self.recorder.drop(eid)
         if self.exec_mode == "step":
             from lerobot.processor.relative_action_processor import bind_relative_anchor
 
@@ -262,8 +284,30 @@ class Engine:
             ep.gen = self.bundle.generator(ep.seed)
         self.episodes[eid] = ep
 
-    def end(self, eid: str) -> None:
-        self.episodes.pop(eid, None)
+    def end(self, eid: str) -> str | None:
+        """Frees the episode; with --record-activations writes its npz and returns the path."""
+        ep = self.episodes.pop(eid, None)
+        if self.recorder is None or ep is None:
+            return None
+        meta = {"episode_id": eid, "seed": ep.seed, "instruction": ep.instruction, "client": ep.record_meta}
+        return self.recorder.save(eid, ep.record_key or eid, meta)
+
+    def _predict(self, batch: dict[str, Any], keys: list[str | None], **kw: Any) -> tuple[Any, np.ndarray]:
+        """predict_action_chunk (+ recorder hooks around it) → (raw chunk, post-processed actions)."""
+        rec = self.recorder
+        if rec is not None:
+            rec.begin(batch)
+        try:
+            with torch.inference_mode():
+                chunk = self.l.policy.predict_action_chunk(batch, **kw)[:, : self.n]
+        except BaseException:
+            if rec is not None:
+                rec.abort()
+            raise
+        acts = self._post(chunk)
+        if rec is not None:
+            rec.collect(keys, acts)
+        return chunk, acts
 
     def episode(self, eid: str) -> Episode:
         ep = self.episodes.get(eid)
@@ -316,11 +360,10 @@ class Engine:
         if ep.rng[1] is not None:
             torch.cuda.set_rng_state(ep.rng[1])
         batch = self.l.pre(self.wire_batch([obs], [instruction]))
-        with torch.inference_mode():
-            chunk = self.l.policy.predict_action_chunk(batch)[:, : self.n]
+        _chunk, acts = self._predict(batch, [eid])
         ep.rng = (torch.get_rng_state(), torch.cuda.get_rng_state() if self.cuda else None)
         ep.calls += 1
-        return self._serve(ep, self._post(chunk)[0], step)
+        return self._serve(ep, acts[0], step)
 
     def infer_batch(self, rows: list[tuple[str, dict[str, np.ndarray], str, bool]]) -> list[np.ndarray]:
         """batched mode: one padded call for rows from different episodes."""
@@ -334,9 +377,8 @@ class Engine:
             instr += [instr[0]] * k
             noise = torch.cat([noise, noise[:1].expand(k, *noise.shape[1:])])
         batch = self.l.pre(self.wire_batch(obs, instr))
-        with torch.inference_mode():
-            chunk = self.l.policy.predict_action_chunk(batch, noise=noise)[:, : self.n]
-        acts = self._post(chunk)
+        keys: list[str | None] = [eid for eid, *_ in rows] + [None] * max(0, k)
+        _chunk, acts = self._predict(batch, keys, noise=noise)
         out = []
         for i, (ep, (_, _, _, step)) in enumerate(zip(eps, rows, strict=True)):
             ep.calls += 1

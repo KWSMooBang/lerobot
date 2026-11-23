@@ -142,6 +142,14 @@ def print_plan(plans: list[tuple[dict, Any, JobPlan]], args: argparse.Namespace,
 # ---------------------------------------------------------------- servers and workers
 
 
+def record_dir(args: argparse.Namespace, run_dir: Path) -> Path | None:
+    """--record-activations: `auto` = <run_dir>/activations; a path as given; None = off."""
+    v = getattr(args, "record_activations", None)
+    if not v:
+        return None
+    return run_dir / "activations" if v == "auto" else Path(v)
+
+
 class ServerProc:
     def __init__(self, gpu: str, args: argparse.Namespace, ctx: Context):
         self.gpu = gpu
@@ -163,6 +171,9 @@ class ServerProc:
         ]  # fmt: skip
         if args.device == "cpu":
             env["CUDA_VISIBLE_DEVICES"] = ""
+        rec = record_dir(args, ctx.run_dir)
+        if rec is not None:
+            cmd += ["--record-activations", str(rec)]
         self.log = open(sdir / f"gpu{gpu}.log", "a")  # noqa: SIM115
         self.log.write(f"\n[{now()}] {shlex.join(cmd)}\n")
         self.log.flush()
@@ -484,6 +495,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--only", default=None, help="keep jobs matching any of these benchmark/suite/condition values"
     )
     ap.add_argument("--dry-run", action="store_true", help="plan + time estimate only (no GPU)")
+    ap.add_argument(
+        "--record-activations",
+        nargs="?",
+        const="auto",
+        default=None,
+        metavar="DIR",
+        help="policy server records per-call activations (pi0 family), one npz per episode; "
+        "no value / auto = <run_dir>/activations (serve/activations.py)",
+    )
     ap.add_argument("--no-gpu-lock", action="store_true")
     ap.add_argument(
         "--device",
@@ -651,6 +671,7 @@ def main(argv: list[str] | None = None) -> int:
                     "ckpt_row": ckpt,
                     "gpus": gpus,
                     "clients_per_gpu": args.clients_per_gpu,
+                    "record_activations": str(record_dir(args, run_dir) or "") or None,
                     "hello": h0,
                     "jobs": [p.job_id for _, _, p in plans],
                 },

@@ -90,6 +90,21 @@ the server. Throughput: single 23–26 env-steps/s (≈ in-process), batched-2 3
 Each job's `run_meta.json → identity` holds `exec_mode`, GPU model, torch, CUDA and `via: policy_server`;
 `metrics.py` and `sc-report` warn when results of different exec modes / GPU models / bench versions are compared.
 
+## Activation recording (T023)
+
+`sc-bench ... --record-activations [DIR]` (no value = `<run_dir>/activations`) starts the policy server with
+`--record-activations`: forward hooks (`../serve/activations.py`, pi0 family) record per policy call the T021 features
+(`attn_mass`, `attn_head`, `attn_img` f16, `exp_h`, `exp_mlp`, `vlm_h`, `vlm_mlp`, `sig_h`, `act_pred`, `seg_ntok`) plus
+hidden-state means (`exp_vec` f16: expert layers 5/11/17 × denoising steps; `vlm_vec`: VLM layers 5/11/17 × agentview /
+wrist / task / state) and write one npz per episode at `end` (or connection close) to `DIR/<record_key>.npz`.
+`reset` may carry `record_key` (the client default = its episode id; the PRO worker sends `<job_id>/<steps rel>`) and
+`record_meta`; the `end` reply carries the npz path, which the PRO worker stores as `activations` in episodes.jsonl.
+Hooks only read tensors: actions are bit-identical with recording on and off (24/24 PRO episodes on GPU 1, 4090);
+recorded values match the earlier replay extraction (`attn_extract.py`) with r ≥ 0.9999
+(`../serve/check_recording.py`). Cost on a 4090: ×1.17 wall time, 0.155 MB per call (≈ 3.6 MB per PRO episode).
+Not in `step` exec mode; batched mode drops the padding rows. Tests: `tests/test_activations.py` (CPU, tiny pi0-shaped
+model).
+
 ## Layout
 
 | path                        | what                                                                                                                                     |

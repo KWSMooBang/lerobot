@@ -113,6 +113,7 @@ class PolicyClient:
         self._ids = itertools.count()
         self.server_ms = 0.0
         self.calls = 0
+        self.last_activations: str | None = None  # npz written by a --record-activations server at end()
         self.info = self.hello()
 
     def _connect(self, timeout_s: float) -> ClientConnection:
@@ -152,15 +153,26 @@ class PolicyClient:
     def _eid(self, episode_id: str) -> str:
         return f"{self.name}/{episode_id}"
 
-    def reset(self, episode_id: str, episode_seed: int, instruction: str) -> None:
-        self._call(
-            {
-                "type": "reset",
-                "episode_id": self._eid(episode_id),
-                "episode_seed": int(episode_seed),
-                "instruction": instruction,
-            }
-        )
+    def reset(
+        self,
+        episode_id: str,
+        episode_seed: int,
+        instruction: str,
+        record_key: str | None = None,
+        record_meta: dict[str, Any] | None = None,
+    ) -> None:
+        """record_key / record_meta: only used by a server started with --record-activations (npz name
+        under its dir, default the episode id; extra metadata saved in the npz)."""
+        msg: dict[str, Any] = {
+            "type": "reset",
+            "episode_id": self._eid(episode_id),
+            "episode_seed": int(episode_seed),
+            "instruction": instruction,
+            "record_key": record_key or episode_id,
+        }
+        if record_meta:
+            msg["record_meta"] = record_meta
+        self._call(msg)
 
     def infer(
         self, episode_id: str, obs: dict[str, np.ndarray], instruction: str, step: bool = False
@@ -183,8 +195,12 @@ class PolicyClient:
         self.calls += 1
         return actions
 
-    def end(self, episode_id: str) -> None:
-        self._call({"type": "end", "episode_id": self._eid(episode_id)})
+    def end(self, episode_id: str) -> str | None:
+        """Frees the episode; returns (and keeps in last_activations) the activation npz path when the
+        server records activations, else None."""
+        resp = self._call({"type": "end", "episode_id": self._eid(episode_id)})
+        self.last_activations = resp.get("activations")
+        return self.last_activations
 
     def close(self) -> None:
         self._stack.close()

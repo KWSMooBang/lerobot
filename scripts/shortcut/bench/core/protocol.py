@@ -8,12 +8,14 @@ Requests (`type` field) and responses (`ok: true` + fields, or `ok: false, error
   hello                                       → {policy_type, ckpt, ckpt_id, exec_mode, action_dim=7, chunk_size,
                                                  n_action_steps, image_keys, state_dim=8, image_orientation,
                                                  protocol_version, exec, inference, server}
-  reset {episode_id, episode_seed, instruction}   → {}            new noise stream + empty action queue
+  reset {episode_id, episode_seed, instruction[, record_key, record_meta]} → {}  new noise stream + empty
+                                                  action queue (record_*: --record-activations servers only)
   infer {episode_id, obs:{image, image2, state}, instruction[, step]}
                                               → {actions: float32[n, 7], server_ms}
         without `step` (default) the server returns the next n_action_steps actions (one chunk); with
         `step: true` it returns one action [1, 7] from its per-episode queue (new chunk when empty).
-  end {episode_id}                            → {}            optional; frees the episode (batching waits less)
+  end {episode_id}                            → {activations}  optional; frees the episode (batching waits
+                                                  less); activations = npz path when the server records, else None
 
 Observation convention (the client's job, checked against hello): images are uint8 [H, W, 3] in the
 orientation of the training data HuggingFaceVLA/libero, i.e. upright (raw LIBERO/robosuite renders rotated

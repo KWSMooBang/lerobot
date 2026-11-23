@@ -2,7 +2,7 @@
 
 Battery job keys: suite(s), perturbation(s) = axis (none | object | position | semantic | task | environment),
 levels (default: all of the axis, see catalog.levels; e.g. position on libero_object: swap, x0.1 … y0.5),
-tasks (default 0-9), episodes (inits per task × level, ≤ 50), seed, video (all | none | first:N), max_steps,
+tasks (default 0-9), episodes (inits per task × level, ≤ 50), seed, video (all | none | first:N | failed+N = every failure + the first N successes per task × level), max_steps,
 instruction_source (training = LIBERO training sentence on the non-language axes, PRO's on semantic / task,
 default | pro_bddl | filename, see catalog), init_source (default | pro | clean, catalog.DEFAULT_INIT_SOURCE),
 repeat.
@@ -48,8 +48,16 @@ def _parse_range(spec: Any) -> list[int]:
     return out
 
 
+def _video_success_cap(spec: Any) -> int | None:
+    """`failed+N`: every failed episode gets a video, successes only the first N per unit; None otherwise."""
+    s = str(spec or "")
+    return int(s.split("+", 1)[1]) if s.startswith("failed+") else None
+
+
 def _video_cap(spec: Any) -> int | None:
     s = str(spec or "first:3")
+    if s.startswith("failed+"):
+        return None  # decided per episode (_video_success_cap)
     if s == "all":
         return None
     if s == "none":
@@ -272,6 +280,7 @@ class LiberoProAdapter(BenchmarkAdapter):
             "repeat_idx": j["repeat"],
             "max_steps": j["max_steps"],
             "video_cap": _video_cap(j.get("video")),
+            "video_success_cap": _video_success_cap(j.get("video")),
             "env_hw": int(hello["image_hw"][0]),
             "backend": ctx.backend,
             "bench_version": bv,

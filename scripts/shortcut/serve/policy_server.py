@@ -12,6 +12,10 @@ a local pretrained_model dir, or a hub id. LIBERO adapter (`notes: adapter=...` 
 waits until every live episode has a request or --batch-wait-ms passed). Stateful policies (observation
 history, temporal ensembling) run per step (exec_mode step, one live episode).
 --ready-file: written (JSON: url, port, pid, hello) once the model is loaded and the socket listens.
+--record-activations DIR: hooks record per-call internal activations (serve/activations.py, pi0 family) and
+write one npz per episode at `end` (or connection close) to DIR/<record_key>.npz; `reset` may carry
+`record_key` (default c<conn>/<episode_id>) and `record_meta` (dict, saved in the npz); the `end` response
+carries `activations` = the written path. Actions are unchanged (hooks only read).
 """
 
 from __future__ import annotations
@@ -153,18 +157,24 @@ class Server:
             return {"ok": True, **self.engine.hello}
         eid = f"c{cid}:{msg['episode_id']}"
         if kind == "reset":
+            meta = msg.get("record_meta")
             await self.run_engine(
-                self.engine.reset, eid, int(msg["episode_seed"]), msg.get("instruction", "")
+                self.engine.reset,
+                eid,
+                int(msg["episode_seed"]),
+                msg.get("instruction", ""),
+                msg.get("record_key") or f"c{cid}/{msg['episode_id']}",
+                meta if isinstance(meta, dict) else None,
             )
             owned.add(eid)
             if self.engine.exec_mode == "step":
                 owned.intersection_update(self.engine.episodes)
             return {"ok": True}
         if kind == "end":
-            await self.run_engine(self.engine.end, eid)
+            path = await self.run_engine(self.engine.end, eid)
             owned.discard(eid)
             self.wake.set()  # a batch may be waiting for this episode
-            return {"ok": True}
+            return {"ok": True, "activations": path}
         return await self.infer(eid, msg)
 
     async def handler(self, ws: ServerConnection) -> None:
@@ -247,7 +257,9 @@ def build_engine(args: argparse.Namespace) -> Any:
             "batch_wait_ms": args.batch_wait_ms,
         },
     }
-    eng = Engine(loaded, device, args.n_action_steps, args.batch, info, image_map)
+    eng = Engine(
+        loaded, device, args.n_action_steps, args.batch, info, image_map, record_dir=args.record_activations
+    )
     eng.hello["exec"] = exec_identity(eng.exec_mode, gpu)
     # inference meta may hold torch dtypes / paths: hello must be msgpack-safe
     eng.hello = json.loads(json.dumps(eng.hello, default=str))
@@ -304,6 +316,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--image-map", default=None, help="image=<policy key>,image2=<policy key>")
     ap.add_argument("--backend", choices=("libero", "mock"), default="libero")
+    ap.add_argument(
+        "--record-activations",
+        default=None,
+        metavar="DIR",
+        help="record per-call activations (pi0 family), one npz per episode under DIR (opt-in)",
+    )
     ap.add_argument("--check", action="store_true", help="load + one blank-obs inference, print, exit")
     return ap
 

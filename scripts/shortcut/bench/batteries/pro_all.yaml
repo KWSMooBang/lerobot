@@ -1,0 +1,17 @@
+# T023: all of LIBERO-PRO, 10 inits per entry, for activation trajectories (sc-bench --record-activations).
+# 4 suites × {none, object, position, semantic, task, environment}; libero_object position = swap + x0.1–0.5
+# + y0.1–0.5 (11 levels). 340 entries (suite × axis × level × task; libero_object y0.5 task 1 has no init
+# file in PRO and is skipped by the planner) × init 0–9 ≈ 3,400 episodes.
+# instruction_source / init_source: T013/T019 defaults (training sentence on visual axes, PRO's on semantic /
+# task; clean init on semantic / task, PRO's on the others). Videos: every failure + the first success per entry.
+name: pro_all
+description: LIBERO-PRO all axes × all levels × 4 suites × 10 inits (T023)
+defaults:
+  seed: 7
+  video: "failed+1"
+  tasks: 0-9
+  episodes: 10
+jobs:
+  - benchmark: libero_pro
+    suites: [libero_spatial, libero_object, libero_goal, libero_10]
+    perturbations: [none, object, position, semantic, task, environment]
