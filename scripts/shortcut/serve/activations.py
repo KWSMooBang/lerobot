@@ -28,7 +28,10 @@ same key into its episodes.jsonl row. Benchmark-agnostic: nothing here knows abo
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -259,6 +262,8 @@ class ActivationRecorder:
         self.n_action_steps = n_action_steps
         self.n_img = len(self.cfg.image_features)  # incl. empty (masked) cameras; present cameras first
         self.buffers: dict[str, list[dict[str, np.ndarray]]] = {}
+        self.calls: dict[str, int] = {}  # policy calls per episode, recorded or not
+        self.skipped: dict[str, list[dict[str, Any]]] = {}  # calls not recorded (call index, reason)
         self.saved = 0
 
     def info(self) -> dict[str, Any]:
@@ -278,10 +283,14 @@ class ActivationRecorder:
         seg = torch.full((n_rows, n_img_keys + n_lang + self.cfg.chunk_size), PAD, dtype=torch.long)
         for c in range(min(self.n_img, 2)):
             seg[:, c * IMG_TOKENS : (c + 1) * IMG_TOKENS] = c
+        self._bad: dict[int, str] = {}
         for b in range(n_rows):
             ids = tokens[b][masks[b]].tolist()
             pos = torch.nonzero(masks[b].cpu()).flatten() + n_img_keys
-            seg[b, pos] = torch.tensor(lang_segments(self.tok, ids))
+            try:  # e.g. a prompt cut at tokenizer_max_length before ';\nAction': skip this row's record only
+                seg[b, pos] = torch.tensor(lang_segments(self.tok, ids))
+            except ValueError as e:
+                self._bad[b] = f"prompt segments: {e}"[:300]
             seg[b, n_img_keys + n_lang :] = 6
         self._ntok = np.stack([np.bincount(seg[b].numpy(), minlength=PAD + 1)[:PAD] for b in range(n_rows)])
         self.hooks.start(
@@ -291,30 +300,56 @@ class ActivationRecorder:
     def abort(self) -> None:
         self.hooks.active = False
 
+    def skip(self, keys: list[str | None], reason: str) -> None:
+        """The call happened but is not recorded (recorder error): count it and flag the episodes."""
+        self.abort()
+        for key in keys:
+            if key is not None:
+                call = self.calls.get(key, 0)
+                self.calls[key] = call + 1
+                self.skipped.setdefault(key, []).append({"call": call, "reason": reason[:300]})
+        print(
+            f"[activations] WARNING call not recorded for {[k for k in keys if k]}: {reason[:300]}",
+            file=sys.stderr,
+            flush=True,
+        )
+
     def collect(self, keys: list[str | None], actions: np.ndarray) -> None:
         """keys: episode buffer key per batch row (None = padding row); actions: (B, n, 7) as served."""
         out = self.hooks.stop()
         for b, key in enumerate(keys):
             if key is None:
                 continue
-            row = {k: v[b] for k, v in out.items()}
+            if b in self._bad:
+                self.skip([key], self._bad[b])
+                continue
+            call = self.calls.get(key, 0)
+            self.calls[key] = call + 1
+            row = {
+                k: v[b].copy() for k, v in out.items()
+            }  # copy: a row view would pin the whole batch buffer
             row["seg_ntok"] = self._ntok[b].astype(np.int32)
-            row["act_pred"] = np.asarray(actions[b], np.float32)
+            row["act_pred"] = np.array(actions[b], np.float32)
+            row["call"] = np.asarray(call, np.int32)
             self.buffers.setdefault(key, []).append(row)
 
     def save(self, key: str, record_key: str, meta: dict[str, Any]) -> str | None:
         """Write the episode's calls to <dir>/<record_key>.npz; returns the path (None if nothing recorded)."""
         rows = self.buffers.pop(key, None)
+        n_calls = self.calls.pop(key, 0)
+        skipped = self.skipped.pop(key, [])
         if not rows:
             return None
         arrays = {k: np.stack([r[k] for r in rows]) for k in rows[0]}
         for k in F16_KEYS:
             arrays[k] = arrays[k].astype(np.float16)
-        arrays["t"] = np.arange(len(rows), dtype=np.int32) * self.n_action_steps
+        arrays["t"] = arrays["call"] * self.n_action_steps  # env step of each recorded call (chunk clients)
         meta = {
             **meta,
             "record_key": record_key,
-            "n_calls": len(rows),
+            "n_calls": n_calls,
+            "n_recorded": len(rows),
+            "skipped_calls": skipped,
             "n_action_steps": self.n_action_steps,
             "policy_type": getattr(self.cfg, "type", None),
             "num_inference_steps": int(self.cfg.num_inference_steps),
@@ -322,13 +357,37 @@ class ActivationRecorder:
             "saved": time.strftime("%Y-%m-%dT%H:%M:%S"),
         }
         arrays["meta"] = np.asarray(json.dumps(meta, default=str))
-        path = self.out_dir / f"{safe_key(record_key)}.npz"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp.npz")
-        np.savez_compressed(tmp, **arrays)
-        tmp.replace(path)
+        path = self.target(record_key)
+        if path is None:
+            return None
+        fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                np.savez_compressed(f, **arrays)
+            os.replace(tmp, path)  # swaps the directory entry: a symlink at `path` is never followed
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
         self.saved += 1
         return str(path)
 
+    def target(self, record_key: str) -> Path | None:
+        """<dir>/<record_key>.npz if its directory resolves inside the recording dir (no escape through a
+        symlinked subdirectory); else None + warning (inference is not affected)."""
+        root = self.out_dir.resolve()
+        path = self.out_dir / f"{safe_key(record_key)}.npz"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        parent = path.parent.resolve()
+        if parent != root and root not in parent.parents:
+            print(
+                f"[activations] WARNING {path} resolves outside {root}: not written",
+                file=sys.stderr,
+                flush=True,
+            )
+            return None
+        return parent / path.name
+
     def drop(self, key: str) -> None:
         self.buffers.pop(key, None)
+        self.calls.pop(key, None)
+        self.skipped.pop(key, None)

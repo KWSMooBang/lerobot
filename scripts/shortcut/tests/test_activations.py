@@ -312,3 +312,118 @@ def test_reset_without_end_drops_buffer(tmp_path: Path) -> None:
 def test_non_pi_policy_is_refused(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="pi0-family"):
         A.Hooks(SimpleNamespace(model=nn.Linear(2, 2)))
+
+
+# ---------------------------------------------------------------- review fixes (codex review of 8d29da28)
+
+
+def test_truncated_prompt_skips_record_not_inference(tmp_path: Path) -> None:
+    """A prompt cut before ';\\nAction' (tokenizer max length) must not fail the call: the record skips it."""
+    long_task = "x" * (LT + 10)  # Pre truncates to LT tokens → no ';\nAction' in the prompt
+    ref = make_engine(None)
+    eng = make_engine(tmp_path)
+    instr = ["short task", long_task, "short task"]
+    for e in (ref, eng):
+        e.reset("e", 7, "short task", record_key="k/e")
+    a_ref = [ref.infer_one("e", obs(k), instr[k], False) for k in range(3)]
+    a_rec = [eng.infer_one("e", obs(k), instr[k], False) for k in range(3)]
+    for a, b in zip(a_ref, a_rec, strict=True):
+        assert np.array_equal(a, b)
+    p = eng.end("e")
+    assert p is not None
+    d = np.load(p)
+    assert d["attn_mass"].shape[0] == 2 and list(d["call"]) == [0, 2] and list(d["t"]) == [0, 8]
+    meta = json.loads(str(d["meta"]))
+    assert meta["n_calls"] == 3 and meta["n_recorded"] == 2
+    assert [s["call"] for s in meta["skipped_calls"]] == [1]
+    assert "prompt segments" in meta["skipped_calls"][0]["reason"]
+
+
+def test_record_key_cannot_escape_dir(tmp_path: Path) -> None:
+    rec_dir, outside = tmp_path / "rec", tmp_path / "outside"
+    rec_dir.mkdir()
+    outside.mkdir()
+    (rec_dir / "evil").symlink_to(outside, target_is_directory=True)
+    eng = make_engine(rec_dir)
+    _, p = run(eng, "e", 1, key="evil/x")
+    assert p is None and not list(outside.iterdir())  # refused, nothing written outside
+    # a symlink at the final path is replaced, never written through; temp files are unique and cleaned up
+    (rec_dir / "ok").mkdir()
+    victim = outside / "victim.npz"
+    victim.write_bytes(b"keep")
+    (rec_dir / "ok" / "y.npz").symlink_to(victim)
+    _, p = run(eng, "e2", 1, key="ok/y")
+    assert p == str((rec_dir / "ok" / "y.npz").resolve())
+    assert victim.read_bytes() == b"keep" and not (rec_dir / "ok" / "y.npz").is_symlink()
+    assert sorted(f.name for f in (rec_dir / "ok").iterdir()) == ["y.npz"]
+
+
+def test_client_default_record_key_is_per_client() -> None:
+    from bench.core.client import PolicyClient
+
+    sent: list[dict] = []
+
+    def fake_call(msg: dict) -> dict:
+        sent.append(msg)
+        return {"ok": True}
+
+    for name in ("w1", "w2"):
+        c = object.__new__(PolicyClient)
+        c.name = name
+        c._call = fake_call  # type: ignore[method-assign]
+        c.reset("unit/i0", 1, "x")
+    assert [m["record_key"] for m in sent] == ["w1/unit/i0", "w2/unit/i0"]
+
+
+def _fake_pro_venvs(root: Path) -> Path:
+    from test_testbed_select import png  # same fake sRGB textures as the render_fix test
+
+    v = root / "venvs"
+    (v / "libero_pro" / "bin").mkdir(parents=True)
+    (v / "libero_pro" / "bin" / "python").symlink_to(sys.executable)
+    src = v / "libero_pro_src"
+    lib = src / "libero" / "libero"
+    a = lib / "assets"
+    (a / "textures").mkdir(parents=True)
+    (a / "scenes").mkdir()
+    (a / "textures" / "floor.png").write_bytes(png(True))
+    (a / "scenes" / "libero_floor_base_style.xml").write_text('<texture file="../textures/floor.png"/>')
+    (lib / "__init__.py").write_text("")
+    (lib / "bddl_files").mkdir()
+    (src / "libero" / "lifelong").mkdir()
+    (src / "SC_VERSION").write_text("libero-pro-test\n")
+    return v
+
+
+def _snapshot(d: Path) -> dict:
+    return {
+        str(p): (p.is_symlink(), p.read_bytes() if p.is_file() and not p.is_symlink() else None)
+        for p in d.rglob("*")
+    }
+
+
+def test_fixed_mirror_never_writes_the_original(tmp_path: Path) -> None:
+    import subprocess  # nosec B404
+
+    script = str(SHORTCUT / "bench" / "libero_pro" / "fixed_mirror.sh")
+    v = _fake_pro_venvs(tmp_path)
+    before = _snapshot(v)
+
+    def sh(dst: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(["bash", script, str(v), str(dst)], capture_output=True, text=True)  # nosec B603 B607
+
+    ok = sh(tmp_path / "fix")
+    assert ok.returncode == 0, ok.stderr
+    assert "fix-" in ok.stdout and _snapshot(v) == before
+    scene = tmp_path / "fix/src/libero/libero/assets/scenes/libero_floor_base_style.xml"
+    assert "textures_nosrgb" in scene.read_text()
+    # reused DST whose libero/libero is a symlink to the original → refused before apply
+    bad = tmp_path / "bad" / "src" / "libero"
+    bad.mkdir(parents=True)
+    (bad / "libero").symlink_to(v / "libero_pro_src" / "libero" / "libero")
+    r = sh(tmp_path / "bad")
+    assert r.returncode != 0 and "refusing" in r.stderr
+    # DST inside the original package → refused before anything is created
+    r = sh(v / "libero_pro_src" / "libero" / "x")
+    assert r.returncode != 0 and "refusing" in r.stderr
+    assert _snapshot(v) == before

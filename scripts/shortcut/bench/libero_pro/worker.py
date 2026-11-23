@@ -141,7 +141,7 @@ def run_episode(
         "n_steps": t,
         "time_policy_s": round(t_policy, 2),
         "time_env_s": round(t_env, 2),
-        "activations": activations,
+        **({"activations": activations} if activations else {}),  # only with a recording server
     }
 
 

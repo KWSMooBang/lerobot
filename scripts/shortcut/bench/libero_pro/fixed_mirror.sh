@@ -16,8 +16,15 @@ DST=$2
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PY=$SRC_VENVS/libero_pro/bin/python
 SRC=$SRC_VENVS/libero_pro_src/libero
+SRC_REAL=$(realpath "$SRC")
+die() { echo "fixed_mirror.sh: refusing: $*" >&2; exit 1; }
+# nothing is created before DST is known to resolve outside the original package
+case "$(realpath -m "$DST")/" in "$SRC_REAL"/* | "$(realpath "$SRC_VENVS/libero_pro_src")/") die "$DST resolves into $SRC_REAL" ;; esac
 mkdir -p "$DST/src/libero"
 DST=$(cd "$DST" && pwd)
+for p in "$DST/src" "$DST/src/libero"; do
+  case "$(realpath "$p")/" in "$SRC_REAL"/*) die "$p resolves into $SRC_REAL" ;; esac
+done
 for d in "$SRC"/*; do
   n=$(basename "$d")
   [ "$n" = libero ] && continue
@@ -25,8 +32,19 @@ for d in "$SRC"/*; do
 done
 # bench_version stamp (catalog.bench_version reads <root>/../../SC_VERSION)
 [ -e "$DST/src/SC_VERSION" ] || ln -s "$SRC_VENVS/libero_pro_src/SC_VERSION" "$DST/src/SC_VERSION"
-"$PY" "$HERE/../render_fix.py" mirror "$SRC/libero" "$DST/src/libero/libero"
-"$PY" "$HERE/../render_fix.py" apply --assets "$DST/src/libero/libero/assets"
+LIB=$DST/src/libero/libero
+"$PY" "$HERE/../render_fix.py" mirror "$SRC/libero" "$LIB"
+# apply writes into $LIB/assets: it must be our copy (a reused DST could hold a symlink to the original, and
+# `mirror` returns early on an existing path). Real directories, resolving outside the original install,
+# no symlinked directory inside assets (files may be symlinks: apply replaces them, never writes through).
+for p in "$DST" "$DST/src" "$DST/src/libero" "$LIB" "$LIB/assets"; do
+  [ -d "$p" ] && [ ! -L "$p" ] || die "$p is not a real directory"
+done
+for p in "$LIB" "$LIB/assets"; do
+  case "$(realpath "$p")/" in "$SRC_REAL"/*) die "$p resolves into the original install ($SRC_REAL)" ;; esac
+done
+[ -z "$(find "$LIB/assets" -type l -xtype d -print -quit)" ] || die "symlinked directory inside $LIB/assets"
+"$PY" "$HERE/../render_fix.py" apply --assets "$LIB/assets"
 cat > "$DST/python" <<EOF
 #!/usr/bin/env bash
 # LIBERO-PRO venv python with the render-fixed package copy first on the path (fixed_mirror.sh)

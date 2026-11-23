@@ -290,13 +290,25 @@ class Engine:
         if self.recorder is None or ep is None:
             return None
         meta = {"episode_id": eid, "seed": ep.seed, "instruction": ep.instruction, "client": ep.record_meta}
-        return self.recorder.save(eid, ep.record_key or eid, meta)
+        try:
+            return self.recorder.save(eid, ep.record_key or eid, meta)
+        except Exception as e:  # a failed write must not fail the client's episode
+            print(
+                f"[activations] WARNING {eid}: npz not written: {type(e).__name__}: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return None
 
     def _predict(self, batch: dict[str, Any], keys: list[str | None], **kw: Any) -> tuple[Any, np.ndarray]:
         """predict_action_chunk (+ recorder hooks around it) → (raw chunk, post-processed actions)."""
         rec = self.recorder
         if rec is not None:
-            rec.begin(batch)
+            try:
+                rec.begin(batch)
+            except Exception as e:  # recording must never fail the inference: skip this call's record
+                rec.skip(keys, f"begin: {type(e).__name__}: {e}")
+                rec = None
         try:
             with torch.inference_mode():
                 chunk = self.l.policy.predict_action_chunk(batch, **kw)[:, : self.n]
@@ -306,7 +318,10 @@ class Engine:
             raise
         acts = self._post(chunk)
         if rec is not None:
-            rec.collect(keys, acts)
+            try:
+                rec.collect(keys, acts)
+            except Exception as e:
+                rec.skip(keys, f"collect: {type(e).__name__}: {e}")
         return chunk, acts
 
     def episode(self, eid: str) -> Episode:

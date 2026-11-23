@@ -162,13 +162,14 @@ class PolicyClient:
         record_meta: dict[str, Any] | None = None,
     ) -> None:
         """record_key / record_meta: only used by a server started with --record-activations (npz name
-        under its dir, default the episode id; extra metadata saved in the npz)."""
+        under its dir, default <client name>/<episode id>; extra metadata saved in the npz)."""
         msg: dict[str, Any] = {
             "type": "reset",
             "episode_id": self._eid(episode_id),
             "episode_seed": int(episode_seed),
             "instruction": instruction,
-            "record_key": record_key or episode_id,
+            "record_key": record_key
+            or self._eid(episode_id),  # default: <client name>/<id>, unique per client
         }
         if record_meta:
             msg["record_meta"] = record_meta
