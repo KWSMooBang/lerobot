@@ -147,7 +147,9 @@ def hedges(a, b):
 
 
 def r3(x):
-    return round(float(x), 3)
+    """rounded float for numbers.json; NaN / ±inf (e.g. a zero baseline) → None so the file stays strict JSON."""
+    x = float(x)
+    return round(x, 3) if np.isfinite(x) else None
 
 
 def r3n(x):
@@ -457,22 +459,35 @@ def ctl_pairwise(Xc):
     return out
 
 
-def boot_ratio_pairs(dm, pw, n=NBOOT):
+def boot_ratio_pairs(dm, pw, n=NBOOT, groups=None):
     """Ratio of means: distance(moved, own-init ctl) / baseline, per column k, where the baseline of trial (t, a) is its
     mean distance to the other ctl inits of task t. Bootstrap resamples task·init pairs; inside each resample the
     baseline is recomputed from the resampled ctl trials only (a duplicated init counts with its multiplicity and is
     never compared with itself), so the uncertainty of the shared ctl reference is included.
-    dm (100, K), pw (10, 10, 10, K) → mean, lo, hi (K,) and n (K,)."""
-    dm = np.asarray(dm, float).reshape(10, 10, -1)
+    dm (100, K), pw (10, 10, 10, K) → mean, lo, hi (K,) and n (K,).
+    groups: optional list of bin slices (phases). Then the baseline is computed per bin first and averaged over the
+    group's bins per trial — the same order as the moved distance (per bin, then averaged) — so a neighbour missing a
+    bin does not change the weighting. Output columns are then the groups. A zero baseline gives NaN, not inf."""
+    dm = np.asarray(dm, float)
     V = np.isfinite(pw).astype(float)
     W = np.nan_to_num(pw)
 
+    def gmean(x):  # (..., K) → (..., G): nan-mean over each group's bins
+        if groups is None:
+            return x
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return np.stack([np.nanmean(x[..., g], -1) for g in groups], -1)
+
+    dmg = gmean(dm).reshape(10, 10, -1)
+
     def ratio(c):  # c (N, 10, 10) counts per task·init
         with np.errstate(divide="ignore", invalid="ignore"):
-            base = np.einsum("ntb,tabk->ntak", c, W) / np.einsum("ntb,tabk->ntak", c, V)
-            R = np.isfinite(base) & np.isfinite(dm)[None]
+            base = gmean(np.einsum("ntb,tabk->ntak", c, W) / np.einsum("ntb,tabk->ntak", c, V))
+            R = np.isfinite(base) & np.isfinite(dmg)[None]
             w = c[..., None] * R
-            return (w * np.nan_to_num(dm)[None]).sum((1, 2)) / (w * np.nan_to_num(base)).sum((1, 2)), (w > 0).sum((1, 2))
+            out = (w * np.nan_to_num(dmg)[None]).sum((1, 2)) / (w * np.nan_to_num(base)).sum((1, 2))
+            return np.where(np.isfinite(out), out, np.nan), (w > 0).sum((1, 2))
 
     m, cnt = ratio(np.ones((1, 10, 10)))
     idx = RNG.integers(0, 100, (n, 100))
@@ -525,11 +540,11 @@ def q2(eps, F, out, res):
         r = {}
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            pwp = np.stack([np.nanmean(D["phase"][f]["pw"][..., p * NB:(p + 1) * NB], -1) for p in range(len(PHASES))], -1)
             v = {k: np.stack([np.nanmean(D["phase"][f][k][:, p * NB:(p + 1) * NB], 1) for p in range(len(PHASES))], 1)
                  for k in MOVED}
-        for k in MOVED:
-            m, lo, hi, n = boot_ratio_pairs(v[k], pwp)
+        groups = [slice(p * NB, (p + 1) * NB) for p in range(len(PHASES))]
+        for k in MOVED:  # per-bin baseline first, then the phase average (same order as the moved distance)
+            m, lo, hi, n = boot_ratio_pairs(D["phase"][f][k], D["phase"][f]["pw"], groups=groups)
             for p, ph in enumerate(PHASES):
                 r.setdefault(ph, {})[f"{k}_over_base"] = [r3(m[p]), r3(lo[p]), r3(hi[p])]
                 r[ph][f"{k}_n_pairs"] = int(n[p])
