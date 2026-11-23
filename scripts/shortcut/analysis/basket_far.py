@@ -130,14 +130,22 @@ def boot_ratio_raw(a, b, n=NBOOT):
     a, b = np.asarray(a, float), np.asarray(b, float)
     ok = ~(np.isnan(a) | np.isnan(b))
     a, b = a[ok], b[ok]
+    if len(a) == 0 or b.mean() <= 0:  # no usable pairs, or the denominator is 0 (e.g. every mask patch removed)
+        return None, None, None, 0
     idx = RNG.integers(0, len(a), (n, len(a)))
-    r = a[idx].mean(1) / b[idx].mean(1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = a[idx].mean(1) / b[idx].mean(1)
+    r = r[np.isfinite(r)]
     return float(a.mean() / b.mean()), float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5)), int(len(a))
+
+
+def r3n(x):
+    return None if x is None else r3(x)
 
 
 def boot_ratio(a, b, n=NBOOT):
     m, lo, hi, _ = boot_ratio_raw(a, b, n)
-    return [r3(m), r3(lo), r3(hi)]
+    return [r3n(m), r3n(lo), r3n(hi)]
 
 
 def mcnemar_exact(b, c):
@@ -362,7 +370,7 @@ def behaviour(eps, C, out, res):
         S[k] = s
     a_ = sum(eps["far20", t, i]["success"] and not eps["farM", t, i]["success"] for t, i in keyorder())
     b_ = sum(eps["farM", t, i]["success"] and not eps["far20", t, i]["success"] for t, i in keyorder())
-    S["far20_vs_farM_mcnemar"] = dict(far20_only=a_, farM_only=b_, p_exact=r3(mcnemar_exact(a_, b_)))
+    S["far20_vs_farM_mcnemar"] = dict(far20_only=a_, farM_only=b_, p_exact=float(f"{mcnemar_exact(a_, b_):.3g}"))
     res["behaviour"] = S
     (d / "summary.json").write_text(json.dumps(S, indent=1))
 
@@ -545,9 +553,9 @@ def basket_attention(eps, C, out, res):
                 rn, rnl, rnh, n = boot_ratio_raw(mn, co)
                 ro, rol, roh, _ = boot_ratio_raw(mo, co)
                 both = ~(np.isnan(co) | np.isnan(mn))
-                paired[key] = dict(n_pairs=n, moved_new_over_ctl_old=[r3(rn), r3(rnl), r3(rnh)],
-                                   moved_old_over_ctl_old=[r3(ro), r3(rol), r3(roh)],
-                                   pct_on_pairs={nm: r3(np.mean(v[both]) * 100) for nm, v in
+                paired[key] = dict(n_pairs=n, moved_new_over_ctl_old=[r3n(rn), r3n(rnl), r3n(rnh)],
+                                   moved_old_over_ctl_old=[r3n(ro), r3n(rol), r3n(roh)],
+                                   pct_on_pairs={nm: (r3(np.mean(v[both]) * 100) if both.any() else None) for nm, v in
                                                  (("ctl_old", co), ("ctl_new", cn), ("moved_old", mo), ("moved_new", mn))})
     res["basket_attention"] = dict(
         render_diff_4090_vs_A100=M.pop("_render_diff"),
@@ -739,7 +747,7 @@ def representation(eps, C, out, res):
         # robustness: z-score and PCA fitted on the two ctl runs only (moved trials projected afterwards)
         rc = own_task(Fc, ["ctl", "ctlF"])
         R.setdefault("task_identity_fit_ctl_only", {})[f] = {
-            k: dict(value=rc[k], change_vs_fit_all=r3(rc[k][0] - r[k][0]), changed_by_0p05_or_more=bool(abs(rc[k][0] - r[k][0]) >= 0.05))
+            k: dict(value=rc[k], change_vs_fit_all=r3(rc[k][0] - r[k][0]), changed_by_0p05_or_more=bool(round(abs(rc[k][0] - r[k][0]), 3) >= 0.05 - 1e-9))
             for k in rc}
         # Q2 divergence: distance to the same machine's ctl at the same task·init, by call and phase-aligned;
         # baseline = that ctl vs its other inits (same task)
@@ -754,7 +762,8 @@ def representation(eps, C, out, res):
             ref = "ctl" if k == "machine" else C[k]["ctl"]
             first = None
             for c in range(NC):
-                if boot_ratio_raw(Dc[k][:, c], Bc[ref][:, c])[1] > 1:  # unrounded lower bound, paired resampling
+                lo_c = boot_ratio_raw(Dc[k][:, c], Bc[ref][:, c])[1]
+                if lo_c is not None and lo_c > 1:  # unrounded lower bound, paired resampling
                     first = c
                     break
             ph = {}
@@ -887,15 +896,18 @@ def distance_summary(C, out, res):
         mk = "s" if r["machine"] == "A100" else "o"
         col = C[k]["hue"]
         for ax, val in ((axes[0], r["follow_success"]), (axes[2], r["expert_own"]), (axes[3], r["expert_carry_over_base"])):
-            if val:
+            if val and val[0] is not None:
                 ax.errorbar(x, val[0], yerr=[[val[0] - val[1]], [val[2] - val[0]]], fmt=mk, color=col, ms=7, capsize=3)
                 ax.annotate(k, (x, val[0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
         a = r["att_paired_late_carry"]
         for key, filled in (("moved_new_over_ctl_old", True), ("moved_old_over_ctl_old", False)):
             m_, lo_, hi_ = a[key]
+            if m_ is None:  # no usable pairs
+                continue
             axes[1].errorbar(x, m_, yerr=[[m_ - lo_], [hi_ - m_]], fmt=mk, color=col, mfc=col if filled else "white",
                              ms=7, capsize=3)
-        axes[1].annotate(k, (x, a["moved_new_over_ctl_old"][0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
+        if a["moved_new_over_ctl_old"][0] is not None:
+            axes[1].annotate(k, (x, a["moved_new_over_ctl_old"][0]), fontsize=7, xytext=(5, 3), textcoords="offset points")
     axes[0].set_title("release follows the basket (fraction)", fontsize=9)
     axes[1].set_title("late-layer carry attention ÷ ctl attention on the basket (paired):\nfilled = new basket, open = "
                       "empty old spot", fontsize=9)
