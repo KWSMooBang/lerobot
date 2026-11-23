@@ -471,15 +471,19 @@ def fig_candidate(c, rl, spaces, T, a1info, path):
     plt.close(fig)
 
 
-def fig_scatter(feat_rows, key, title, path, cands, rate, excluded_rate=None):
+def fig_scatter(feat_rows, key, title, path, cands, rate, excluded_rate=None, pp=None, stats_pp=None):
     fig, axes = plt.subplots(2, 3, figsize=(15, 9))
     for ax, f in zip(axes.ravel(), FEATS):
         x = np.array([feat_rows[c].get(f"{f}:{key}", np.nan) for c in cands], float)
         y = np.array([rate[c] for c in cands])
         ok = np.isfinite(x)
         succ = y >= SUCC_MIN / 10
-        ax.scatter(x[ok & succ], y[ok & succ], s=55, c=C_B, edgecolor=INK, lw=0.6, zorder=3, label="success ≥ 3/10")
-        ax.scatter(x[ok & ~succ], y[ok & ~succ], s=40, c=C_A, edgecolor=INK, lw=0.6, zorder=3, label="< 3/10")
+        ppm = np.array([c in (pp or ()) for c in cands])
+        for msk, mk, nm in ((ppm, "o", "pick-and-place swap"), (~ppm, "s", "drawer / push / chain / other")):
+            ax.scatter(x[ok & succ & msk], y[ok & succ & msk], s=55, c=C_B, marker=mk, edgecolor=INK, lw=0.6,
+                       zorder=3, label=f"success ≥ 3/10 · {nm}")
+            ax.scatter(x[ok & ~succ & msk], y[ok & ~succ & msk], s=40, c=C_A, marker=mk, edgecolor=INK, lw=0.6,
+                       zorder=3, label=f"< 3/10 · {nm}")
         for c, xi, yi in zip(cands, x, y):
             if np.isfinite(xi):
                 ax.annotate(c, (xi, yi), xytext=(3, 3), textcoords="offset points", fontsize=7, color=INK2)
@@ -500,10 +504,13 @@ def fig_scatter(feat_rows, key, title, path, cands, rate, excluded_rate=None):
             s = f"\nconstant across candidates (n = {st['n']})"
         else:
             s = f"\nSpearman ρ = {st['rho']:+.2f}, perm p = {st['p']:.3f}, n = {st['n']}"
-        ax.set_title(f"{f}{s}", fontsize=9, color=INK)
+            sp_ = (stats_pp or {}).get(f"{f}:{key}")
+            if sp_ and sp_["rho"] is not None:
+                s += f"\npick-and-place only (○): ρ = {sp_['rho']:+.2f}, p = {sp_['p']:.3f}, n = {sp_['n']}"
+        ax.set_title(f"{f}{s}", fontsize=8, color=INK)
         ax.set_xlabel(title, fontsize=8, color=INK2)
         ax.set_ylabel("new-task success rate", fontsize=8, color=INK2)
-    axes[0, 0].legend(fontsize=7, frameon=False)
+    axes[0, 0].legend(fontsize=6, frameon=False)
     fig.suptitle(f"{title} vs new-task success (one point per candidate; g18/g28 grey △, not in the statistics)",
                  fontsize=11, color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
@@ -803,9 +810,11 @@ def main():
         rows["_stats"] = stats
         excl = {c: (rows[c], rate[c]) for c in EXCLUDED}
         for k, ttl in (("A1", "A1 closest approach (/ within-task spread)"), ("A1c", "A1c crossing length (calls < 1)"),
-                       ("A2_0", "A2 distance at call 0 (/ spread)"), ("A3", "A3 destination exclusivity"),
+                       ("A2_0", "A2 distance at call 0 (/ spread)"),
+                       ("A2_pre", "A2_pre mean distance of the two sources before the grasp (/ spread)"),
+                       ("A3", "A3 destination exclusivity"),
                        ("A4_min", "A4 base task: min distance to another task (/ spread)")):
-            fig_scatter(rows, k, ttl, OUT / f"fig2_scatter_{k}.png", main_c, rate, excl)
+            fig_scatter(rows, k, ttl, OUT / f"fig2_scatter_{k}.png", main_c, rate, excl, pp, stats_pp)
         d = OUT / "fig3_switch"
         d.mkdir(exist_ok=True)
         for f in FEATS:
