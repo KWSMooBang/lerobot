@@ -46,6 +46,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - C9 (vision-only 학습) 는 선택, 보류
 
 ## GPU 예산
+- 2026-11-23 사람 지시: zest kubectl 이 읽기 전용이 되어, T022 basket far 실험은 VGI-102(이 컨테이너 호스트) GPU 0 에서 실행 (10/30 'VGI-102 GPU 금지' 의 예외, ≈1.3 GPU-h).
 - kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함).
 - **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
