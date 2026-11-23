@@ -24,6 +24,7 @@ Run:  OPENBLAS_CORETYPE=ZEN python basket_traj.py [--out DIR]   (numpy, scipy, s
 import argparse
 import csv
 import json
+import warnings
 from collections import defaultdict
 from pathlib import Path
 
@@ -97,8 +98,12 @@ def boot_ratio(a, b, n=NBOOT):
     a, b = np.asarray(a, float), np.asarray(b, float)
     ok = ~(np.isnan(a) | np.isnan(b))
     a, b = a[ok], b[ok]
+    if len(a) == 0 or b.mean() <= 0:  # no usable pairs or zero denominator
+        return np.nan, np.nan, np.nan, 0
     idx = RNG.integers(0, len(a), (n, len(a)))
-    r = a[idx].mean(1) / b[idx].mean(1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = a[idx].mean(1) / b[idx].mean(1)
+    r = r[np.isfinite(r)]
     return float(a.mean() / b.mean()), float(np.percentile(r, 2.5)), float(np.percentile(r, 97.5)), int(len(a))
 
 
@@ -110,10 +115,14 @@ def dz(diff):
         return dict(n=int(len(d)))
     idx = RNG.integers(0, len(d), (NBOOT, len(d)))
     bm = d[idx].mean(1)
-    bd = bm / np.maximum(d[idx].std(1, ddof=1), 1e-12)
+    sd = d[idx].std(1, ddof=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        bd = np.where(sd > 1e-9, bm / sd, np.nan)  # zero-variance resamples have no d_z: dropped
     return dict(mean=r3(d.mean()), ci=[r3(np.percentile(bm, 2.5)), r3(np.percentile(bm, 97.5))],
-                dz=r3(d.mean() / max(d.std(ddof=1), 1e-12)), dz_ci=[r3(np.percentile(bd, 2.5)), r3(np.percentile(bd, 97.5))],
-                n=int(len(d)))
+                dz=r3n(d.mean() / d.std(ddof=1) if d.std(ddof=1) > 1e-9 else None),
+                dz_ci=[r3n(np.nanpercentile(bd, 2.5)) if np.isfinite(bd).any() else None,
+                       r3n(np.nanpercentile(bd, 97.5)) if np.isfinite(bd).any() else None],
+                dz_boot_dropped=int((~np.isfinite(bd)).sum()), n=int(len(d)))
 
 
 def hedges(a, b):
@@ -127,15 +136,22 @@ def hedges(a, b):
     def g(x, y):
         s = np.sqrt(((len(x) - 1) * x.var(ddof=1) + (len(y) - 1) * y.var(ddof=1)) / (len(x) + len(y) - 2))
         j = 1 - 3 / (4 * (len(x) + len(y)) - 9)
-        return j * (x.mean() - y.mean()) / max(s, 1e-12)
+        return j * (x.mean() - y.mean()) / s if s > 1e-9 else np.nan  # zero pooled variance: undefined
 
-    bs = [g(a[RNG.integers(0, len(a), len(a))], b[RNG.integers(0, len(b), len(b))]) for _ in range(NBOOT)]
-    return dict(diff=r3(a.mean() - b.mean()), g=r3(g(a, b)), g_ci=[r3(np.nanpercentile(bs, 2.5)), r3(np.nanpercentile(bs, 97.5))],
-                na=int(len(a)), nb=int(len(b)))
+    bs = np.array([g(a[RNG.integers(0, len(a), len(a))], b[RNG.integers(0, len(b), len(b))]) for _ in range(NBOOT)])
+    ok = np.isfinite(bs)
+    g0 = g(a, b)
+    return dict(diff=r3(a.mean() - b.mean()), g=r3n(g0 if np.isfinite(g0) else None),
+                g_ci=[r3n(np.percentile(bs[ok], 2.5)) if ok.any() else None, r3n(np.percentile(bs[ok], 97.5)) if ok.any() else None],
+                boot_dropped_zero_var=int((~ok).sum()), na=int(len(a)), nb=int(len(b)))
 
 
 def r3(x):
     return round(float(x), 3)
+
+
+def r3n(x):
+    return None if x is None else r3(x)
 
 
 # ---------------------------------------------------------------- data
@@ -160,33 +176,40 @@ def load():
 
 
 def bounds(e):
-    """phase → (start, end) in steps, or None."""
+    """phase → [start, end) in steps, exactly as documented (or None when empty):
+      approach [0, g-20) · grasp [g-20, g+20) · carry [g+20, r-20) · release [r-20, r+20) · after [r+20, 280)
+    No release: carry [g+20, 280). No grasp: approach [0, 280). When grasp and release windows overlap
+    (r - g < 40) they are split at the midpoint (g + r) / 2, so a step is never in two phases and nothing at or after
+    the release step can fall in carry (carry ends at r - 20)."""
     g, r = e["grasp"], e["release"]
     b = dict.fromkeys(PHASES)
     if g is None:
         b["approach"] = (0, T_END)
         return b
-    b["approach"] = (0, max(g - 20, 1))
-    b["grasp"] = (max(g - 20, 0), g + 20)
+    win = {"approach": (0, g - 20), "grasp": (g - 20, g + 20)}
     if r is None:
-        b["carry"] = (g + 20, T_END) if g + 20 < T_END - 10 else None
-        return b
-    b["carry"] = (g + 20, r - 20) if r - 20 > g + 20 else None
-    b["release"] = (r - 20, min(r + 20, T_END))
-    b["after"] = (r + 20, T_END) if r + 20 < T_END - 10 else None
+        win["carry"] = (g + 20, T_END)
+    else:
+        split = (g + r) / 2 if r - 20 < g + 20 else None
+        if split is not None:
+            win["grasp"] = (g - 20, split)
+        win["carry"] = (g + 20, r - 20)
+        win["release"] = (r - 20 if split is None else split, r + 20)
+        win["after"] = (r + 20, T_END)
+    for ph, (lo, hi) in win.items():
+        lo, hi = max(lo, 0), min(hi, T_END)
+        b[ph] = (lo, hi) if hi > lo else None
     return b
 
 
 def call_phase(e):
-    """phase label per call (by call step)."""
+    """phase label per call step: the documented window that contains it (windows are disjoint and cover [0, 280))."""
     b = bounds(e)
     out = []
     for s in STEPS:
-        lab = None
-        for p in PHASES:
-            if b[p] is not None and b[p][0] <= s < b[p][1]:
-                lab = p
-        out.append(lab or ("after" if b["after"] else "carry" if b["carry"] else "approach"))
+        lab = [p for p in PHASES if b[p] is not None and b[p][0] <= s < b[p][1]]
+        assert len(lab) == 1, (e["kind"], e["task"], e["init"], s, b)
+        out.append(lab[0])
     return out
 
 
@@ -211,20 +234,38 @@ def keyorder():
     return [(t, i) for t in range(10) for i in range(10)]
 
 
-def feature_arrays(eps):
-    """feat → kind → (100, NC, D) z-scored over all 300×NC calls."""
+NAN_REPORT = {}
+
+
+def feature_arrays(eps, fit=None):
+    """feat → kind → (100, NC, D) z-scored per dimension, NaN-aware. Statistics come from the conditions in `fit`
+    (default all three: the T021 design; ["ctl"] for the robustness check). Non-finite values (log of 0, …) are counted
+    in NAN_REPORT and kept as NaN — a coordinate is only dropped when its finite values have no spread; the distance
+    functions average over the finite coordinates and PCA sees NaN as 0 (= the fit mean)."""
     F = {}
     for f, fn in FEATS.items():
-        raw = {k: np.stack([fn(eps[k, t, i]) for t, i in keyorder()]).astype(np.float32) for k in KINDS}
-        flat = np.concatenate([raw[k].reshape(-1, raw[k].shape[-1]) for k in KINDS])
-        mu, sd = flat.mean(0), flat.std(0)
-        keep = sd > 1e-6
+        with np.errstate(divide="ignore", invalid="ignore"):
+            raw = {k: np.stack([fn(eps[k, t, i]) for t, i in keyorder()]).astype(np.float32) for k in KINDS}
+        for k in KINDS:
+            raw[k][~np.isfinite(raw[k])] = np.nan
+        flat = np.concatenate([raw[k].reshape(-1, raw[k].shape[-1]) for k in (fit or KINDS)])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mu, sd = np.nanmean(flat, 0), np.nanstd(flat, 0)
+        keep = np.nan_to_num(sd) > 1e-6
         F[f] = {k: ((raw[k] - mu) / np.where(keep, sd, 1))[..., keep] for k in KINDS}
+        if fit is None:
+            NAN_REPORT[f] = dict(dims=int(raw["ctl"].shape[-1]), dims_kept=int(keep.sum()),
+                                 nan_values={k: int(np.isnan(raw[k]).sum()) for k in KINDS},
+                                 dims_with_any_nan=int(np.isnan(np.concatenate([raw[k] for k in KINDS])).any((0, 1)).sum()))
     return F
 
 
 def rms(a, b):
-    return np.sqrt(np.mean((a - b) ** 2, -1))
+    """RMS over the last axis, ignoring non-finite coordinates (NaN where nothing is finite, e.g. a missing phase)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return np.sqrt(np.nanmean((a - b) ** 2, -1))
 
 
 # ---------------------------------------------------------------- figure helpers
@@ -247,33 +288,57 @@ def phase_axis(ax):
 # ---------------------------------------------------------------- Q1: trial maps
 
 
-def q1(eps, F, out, res):
-    from scipy.cluster.hierarchy import dendrogram, linkage
+def trial_pca(FF, f, fit_kinds):
+    """PCA-50 of whole trials (rows ordered kind, task, init); fitted on the trials of `fit_kinds`, all projected.
+    NaN (non-finite raw values) → 0 = the z-score mean."""
     from sklearn.decomposition import PCA
+
+    Z = np.nan_to_num(np.concatenate([FF[f][k].reshape(100, -1) for k in KINDS]))
+    kind = np.repeat(KINDS, 100)
+    return PCA(n_components=50, random_state=0).fit(Z[np.isin(kind, fit_kinds)]).transform(Z)
+
+
+def own_task_rows(P, task, kind):
+    ctl = kind == "ctl"
+    cent = np.stack([P[ctl & (task == t)].mean(0) for t in range(10)])
+    rows = {}
+    for k in KINDS:
+        own, d_own, d_other, rel = [], [], [], []
+        for j in np.where(kind == k)[0]:
+            c = cent.copy()
+            if k == "ctl":  # leave the trial itself out of its centroid
+                c[task[j]] = P[ctl & (task == task[j]) & (np.arange(300) != j)].mean(0)
+            d = np.linalg.norm(c - P[j], axis=1)
+            own.append(float(np.argmin(d) == task[j]))
+            d_own.append(d[task[j]])
+            d_other.append(np.delete(d, task[j]).min())
+        rows[k] = dict(own=np.array(own), d_own=np.array(d_own), d_other=np.array(d_other))
+    return rows
+
+
+def q1(eps, F, Fc, out, res):
+    from scipy.cluster.hierarchy import dendrogram, linkage
     from sklearn.manifold import TSNE
 
     ko = keyorder()
     res["q1"] = {}
+    res["q1_fit_ctl_only"] = {}
+    kind = np.repeat(KINDS, 100)
+    task = np.tile(np.repeat(np.arange(10), 10), 3)
+    ok = np.concatenate([[eps[k, t, i]["success"] for t, i in ko] for k in KINDS])
+    ctl = kind == "ctl"
     for f in FEATS:
-        Z = np.concatenate([F[f][k].reshape(100, -1) for k in KINDS])  # 300 × (NC·D); order: kind, task, init
-        kind = np.repeat(KINDS, 100)
-        task = np.tile(np.repeat(np.arange(10), 10), 3)
-        ok = np.concatenate([[eps[k, t, i]["success"] for t, i in ko] for k in KINDS])
-        P = PCA(n_components=50, random_state=0).fit_transform(Z)
-        ctl = kind == "ctl"
-        cent = np.stack([P[ctl & (task == t)].mean(0) for t in range(10)])
-        rows = {}
+        P = trial_pca(F, f, KINDS)  # T021 design: z-score and PCA on all 300 trials
+        rows = own_task_rows(P, task, kind)
+        # robustness: z-score and PCA fitted on the 100 ctl trials only, opp / near projected afterwards
+        rows_c = own_task_rows(trial_pca(Fc, f, ["ctl"]), task, kind)
+        rc = {}
         for k in KINDS:
-            own, d_own, d_other, rel = [], [], [], []
-            for j in np.where(kind == k)[0]:
-                c = cent.copy()
-                if k == "ctl":  # leave the trial itself out of its centroid
-                    c[task[j]] = P[ctl & (task == task[j]) & (np.arange(300) != j)].mean(0)
-                d = np.linalg.norm(c - P[j], axis=1)
-                own.append(float(np.argmin(d) == task[j]))
-                d_own.append(d[task[j]])
-                d_other.append(np.delete(d, task[j]).min())
-            rows[k] = dict(own=np.array(own), d_own=np.array(d_own), d_other=np.array(d_other))
+            a, b = rows[k]["own"].mean(), rows_c[k]["own"].mean()
+            m, lo, hi = boot_mean(rows_c[k]["own"])
+            rc[k] = dict(nearest_ctl_centroid_is_own_task=[r3(m[0]), r3(lo[0]), r3(hi[0])], change_vs_fit_all=r3(b - a),
+                         changed_by_0p05_or_more=bool(round(abs(b - a), 3) >= 0.05 - 1e-9))
+        res["q1_fit_ctl_only"][f] = rc
         # per-task ctl spread: mean LOO distance of ctl trials to their own ctl centroid
         spread = np.array([rows["ctl"]["d_own"][task[ctl] == t].mean() for t in range(10)])
         r = {}
@@ -381,6 +446,45 @@ def baseline_ctl(Xc):
     return out
 
 
+def ctl_pairwise(Xc):
+    """Xc (100, B, D) ctl → (10 tasks, 10, 10, B) RMS distance between inits a, b of the same task (NaN on the diagonal)."""
+    out = np.full((10, 10, 10, Xc.shape[1]), np.nan)
+    for t in range(10):
+        for a in range(10):
+            for b in range(10):
+                if a != b:
+                    out[t, a, b] = rms(Xc[t * 10 + a], Xc[t * 10 + b])
+    return out
+
+
+def boot_ratio_pairs(dm, pw, n=NBOOT):
+    """Ratio of means: distance(moved, own-init ctl) / baseline, per column k, where the baseline of trial (t, a) is its
+    mean distance to the other ctl inits of task t. Bootstrap resamples task·init pairs; inside each resample the
+    baseline is recomputed from the resampled ctl trials only (a duplicated init counts with its multiplicity and is
+    never compared with itself), so the uncertainty of the shared ctl reference is included.
+    dm (100, K), pw (10, 10, 10, K) → mean, lo, hi (K,) and n (K,)."""
+    dm = np.asarray(dm, float).reshape(10, 10, -1)
+    V = np.isfinite(pw).astype(float)
+    W = np.nan_to_num(pw)
+
+    def ratio(c):  # c (N, 10, 10) counts per task·init
+        with np.errstate(divide="ignore", invalid="ignore"):
+            base = np.einsum("ntb,tabk->ntak", c, W) / np.einsum("ntb,tabk->ntak", c, V)
+            R = np.isfinite(base) & np.isfinite(dm)[None]
+            w = c[..., None] * R
+            return (w * np.nan_to_num(dm)[None]).sum((1, 2)) / (w * np.nan_to_num(base)).sum((1, 2)), (w > 0).sum((1, 2))
+
+    m, cnt = ratio(np.ones((1, 10, 10)))
+    idx = RNG.integers(0, 100, (n, 100))
+    c = np.zeros((n, 100))
+    np.add.at(c, (np.arange(n)[:, None], idx), 1)
+    rb, _ = ratio(c.reshape(n, 10, 10))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lo, hi = np.nanpercentile(np.where(np.isfinite(rb), rb, np.nan), [2.5, 97.5], 0)
+    return m[0], lo, hi, cnt[0]
+
+
 def q2(eps, F, out, res):
     ko = keyorder()
     PI = {f: {k: np.stack([phase_interp(F[f][k][j], eps[k, t, i]) for j, (t, i) in enumerate(ko)]) for k in KINDS} for f in FEATS}
@@ -388,7 +492,8 @@ def q2(eps, F, out, res):
     for f in FEATS:
         for axis, A in (("call", F[f]), ("phase", PI[f])):
             D[axis][f] = {k: rms(A[k], A["ctl"]) for k in MOVED}
-            D[axis][f]["base"] = baseline_ctl(A["ctl"])
+            D[axis][f]["base"] = baseline_ctl(A["ctl"])  # per-trial baseline, for the figures and Q4
+            D[axis][f]["pw"] = ctl_pairwise(A["ctl"])  # for the ratio bootstrap
             D[axis][f]["opp_near"] = rms(A["opp"], A["near"])
     res["q2"] = {}
     for axis, nb, xl in (("call", NC, "policy call (×10 steps)"), ("phase", len(PHASES) * NB, None)):
@@ -415,28 +520,28 @@ def q2(eps, F, out, res):
         fig.tight_layout()
         fig.savefig(out / "6_trajectories" / f"divergence_by_{axis}.png", dpi=115, facecolor=SURFACE)
         plt.close(fig)
-    # numbers: per phase, ratio of means vs the ctl baseline, and opp − near paired
+    # numbers: per phase, ratio of means vs the ctl baseline (baseline recomputed in every resample), opp − near paired
     for f in FEATS:
         r = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pwp = np.stack([np.nanmean(D["phase"][f]["pw"][..., p * NB:(p + 1) * NB], -1) for p in range(len(PHASES))], -1)
+            v = {k: np.stack([np.nanmean(D["phase"][f][k][:, p * NB:(p + 1) * NB], 1) for p in range(len(PHASES))], 1)
+                 for k in MOVED}
+        for k in MOVED:
+            m, lo, hi, n = boot_ratio_pairs(v[k], pwp)
+            for p, ph in enumerate(PHASES):
+                r.setdefault(ph, {})[f"{k}_over_base"] = [r3(m[p]), r3(lo[p]), r3(hi[p])]
+                r[ph][f"{k}_n_pairs"] = int(n[p])
         for p, ph in enumerate(PHASES):
-            sl = slice(p * NB, (p + 1) * NB)
-            with np.errstate(all="ignore"):
-                import warnings
-
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    v = {k: np.nanmean(D["phase"][f][k][:, sl], 1) for k in MOVED + ["base"]}
-            r[ph] = {f"{k}_over_base": [r3(x) for x in boot_ratio(v[k], v["base"])[:3]] for k in MOVED}
-            r[ph]["opp_minus_near"] = dz(v["opp"] - v["near"])
+            r[ph]["opp_minus_near"] = dz(v["opp"][:, p] - v["near"][:, p])
         # by call: first call where the ratio's lower CI exceeds 1 (moved trial as far from its own-init ctl as other inits)
         for k in MOVED:
-            first = None
-            for c in range(NC):
-                m, lo, hi, _ = boot_ratio(D["call"][f][k][:, c], D["call"][f]["base"][:, c])
-                if lo > 1 and first is None:
-                    first = c
-            r[f"{k}_first_call_above_base"] = first
-            r[f"{k}_call0_over_base"] = [r3(x) for x in boot_ratio(D["call"][f][k][:, 0], D["call"][f]["base"][:, 0])[:3]]
+            m, lo, hi, _ = boot_ratio_pairs(D["call"][f][k], D["call"][f]["pw"])
+            above = np.where(lo > 1)[0]
+            r[f"{k}_first_call_above_base"] = int(above[0]) if len(above) else None
+            r[f"{k}_call0_over_base"] = [r3(m[0]), r3(lo[0]), r3(hi[0])]
+            r[f"{k}_by_call_over_base"] = [[r3(a), r3(b), r3(c)] for a, b, c in zip(m, lo, hi, strict=True)]
         res["q2"][f] = r
         print(f"[q2] {f}: " + " ".join(f"{ph}:{r[ph]['opp_over_base'][0]}/{r[ph]['near_over_base'][0]}" for ph in PHASES), flush=True)
     return PI, D
@@ -449,7 +554,7 @@ def trajectories(eps, F, out):
     ko = keyorder()
     for f in FEATS:
         X = np.concatenate([F[f][k].reshape(-1, F[f][k].shape[-1]) for k in KINDS])
-        Pc = PCA(n_components=min(30, X.shape[1]), random_state=0).fit_transform(X)
+        Pc = PCA(n_components=min(30, X.shape[1]), random_state=0).fit_transform(np.nan_to_num(X))
         Tc = TSNE(n_components=2, perplexity=50, init="pca", learning_rate="auto", random_state=0).fit_transform(Pc)
         Tc = Tc.reshape(3, 100, NC, 2)
         fig, axes = plt.subplots(2, 5, figsize=(17, 7.5), facecolor=SURFACE)
@@ -720,6 +825,7 @@ def main():
     eps = load()
     print(f"[load] {len(eps)} episodes", flush=True)
     F = feature_arrays(eps)
+    Fc = feature_arrays(eps, fit=["ctl"])
     res = {"n": {k: dict(success=int(sum(eps[k, t, i]["success"] for t, i in keyorder()))) for k in KINDS},
            "dims": {f: int(F[f]["ctl"].shape[-1]) for f in FEATS}}
     for k in KINDS:
@@ -729,7 +835,8 @@ def main():
     activation(eps, out, res)
     PI, D = q2(eps, F, out, res)
     q4(eps, F, PI, D, A, out, res)
-    q1(eps, F, out, res)
+    q1(eps, F, Fc, out, res)
+    res["nan_report"] = NAN_REPORT
     if not a.skip_tsne:
         trajectories(eps, F, out)
     (out / "5_analysis" / "numbers.json").write_text(json.dumps(res, indent=1, ensure_ascii=False))
