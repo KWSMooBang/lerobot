@@ -47,6 +47,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 
 ## GPU 예산
 - 2026-11-23 사람 지시: zest kubectl 이 읽기 전용이 되어, T022 basket far 실험은 VGI-102(이 컨테이너 호스트) GPU 0 에서 실행 (10/30 'VGI-102 GPU 금지' 의 예외, ≈1.3 GPU-h).
+- 2026-11-23 사람 지시: VGI-102 GPU 1 에서 T023 (pi05lib × LIBERO-PRO 전체 3,400 ep + activation 기록) 실행, 예상 ≈11–14 GPU-h, 16 GPU-h 넘으면 멈춤. GPU 0 은 T022.
 - kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함).
 - **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
@@ -113,3 +114,4 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-11-10 T020 병합 (exp/sc-variant-designer-v2 e2cdae1f): 변형 설계 도구 (YAML → BDDL·init → 실행 가능성 → 미리보기), condition custom + 다중 목표 추적·fallback 표 (C0 짝은 source_init_idx), catalog·validate 연결. 예시 103개 (goal15 30 + control 20 + Goal 후보 n01–n23 + Object C6–C8; feasible 78 / infeasible 5 / n/a 20), 갤러리 analysis/variants/gallery.html. TurnOff 는 not TurnOn 으로 판정. codex 3회. 서버 goal15_trainfmt 실행은 이전 commit cdd3aec6 (exp/sc-variant-designer) 로 진행 중 — 그 브랜치는 실행이 끝난 뒤 정리.
 - 2026-11-23 사람 지시: basket near(+10 cm)는 위치 변화가 작음 → 바구니를 카메라 쪽으로 20·30 cm 당긴 조건 추가 (T022, baccus 서버, ≈1 GPU-h). reach 확인 후 거리 확정, 이후 거리별 내부 표현 분석.
 - 2026-11-23 T022 거리 확정: +x 만 당기면 원근 때문에 바구니가 정책 화면 왼쪽 끝에 잘림 → 화면 오른쪽(world −y) 으로 함께 이동. 사람 승인 far25 = (0.25, 0.20) (원래 (0, 0.26) 에서 25.7 cm, 10 task 화면 안 왼쪽 여유 13 px, 50 init 안정, 물체 최소 거리 5.3 cm). far20 = 같은 방향 선 위 (0.20, 0.21) (20.6 cm, lead 결정, L2 확인 중). 실행 VGI-102 GPU 0, ctl·far20·far25 각 100 ep.
+- 2026-11-23 사람 지시: GPU 1 에서 pi05lib 로 LIBERO-PRO·Plus 성능 + activation trajectory 분석, 참고 논문 Churchland 2012 (jPCA 회전 동역학), Gallego 2018 (조건 간 manifold 보존·CCA 정렬), Inagaki 2019 (이산 attractor). 범위는 '일단 LIBERO-PRO 만 전부' (4 suite × 6 교란, Object position 11 level, 340 항목 × init 10). T023: 정책 서버에 activation 기록 옵션 (action 비트 일치 확인) → 본 평가 → 성능·shortcut 비율 + 세 논문 방식 분석. 질문: 교란 실패 때 내부 상태가 학습한 task 궤적으로 끌려 들어가는가 (이산 attractor = '지시문은 스위치' 결론의 내부 근거).
