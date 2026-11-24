@@ -77,4 +77,7 @@
 - A, B의 모든 p값 수와 BH-FDR q를 numbers.json에 같이 보고합니다. 가설 판정은 위에서 정한 셀(traj, 층 all)만 씁니다.
 
 ## 4. 변경 기록
-- (없음)
+- 2026-11-24 (A 결과를 본 뒤, **탐색 분석으로만 추가**, 가설 판정은 위 정의 그대로):
+  - A에서 expert·action이 사전 정의한 motion(eef 위치 + gripper)보다 verb와 기록된 action 순서(motion_act)를 훨씬 많이 따라서, 부분 상관을 motion_act 기준으로도 계산(`partial_x`: sem|motion_act, motion_act|sem, sem_verb|motion_act, motion_act|sem_verb).
+  - gemma_task는 문장 토큰 activation의 **크기 평균**이라 문장 길이가 섞일 수 있어, 단어 수 차이 RDM(`len_words`)을 추가하고 sem_emb·sem_word를 동작·장면·길이로 통제한 부분 상관을 계산.
+  - semantics.csv qualifier 추출 정규식 수정(결과 계산 전): "middle drawer"의 middle을 수식어로 잡던 것, g31 "bowl on the plate"를 출발 위치로 잡던 것을 고침. 좌/우 수식어는 문장 순서대로 비교(t63 ≠ t64).
