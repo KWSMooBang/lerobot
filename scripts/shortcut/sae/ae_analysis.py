@@ -74,7 +74,7 @@ def stage_extract() -> None:
     M = C.meta()
     tok = np.lib.format.open_memmap(CACHE / "exp_tok9.npy", "w+", np.float16, (6, C.N_TOT, 50, 128))
     act = np.zeros((C.N_TOT, 7), np.float32)
-    with ProcessPoolExecutor(C.WORKERS) as ex:
+    with ProcessPoolExecutor(C.WORKERS, initializer=_one_thread) as ex:
         for n, (i, t, a) in enumerate(ex.map(_extract_one, M, chunksize=8)):
             m = M[i]
             tok[:, m["off"]: m["off"] + m["C"]] = t.transpose(1, 0, 2, 3)
@@ -292,6 +292,37 @@ def stage_fallback() -> None:
                                 "instr_by_call2": float(np.mean([r["instr_by2"] for r in rows if r["src"] == src] or [np.nan]))}
                           for src in ("cand", "l90")}}
         res["H3"] = bool(res["exec_by_call2"] is not None and res["exec_by_call2"] >= 0.5 and res["instr_by_call2"] <= 0.1)
+        # EXPLORATORY (not in PREREG; added because PREREG task-selective features cover few tasks): pair-contrast
+        # features per trial from U40: exec-pref = P(fire|executed) >= 0.3 and P(fire|instructed) <= 0.05, and reverse
+        ti = {t: i for i, t in enumerate(s["tasks"])}
+        Ex, Ix, rx = [], [], []
+        for p in pool:
+            if p["instructed"] not in ti or not all(t in ti for t in p["executed"]):
+                continue
+            pe = s["T"][[ti[t] for t in p["executed"]]].max(0)
+            pi = s["T"][ti[p["instructed"]]]
+            fe = np.flatnonzero(s["live"] & (pe >= 0.3) & (pi <= 0.05))
+            fi = np.flatnonzero(s["live"] & (pi >= 0.3) & (pe <= 0.05))
+            if not len(fe) or not len(fi):
+                continue
+            m = p["m"]
+            blk = F[m["off"]: m["off"] + m["C"]]
+            e, i = blk[:, fe].mean(1), blk[:, fi].mean(1)  # share of the contrast features firing per call
+            Ex.append(np.pad(e, (0, 60 - m["C"]), constant_values=np.nan))
+            Ix.append(np.pad(i, (0, 60 - m["C"]), constant_values=np.nan))
+            rx.append({"src": p["src"], "n_fe": len(fe), "n_fi": len(fi), "exec_win_calls0_2": float(e[:3].mean() > i[:3].mean()),
+                       "exec_win_all": float(e.mean() > i.mean()), "e02": float(e[:3].mean()), "i02": float(i[:3].mean())})
+        Ex, Ix = np.array(Ex), np.array(Ix)
+        res["exploratory_pair_contrast"] = {
+            "n_trials": len(rx), "by_src": dict(Counter(r["src"] for r in rx)),
+            "median_n_exec_pref": float(np.median([r["n_fe"] for r in rx])) if rx else None,
+            "median_n_instr_pref": float(np.median([r["n_fi"] for r in rx])) if rx else None,
+            "share_trials_exec_gt_instr_calls0_2": float(np.mean([r["exec_win_calls0_2"] for r in rx])) if rx else None,
+            "share_trials_exec_gt_instr_all": float(np.mean([r["exec_win_all"] for r in rx])) if rx else None,
+            "mean_frac_exec_pref_firing_calls0_2": float(np.mean([r["e02"] for r in rx])) if rx else None,
+            "mean_frac_instr_pref_firing_calls0_2": float(np.mean([r["i02"] for r in rx])) if rx else None,
+            "curve_exec": np.nanmean(Ex, 0)[:30].tolist() if len(Ex) else [],
+            "curve_instr": np.nanmean(Ix, 0)[:30].tolist() if len(Ix) else []}
         out[key] = res
         curves[key] = {"exec": np.nanmean(E_c, 0)[:30].tolist() if len(E_c) else [],
                        "instr": np.nanmean(I_c, 0)[:30].tolist() if len(I_c) else []}
@@ -448,9 +479,15 @@ def _rep(layer: int, kind: str) -> np.ndarray:
     return z.astype(np.float32)
 
 
+def _one_thread() -> None:
+    """pool workers: 1 BLAS thread each (≤ 8 CPU workers in total)."""
+    from threadpoolctl import threadpool_limits
+
+    threadpool_limits(1)
+
+
 def dec_job(job):
     layer, kind = job
-    os.environ["OMP_NUM_THREADS"] = "1"
     M = C.meta()
     U = C.u40(M)
     X = _rep(layer, kind)
@@ -500,7 +537,7 @@ def dec_job(job):
 def stage_dec() -> None:
     jobs = [(L, k) for L in C.LAYERS for k in ("vec", "sae")]
     out = {}
-    with ProcessPoolExecutor(C.WORKERS) as ex:
+    with ProcessPoolExecutor(C.WORKERS, initializer=_one_thread) as ex:
         for (layer, kind), r in ex.map(dec_job, jobs):
             out.setdefault(f"L{layer}_s9", {})[kind] = r
             print(layer, kind, r, flush=True)
@@ -637,15 +674,23 @@ def stage_numbers() -> None:
         fig.savefig(FIG / "selectivity.png", dpi=120)
         plt.close(fig)
     if "fallback" in nums:
-        fig, axes = plt.subplots(1, 6, figsize=(17, 3), sharey=True)
-        for ax, L in zip(axes, C.LAYERS, strict=True):
+        fig, axes = plt.subplots(2, 6, figsize=(17, 5.6))
+        for j, L in enumerate(C.LAYERS):
             cv = nums["fallback"]["curves"][f"L{L}_s9"]
-            ax.plot(cv["exec"], color="C2", label="executed-task features")
-            ax.plot(cv["instr"], color="C3", label="instructed-task features")
-            ax.set_title(f"L{L}")
-            ax.set_xlabel("call")
-        axes[0].set_ylabel("share of fallback trials firing")
-        axes[0].legend(fontsize=7)
+            n = nums["fallback"][f"L{L}_s9"]["n_trials_with_features"]
+            axes[0, j].plot(cv["exec"], color="C2", label="executed-task features (any)")
+            axes[0, j].plot(cv["instr"], color="C3", label="instructed-task features (any)")
+            axes[0, j].set_title(f"L{L} PREREG (n={n})", fontsize=9)
+            axes[0, j].set_ylim(-0.02, 1.02)
+            ex = nums["fallback"][f"L{L}_s9"]["exploratory_pair_contrast"]
+            axes[1, j].plot(ex["curve_exec"], color="C2", label="exec-preferring features firing")
+            axes[1, j].plot(ex["curve_instr"], color="C3", label="instr-preferring features firing")
+            axes[1, j].set_title(f"L{L} exploratory pair contrast (n={ex['n_trials']})", fontsize=8)
+            axes[1, j].set_xlabel("call")
+        axes[0, 0].set_ylabel("share of trials")
+        axes[1, 0].set_ylabel("share of contrast features")
+        axes[0, 0].legend(fontsize=6)
+        axes[1, 0].legend(fontsize=6)
         fig.tight_layout()
         fig.savefig(FIG / "fallback_timing.png", dpi=120)
         plt.close(fig)
