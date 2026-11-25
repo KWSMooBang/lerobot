@@ -97,3 +97,9 @@ codex 리뷰 반영 (5571c4cf, 결론 동일): 따라간 비율은 같은 init c
 - 성공률은 단조롭지 않다: 20–26 cm 에서 52–61 (opp 72 보다 낮음, far20 vs far25 McNemar p=0.14). 실패 대부분 '바구니 밖' (41/34) 이고 팔·물체가 바구니를 밀거나 넘어뜨림, 특히 키 큰 물체 (O8 milk·O10 orange juice far20 0/10) → 위치 shortcut 이 아니라 새 위치에서의 운반·놓기 정밀도 문제.
 - 갈라지는 시점: SigLIP·patch attention 은 첫 호출/호출 5 (보는 것은 일찍 바뀜), expert·action 은 운반 시작 (호출 10–11) — near 와 같고 opp (호출 3) 와 다름.
 - 한계: near·opp 는 A100, far 는 y 도 5–6 cm 바뀜, attention 마스크 크기 조건별 상이. next 후보: 순수 옆 방향 (y) 이동만 하는 조건으로 '옆 방향 무시' 확인, 키 큰 물체 실패 원인 (충돌) 분리. 사용 1.33 GPU-h.
+
+## T028 rich activation 재추출 (VGI-102 RTX 4090 GPU 0, 2026-11-25)
+기존 에피소드의 재생 입력을 다시 넣어 방향+크기 (벡터) activation 저장 — 이해 담당 층별 구간 평균 벡터·언어 token 벡터 (PCA-256), 동작 담당이 읽는 K·V (RoPE 전), action token 50개 (PCA-128, 층 6 × denoise 3), denoise 경로, 호출 4곳 × 잡음 16개 probe. 대상 1,560 ep (libero3 300, basket A100 200, Goal train10+cand31 410, basket far 4090 300, LIBERO-90 L10 장면 350). queue 밖 실행이라 results.tsv 행 없음.
+출력 /outputs/VLA-shortcut-exps/rich_acts/ (manifest.csv, pca_bases.npz, weights.npz, README.md), 87 GB, 코드 exp/sc-rich-acts 240cc173.
+검증: basket far (원래 4090) 300 ep 모든 키 bit 일치, A100 실행 1,260 ep 기존 키 r ≥ 0.99982 (재생 기계가 달라 action 차이 중앙값 0.007, 드문 gripper ±1 flip 은 이전 추출과 같음). PCA held-out 설명 비율 vlm_tok .908–.999, exp_tok .921–1.000; 층 17 template token 의 massive activation (dim 1577·1959, 최대 2.9e5) 때문에 일부 배열 fp32.
+**판단**: keep — T029 분석 데이터. 사용 ≈1.8 GPU-h (smoke 0.2, pilot 0.15, 본 1.44). LIBERO-90 other 550 ep 는 미실시 (≈0.6 GPU-h, ≈35 GB, 필요 시 사람 승인).
