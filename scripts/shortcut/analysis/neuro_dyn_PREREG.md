@@ -190,3 +190,10 @@ Stage-B (T028) details get an addendum, committed before any B analysis.
 - Predictions:
   - Source weights > random-source weights.
   - In successful compositions (NEW), the weight moves from the object source to the destination source over the episode; in FALLBACK the base task dominates throughout.
+
+## Amendment B.1 (2026-11-25, after the pilot code run and before the full stage-B run; no full-data result seen)
+- **Held-out rule narrowed.** pca_fit = 0 is only 20 % of the episodes (k % 5 == 4). Analyses that use raw T028 keys do not depend on the T028 PCA bases, so they use all episodes. Raw keys are exp_mean, exp_vec, vlm_seg, k_seg, v_seg, k_tok, v_tok, attn_mass and mn_*. This covers B1, A2a (K/V level), A3, A4 (denoise and call axes), A5, A6 and A7.
+- Analyses on T028 PCA coordinates keep the pca_fit = 0 rule: A2b and the A4 token axis (exp_tok_pc). A2a residual-level metrics reconstructed from vlm_tok_pc are labelled secondary.
+- A3 is also reported on held-out episodes only, as robustness.
+- **jPCA**: the cross-condition mean trajectory (training fold) is subtracted before the PCA, as in Churchland 2012. Call-axis trajectories are time-normalised to 20 bins. The pilot showed that without this, a shared drift dominates the denoise axis (R² < 0).
+- A6 baseline groups by init: a task-grouped CV is undefined when the label is the task.
