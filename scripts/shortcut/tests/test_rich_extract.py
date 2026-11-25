@@ -355,7 +355,7 @@ def test_pca_fit_and_projection(setup: dict) -> None:
             assert all(0 <= c <= 1 + 1e-6 for c in curve) and curve == sorted(curve)
             assert abs(curve[-1] - 1) < 1e-3  # full basis captures everything
     (out_dir / "config.json").write_text(json.dumps({"pca": dims, "mlp_layers": [2, 5], "keep_vlm_vec": False}))
-    RE.cmd_project_pilot(SimpleNamespace(out=str(out_dir)))
+    RE.cmd_project_pilot(SimpleNamespace(out=str(out_dir), strip_fit_raw=False))
     d = np.load(out_dir / setup["rows"][3]["path"])
     for s, k in dims.items():
         assert d[f"{s}_pc"].shape == d[s].shape[:-1] + (k,)

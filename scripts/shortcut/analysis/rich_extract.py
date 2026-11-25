@@ -775,10 +775,14 @@ def cmd_project_pilot(a: argparse.Namespace) -> None:
             continue
         p = out / r["path"]
         d = dict(np.load(p))
-        if all(f"{s}_pc" in d for s in cfg["pca"]):
+        strip = a.strip_fit_raw and r["pca_fit"] == "1"
+        done = all(f"{s}_pc" in d for s in cfg["pca"])
+        if done and not (strip and any(s in d for s in cfg["pca"])):
             continue
         absmax: dict[str, float] = {}
         for s, k in cfg["pca"].items():
+            if f"{s}_pc" in d:
+                continue
             layers = PCA_STREAMS[s][0]
             mean = np.stack([z[f"{s}/L{li}/mean"] for li in layers])
             comp = np.stack([z[f"{s}/L{li}/components"][:k] for li in layers])
@@ -790,6 +794,11 @@ def cmd_project_pilot(a: argparse.Namespace) -> None:
             d[f"{s}_pc"] = f16(f"{s}_pc", pc, absmax)
         meta = json.loads(str(d["meta"]))
         meta["pca_dims"] = cfg["pca"]
+        if strip:  # PCA-fit pilot episodes: drop the raw token streams (held-out pilot episodes keep them)
+            for s in cfg["pca"]:
+                d.pop(s, None)
+            meta["raw"] = False
+            meta["raw_stripped"] = list(cfg["pca"])
         d["meta"] = np.asarray(json.dumps(meta, default=str))
         save_npz(p, d)
         print(f"[project-pilot] {r['path']} {absmax}", flush=True)
@@ -903,6 +912,7 @@ def main() -> None:
     p.add_argument("--threads", type=int, default=8)
     p = sp.add_parser("project-pilot")
     p.add_argument("--out", required=True)
+    p.add_argument("--strip-fit-raw", action="store_true", help="drop raw vlm_tok/exp_tok from the PCA-fit pilot files")
     p = sp.add_parser("weights")
     p.add_argument("--out", required=True)
     p = sp.add_parser("summary")
