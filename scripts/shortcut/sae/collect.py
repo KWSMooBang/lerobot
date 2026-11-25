@@ -281,6 +281,15 @@ def make_plan(args: argparse.Namespace, out_root: Path) -> dict[str, Any]:
         "noise_seed": args.noise_seed,
         "pooling": "group-mean cam1,cam2,text (pad + empty camera excluded); ae: action-token mean per step",
     }
+    stride = getattr(args, "frame_stride", 1)
+    tok_steps = parse_ae_steps(getattr(args, "tok_steps", "none") or "none")
+    # T031 options enter the identity only when used, so T015 plans keep their identity
+    if stride != 1:
+        identity["frame_stride"] = stride  # frames with frame_index % stride == 0
+    if tok_steps:
+        identity["tok_steps"] = tok_steps
+        identity["tok_per_step"] = args.tok_per_step
+    eps = eps.assign(length=(eps["length"] + stride - 1) // stride)  # kept frames per episode
     parts = store.split_parts(eps["episode_index"].tolist(), eps["length"].tolist(), args.parts)
     lengths = dict(zip(eps["episode_index"], eps["length"], strict=True))
     plan = {
@@ -301,6 +310,8 @@ def print_dry_run(plan: dict[str, Any], mine: list[int], args: argparse.Namespac
     n_all = sum(p["n_frames"] for p in parts)
     n_mine = sum(parts[j]["n_frames"] for j in mine)
     bpt = bytes_per_timestep(ident["layers"], len(ident["ae_steps"]))
+    n_ae = sum(layer_family(x) == "ae" for x in ident["layers"])
+    bpt += n_ae * len(ident.get("tok_steps", [])) * ident.get("tok_per_step", 0) * 1024 * 2
     n_pg = sum(layer_family(x) == "pg" for x in ident["layers"])
     src = plan.get("source", {})
     print(
@@ -347,6 +358,15 @@ def noise_for(episodes: np.ndarray, frames: np.ndarray, shape: tuple[int, int], 
     return torch.stack(out)
 
 
+def tok_idx_for(episodes: np.ndarray, frames: np.ndarray, k: int, n_tok: int, seed: int) -> np.ndarray:
+    """(B, k) sorted action-token indices, drawn without replacement, seeded by (seed, episode, frame)."""
+    out = np.empty((len(episodes), k), np.int64)
+    for i, (e, f) in enumerate(zip(episodes.tolist(), frames.tolist(), strict=True)):
+        h = int.from_bytes(hashlib.sha256(f"tok:{seed}:{e}:{f}".encode()).digest()[:8], "little")
+        out[i] = np.sort(np.random.default_rng(h).choice(n_tok, k, replace=False))
+    return out
+
+
 class NonFiniteActivationError(RuntimeError):
     pass
 
@@ -354,10 +374,15 @@ class NonFiniteActivationError(RuntimeError):
 class PartWriter:
     """Memmaps of one part in <part>.tmp/; fp16 unless a layer overflows (then that layer turns fp32)."""
 
-    def __init__(self, tmp: Path, layers: list[str], n_rows: int, n_steps: int):
+    def __init__(
+        self, tmp: Path, layers: list[str], n_rows: int, n_steps: int, tok_steps: int = 0, tok_k: int = 0
+    ):
         self.tmp = tmp
         self.n = n_rows
         self.n_steps = n_steps
+        self.tok_shape = (tok_steps, tok_k)
+        if tok_steps:  # per-token arrays "<aeNN>_tok": (T, tok_steps, K, d)
+            layers = layers + [f"{x}_tok" for x in layers if layer_family(x) == "ae"]
         self.arrs: dict[str, Any] = {}  # np.memmap
         self.overflow: list[str] = []
         for name in layers:
@@ -367,6 +392,8 @@ class PartWriter:
         )
 
     def _shape(self, name: str) -> tuple[int, ...]:
+        if name.endswith("_tok"):
+            return (self.n, *self.tok_shape, layer_dim(name))
         mid = len(GROUPS) if layer_family(name) == "pg" else self.n_steps
         return (self.n, mid, layer_dim(name))
 
@@ -468,6 +495,9 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
     gpu_name = torch.cuda.get_device_name(0) if device == "cuda" else "cpu"
     stop_layer = prefix_stop_layer(ident["layers"])
     prefix_only = not args.full_forward and stop_layer is not None
+    stride = int(ident.get("frame_stride", 1))
+    tok_steps = list(ident.get("tok_steps", []))
+    tok_k = int(ident.get("tok_per_step", 0))
     # not part of the identity: prefix-only records the same values; only done.json says how it ran
     forward_desc = (
         f"prefix-only (stopped after {stop_layer}; full forward on the first batch of the part for policy_action0)"
@@ -496,9 +526,11 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
             rows = cols[cols["episode_index"].isin(p["episodes"])].sort_values(
                 ["episode_index", "frame_index"]
             )
+            rows = rows[rows["frame_index"] % stride == 0]
             if len(rows) != p["n_frames"]:
                 raise SystemExit(f"{pid}: {len(rows)} frames in the data, plan says {p['n_frames']}")
-            writer = PartWriter(tmp, ident["layers"], len(rows), len(ident["ae_steps"]))
+            writer = PartWriter(tmp, ident["layers"], len(rows), len(ident["ae_steps"]), len(tok_steps), tok_k)
+            tok_idx_all = np.lib.format.open_memmap(tmp / "tok_idx.npy", "w+", np.int8, (len(rows), tok_k)) if tok_steps else None
             loader = DataLoader(
                 Subset(ds, rows["rel"].tolist()),
                 batch_size=args.batch,
@@ -508,7 +540,7 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
             meta_rows: list[dict[str, Any]] = []
             pos = 0
             n_full = 0
-            rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"])
+            rec = ActivationRecorder(policy, ident["layers"], ident["ae_steps"], tok_steps=tok_steps)
             for batch in loader:
                 lease.check()  # raises LeaseLostError if the part was taken over
                 bsz = len(batch["task"])
@@ -523,6 +555,10 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                 # prefix-only: same sample_actions path, cut after the deepest requested PaliGemma layer;
                 # the first batch of a part still runs in full for the policy_action0 sanity check
                 full = not prefix_only or pos == 0
+                if tok_steps:
+                    ti = tok_idx_for(ep, fr, tok_k, cfg.chunk_size, ident["noise_seed"])
+                    rec.tok_idx = torch.from_numpy(ti)
+                    tok_idx_all[pos : pos + bsz] = ti
                 rec.stop_after_prefix = not full
                 try:
                     with torch.inference_mode(), rec:
@@ -543,6 +579,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
                     writer.write(name, sl, x.cpu().numpy())
                 for name, x in rec.ae.items():
                     writer.write(name, sl, x.cpu().numpy())
+                for name, x in rec.aetok.items():
+                    writer.write(f"{name}_tok", sl, x.cpu().numpy())
                 assert rec.counts is not None
                 writer.counts[sl] = rec.counts.cpu().numpy().astype(np.int32)
                 for i in range(bsz):
@@ -566,6 +604,8 @@ def run_parts(args: argparse.Namespace, plan: dict[str, Any], acts_dir: Path, pa
             if pos != len(rows):
                 raise SystemExit(f"{pid}: wrote {pos} rows of {len(rows)} (--max-batches is for debugging)")
             dtypes = writer.close()
+            if tok_idx_all is not None:
+                tok_idx_all.flush()
             pd.DataFrame(meta_rows).to_parquet(tmp / "meta.parquet", index=False)
             secs = time.time() - t0
             store.write_json_atomic(
@@ -640,6 +680,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--workers", type=int, default=6, help="dataloader workers per GPU (PNG decoding)")
     ap.add_argument("--noise-seed", type=int, default=0)
+    ap.add_argument("--frame-stride", type=int, default=1, help="keep frames with frame_index %% s == 0 (T031)")
+    ap.add_argument("--tok-steps", default="none", help="denoising steps with per-token records, e.g. 9 (T031)")
+    ap.add_argument("--tok-per-step", type=int, default=8, help="action tokens sampled per timestep (T031)")
     ap.add_argument(
         "--full-forward",
         action="store_true",

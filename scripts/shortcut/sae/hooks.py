@@ -145,6 +145,7 @@ class ActivationRecorder:
         layers: Iterable[str],
         ae_steps: Sequence[int] | None = None,
         stop_after_prefix: bool = False,
+        tok_steps: Sequence[int] | None = None,
     ):
         self.policy = policy
         self.model = _pi05_model(policy)
@@ -158,6 +159,11 @@ class ActivationRecorder:
         self.pg: dict[str, Tensor] = {}
         self.counts: Tensor | None = None
         self._ae: dict[str, list[Tensor]] = {}
+        # per-token recording (T031): at denoising steps `tok_steps`, the action tokens `tok_idx` (B, K) (set by the
+        # caller before each forward) of every action-expert layer → `aetok[name]` (B, len(tok_steps), K, d)
+        self.tok_steps = sorted(set(tok_steps)) if tok_steps else []
+        self.tok_idx: Tensor | None = None
+        self._aetok: dict[str, list[Tensor]] = {}
         self._orig: dict[str, Any] = {}
 
     # -- prefix layout: wrap the instance's embed_prefix/_embed_images (no change to lerobot code)
@@ -178,7 +184,7 @@ class ActivationRecorder:
             self._layout = self._build_layout(pad_masks, int(tokens.shape[1]))
             self.counts = self._layout.counts
             self._step = -1
-            self.pg, self._ae = {}, {}
+            self.pg, self._ae, self._aetok = {}, {}, {}
             return embs, pad_masks, att_masks
 
         # instance attributes that were there before (another wrapper), restored on detach
@@ -233,6 +239,11 @@ class ActivationRecorder:
                 def post_ae(_m, _a, out, name=name):
                     if self.ae_steps is None or self._step in self.ae_steps:
                         self._ae.setdefault(name, []).append(out.float().mean(dim=1))
+                    if self._step in self.tok_steps:
+                        if self.tok_idx is None:
+                            raise RuntimeError("tok_steps set but tok_idx is None")
+                        ix = self.tok_idx.to(out.device).long()[..., None].expand(-1, -1, out.shape[-1])
+                        self._aetok.setdefault(name, []).append(out.float().gather(1, ix))
 
                 self.handles.append(mod.register_forward_hook(post_ae))
 
@@ -278,6 +289,10 @@ class ActivationRecorder:
     @property
     def n_steps(self) -> int:
         return self._step + 1
+
+    @property
+    def aetok(self) -> dict[str, Tensor]:
+        return {k: torch.stack(v, dim=1) for k, v in self._aetok.items()}
 
     @property
     def ae(self) -> dict[str, Tensor]:

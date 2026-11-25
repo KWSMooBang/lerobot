@@ -466,3 +466,25 @@ def _obs():
     repo, root, rev = collect.dataset_source(OUT_ROOT)
     ds = LeRobotDataset(repo, root=root, revision=rev, episodes=[379])
     return mock_pre(torch.utils.data.default_collate([ds[5]]))
+
+
+def test_frame_stride_and_token_records(tmp_path, mock_loader):
+    """T031: --frame-stride keeps frame_index % s == 0 (same values as the full run there); --tok-steps records
+    K sampled action tokens per timestep with their indices, the per-token values average like the token mean."""
+    d_all = _collect(tmp_path / "all", [], "ae:0,17")
+    d_sub = _collect(tmp_path / "sub", ["--frame-stride", "3", "--tok-steps", "9", "--tok-per-step", "5"], "ae:0,17")
+    m_all = pd.read_parquet(d_all / "meta.parquet")
+    m_sub = pd.read_parquet(d_sub / "meta.parquet")
+    keep = (m_all["frame_index"] % 3 == 0).to_numpy()
+    assert (m_sub["frame_index"] % 3 == 0).all() and len(m_sub) == keep.sum()
+    for name in ("ae00", "ae17"):
+        np.testing.assert_allclose(np.load(d_sub / f"{name}.npy"), np.load(d_all / f"{name}.npy")[keep], atol=1e-3)
+    tok = np.load(d_sub / "ae17_tok.npy")
+    idx = np.load(d_sub / "tok_idx.npy")
+    assert tok.shape == (len(m_sub), 1, 5, tok.shape[-1]) and idx.shape == (len(m_sub), 5)
+    assert (np.diff(idx, axis=1) > 0).all()  # sorted, without replacement
+    # mock chunk has 5 action tokens: all 5 sampled → their mean is the stored step-9 token mean
+    np.testing.assert_allclose(tok[:, 0].astype(np.float32).mean(1), np.load(d_sub / "ae17.npy")[:, 9], atol=2e-3)
+    ident = json.loads((d_sub.parents[1] / "plan.json").read_text())["identity"]
+    assert ident["frame_stride"] == 3 and ident["tok_steps"] == [9] and ident["tok_per_step"] == 5
+    assert "frame_stride" not in json.loads((d_all.parents[1] / "plan.json").read_text())["identity"]
