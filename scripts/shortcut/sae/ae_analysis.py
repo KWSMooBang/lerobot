@@ -41,6 +41,9 @@ CACHE = C.DATA / "t028_cache"  # T028 extracts (exp_tok9, act0)
 CODES = Path(os.environ.get("T031_CODES", CACHE))  # SAE codes and per-stage pickles
 FIG = AN / "figs"
 STEPS = (0, 4, 9)
+# token-mean SAEs: all 18 expert layers (T031 extension, 2026-11-26); per-token SAEs: C.LAYERS (6)
+ML = [int(x) for x in os.environ.get("T031_MEAN_LAYERS", ",".join(map(str, range(18)))).split(",")]
+TL = list(C.LAYERS)
 PHASES = ("reach", "grasp", "carry", "release")
 ACT_DIMS = ("x", "y", "z", "rx", "ry", "rz", "gripper")
 
@@ -105,7 +108,7 @@ def stage_encode() -> None:
     torch.set_num_threads(C.WORKERS)
     q = {}
     CODES.mkdir(parents=True, exist_ok=True)
-    for layer in C.LAYERS:
+    for layer in ML:
         for step in STEPS:
             f = CODES / f"codes_L{layer:02d}_s{step}.npz"
             sae = TopKSAE.load(sae_dir(layer, step), "cpu")
@@ -116,12 +119,13 @@ def stage_encode() -> None:
                 idx, val = C.encode_np(sae, x.numpy(), "cpu")
                 np.savez(f, idx=idx, val=val.astype(np.float16))
             print(f"encode L{layer} s{step}: T028 VE {met['var_explained']:.4f} nmse {met['nmse']:.4f}", flush=True)
+    for layer in TL:
         # per-token SAE on the PCA-128 reconstruction (T028 basis exp_tok/L*), step 9
         pb = np.load(C.RICH / "pca_bases.npz")
         comp, mean = pb[f"exp_tok/L{layer}/components"], pb[f"exp_tok/L{layer}/mean"]
         trunc = 1 - float(pb[f"exp_tok/L{layer}/explained_variance"].sum() / pb[f"exp_tok/L{layer}/total_variance"])
         sae = TopKSAE.load(sae_dir(layer, 9, True), "cpu")
-        tk = np.load(CACHE / "exp_tok9.npy", mmap_mode="r")[C.LAYERS.index(layer)]  # (N, 50, 128)
+        tk = np.load(CACHE / "exp_tok9.npy", mmap_mode="r")[TL.index(layer)]  # (N, 50, 128)
         n = sae.cfg.n_latents
         call_mean = np.zeros((C.N_TOT, n), np.float16)  # per call, feature activation averaged over the 50 tokens
         pos_fire = np.zeros((C.N_TOT, 5, n), np.uint8)  # per call, # tokens firing in token bands of 10
@@ -190,7 +194,7 @@ def stage_select() -> None:
     M = C.meta()
     act = np.load(CACHE / "act0.npy")
     out, keep = {}, {}
-    for layer in C.LAYERS:
+    for layer in ML:
         for step in STEPS:
             D = dense(layer, step)
             s = selectivity(D > 0, M)
@@ -211,7 +215,7 @@ def stage_select() -> None:
             print(key, {k: out[key][k] for k in ("live", "phase_selective", "task_selective")},
                   "gripper |r|", round(out[key]["max_abs_r"]["gripper"], 3), flush=True)
     # per-token SAE (call mean over the 50 reconstructed tokens): position profile
-    for layer in C.LAYERS:
+    for layer in TL:
         pf = np.load(CODES / f"tokpos_L{layer:02d}.npy", mmap_mode="r")
         U = C.u40(M)
         urows = np.concatenate([np.arange(m["off"], m["off"] + m["C"]) for m in U])
@@ -231,7 +235,7 @@ def stage_select() -> None:
     save("select", out)
     pickle.dump(keep, open(CODES / "select.pkl", "wb"))
     # H2a, H2b
-    sh = {L: out[f"L{L}_s9"]["phase_share"] for L in C.LAYERS}
+    sh = {L: out[f"L{L}_s9"]["phase_share"] for L in ML}
     save("h2", {"phase_share_s9": sh, "H2a_late_gt_early": bool(min(sh[14], sh[17]) > max(sh[2], sh[5])),
                 "H2a_mean_late_minus_early": (sh[14] + sh[17] - sh[2] - sh[5]) / 2,
                 "H2b_L17_max_abs_r_gripper": out["L17_s9"]["max_abs_r"]["gripper"],
@@ -257,7 +261,7 @@ def stage_fallback() -> None:
     pool = fallback_pool(M)
     out = {"n_pool": len(pool), "by_src": dict(Counter(p["src"] for p in pool))}
     curves = {}
-    for layer in C.LAYERS:
+    for layer in ML:
         key = f"L{layer}_s9"
         s = sel[key]
         feats_of = defaultdict(list)
@@ -327,7 +331,7 @@ def stage_fallback() -> None:
         curves[key] = {"exec": np.nanmean(E_c, 0)[:30].tolist() if len(E_c) else [],
                        "instr": np.nanmean(I_c, 0)[:30].tolist() if len(I_c) else []}
         print(key, {k: res[k] for k in ("n_trials_with_features", "exec_by_call2", "instr_by_call2", "H3")}, flush=True)
-    out["H3_all_layers"] = all(out[f"L{L}_s9"]["H3"] for L in C.LAYERS)
+    out["H3_all_layers"] = all(out[f"L{L}_s9"]["H3"] for L in ML)
     save("fallback", out | {"curves": curves})
 
 
@@ -369,7 +373,7 @@ def stage_basket() -> None:
     sel = pickle.load(open(CODES / "select.pkl", "rb"))
     out = {"n": {k: len(v) for k, v in G.items()}}
     keep = {}
-    for layer in C.LAYERS:
+    for layer in ML:
         key = f"L{layer}_s9"
         D = dense(layer, 9)
         E = {k: np.stack([ep_mean(D, m) for m in v]) for k, v in G.items()}
@@ -416,7 +420,7 @@ def stage_kauf() -> None:
     from safetensors.numpy import load_file
 
     out, keep = {"random_expectation": W.shape[0] / W.shape[1]}, {}
-    for layer in C.LAYERS:
+    for layer in ML:
         key = f"L{layer}_s9"
         Wd = load_file(str(sae_dir(layer, 9) / "sae.safetensors"))["W_dec"].astype(np.float64)  # (1024, n)
         pot = ((Q.T @ Wd) ** 2).sum(0) / (Wd ** 2).sum(0)
@@ -535,7 +539,7 @@ def dec_job(job):
 
 
 def stage_dec() -> None:
-    jobs = [(L, k) for L in C.LAYERS for k in ("vec", "sae")]
+    jobs = [(L, k) for L in ML for k in ("vec", "sae")]
     out = {}
     with ProcessPoolExecutor(C.WORKERS, initializer=_one_thread) as ex:
         for (layer, kind), r in ex.map(dec_job, jobs):
@@ -589,7 +593,8 @@ def stage_traj() -> None:
     CS = cases(M)
     FIG.mkdir(parents=True, exist_ok=True)
     out = {}
-    for layer in (11, 17):
+    (FIG / "traj").mkdir(parents=True, exist_ok=True)
+    for layer in ML:
         D = dense(layer, 9)
         for cname, groups in CS.items():
             groups = {k: v for k, v in groups.items() if v}
@@ -617,9 +622,128 @@ def stage_traj() -> None:
             fig.suptitle(f"{cname}: SAE feature activation per call, expert L{layer} step 9 (mean over episodes; "
                          f"-- median grasp, : median release)", fontsize=10)
             fig.tight_layout()
-            fig.savefig(FIG / f"traj_{cname}_L{layer}.png", dpi=110)
+            fig.savefig(FIG / "traj" / f"traj_{cname}_L{layer:02d}.png", dpi=100)
             plt.close(fig)
     save("traj", out)
+
+
+# ============================================================================ A1b layer × call maps
+def _cos(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """row-wise cosine similarity (T, n) x (T, n) → (T,)."""
+    na = np.linalg.norm(a, axis=-1)
+    nb = np.linalg.norm(b, axis=-1)
+    return (a * b).sum(-1) / np.maximum(na * nb, 1e-9)
+
+
+NC = 28  # calls shown in the maps (all U40 episodes have >= 28)
+
+
+def maps_job(job):
+    """one (layer, step): fallback executed-vs-instructed map row + case contrasts (per call)."""
+    layer, step = job
+    M = C.meta()
+    D = dense(layer, step)
+    U = C.u40(M)
+    by_task = defaultdict(list)
+    for m in U:
+        by_task[m["task"]].append(D[m["off"]: m["off"] + NC])
+    tmean = {t: np.mean(v, 0) for t, v in by_task.items()}  # (NC, n) U40 mean code per call
+    res = {}
+    # fallback pool: share of trials closer to the executed task than to the instructed task, per call
+    win, diff = [], []
+    for p in fallback_pool(M):
+        m = p["m"]
+        if p["instructed"] not in tmean or not all(t in tmean for t in p["executed"]):
+            continue
+        x = D[m["off"]: m["off"] + NC]
+        se = np.max([_cos(x, tmean[t]) for t in p["executed"]], 0)
+        si = _cos(x, tmean[p["instructed"]])
+        win.append(se > si)
+        diff.append(se - si)
+    res["fallback_exec_closer"] = np.mean(win, 0)
+    res["fallback_sim_diff"] = np.mean(diff, 0)
+    res["fallback_n"] = len(win)
+    # cases
+    CS = cases(M)
+    mean = lambda ids: np.mean([D[M[i]["off"]: M[i]["off"] + NC] for i in ids], 0)  # noqa: E731
+    b = CS["basket_O9"]
+
+    def split_floor(ids):
+        h = len(ids) // 2
+        return 1 - _cos(mean(ids[:h]), mean(ids[h:]))
+
+    floorA, floorV = split_floor(b["ctl (A100)"]), split_floor(b["ctl4090"])
+    res["basket_opp"] = 1 - _cos(mean(b["opp (A100)"]), mean(b["ctl (A100)"])) - floorA
+    res["basket_far20"] = 1 - _cos(mean(b["far20"]), mean(b["ctl4090"])) - floorV
+    res["basket_far25"] = 1 - _cos(mean(b["far25"]), mean(b["ctl4090"])) - floorV
+    g = CS["goal_g10"]
+    gm = mean(g["g10 (cand)"])
+    res["g10_G7_minus_G2"] = _cos(gm, mean(g["G7"])) - _cos(gm, mean(g["G2"]))
+    lk = next(k for k in CS if k.startswith("l90_"))
+    lc = CS[lk]
+    did = next(k for k in lc if "did" in k)
+    lt = did.split("did ")[1]
+    instr = M[lc[did][0]]["nearest_trained"]
+    if instr in tmean and lt in tmean:
+        lm = mean(lc[did])
+        res["l90_exec_minus_instr"] = _cos(lm, tmean[lt]) - _cos(lm, tmean[instr])
+        res["l90_label"] = f"{lk[4:]} did {lt}, instructed≈{instr}"
+    return job, res
+
+
+def stage_maps() -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    jobs = [(L, s) for s in STEPS for L in ML]
+    R = {}
+    with ProcessPoolExecutor(C.WORKERS, initializer=_one_thread) as ex:
+        for job, r in ex.map(maps_job, jobs):
+            R[job] = r
+    out = {}
+    panels = [("fallback_exec_closer", "fallback pool: share of trials closer to EXECUTED task", "viridis", (0, 1)),
+              ("fallback_sim_diff", "fallback pool: cos(executed) − cos(instructed)", "RdBu_r", None),
+              ("basket_far25", "basket O9 far25 vs ctl4090 (cos dist − split-half floor)", "magma", None),
+              ("basket_far20", "basket O9 far20 vs ctl4090", "magma", None),
+              ("basket_opp", "basket O9 opp vs ctl A100", "magma", None),
+              ("g10_G7_minus_G2", "Goal g10: cos(G7) − cos(G2)", "RdBu_r", None),
+              ("l90_exec_minus_instr", "L90 lscene: cos(executed) − cos(instructed)", "RdBu_r", None)]
+    for st in STEPS:
+        fig, axes = plt.subplots(2, 4, figsize=(19, 8))
+        for ax, (key, title, cmap, lim) in zip(axes.flat, panels, strict=False):
+            if not all(key in R[(L, st)] for L in ML):
+                ax.axis("off")
+                continue
+            A = np.stack([R[(L, st)][key] for L in ML])
+            out[f"s{st}/{key}"] = A.round(4).tolist()
+            if lim is None:
+                v = np.nanmax(np.abs(A))
+                lim = (-v, v) if cmap == "RdBu_r" else (min(0, np.nanmin(A)), np.nanmax(A))
+            im = ax.imshow(A, aspect="auto", origin="lower", cmap=cmap, vmin=lim[0], vmax=lim[1])
+            ax.set_yticks(range(len(ML)), [str(L) for L in ML], fontsize=6)
+            ax.set_ylabel("expert layer")
+            ax.set_xlabel("call")
+            if key.startswith("l90"):
+                title += f"\n{R[(ML[0], st)].get('l90_label', '')}"
+            ax.set_title(title, fontsize=8)
+            plt.colorbar(im, ax=ax, fraction=0.04)
+        axes.flat[-1].axis("off")
+        fig.suptitle(f"layer × call maps, SAE codes, denoise step {st} "
+                     f"(fallback n={R[(ML[0], st)]['fallback_n']}; U40 task means per call as references)", fontsize=10)
+        fig.tight_layout()
+        fig.savefig(FIG / f"maps_step{st}.png", dpi=110)
+        plt.close(fig)
+    out["fallback_n"] = R[(ML[0], 9)]["fallback_n"]
+    out["l90_label"] = R[(ML[0], 9)].get("l90_label")
+    # compact summaries: fallback exec-closer share at calls 0-2 and over all calls, per layer (step 9)
+    out["summary_s9"] = {f"L{L}": {"exec_closer_calls0_2": float(np.mean(R[(L, 9)]["fallback_exec_closer"][:3])),
+                                   "exec_closer_all": float(np.mean(R[(L, 9)]["fallback_exec_closer"])),
+                                   "far25_mean_dist": float(np.mean(R[(L, 9)]["basket_far25"])),
+                                   "opp_mean_dist": float(np.mean(R[(L, 9)]["basket_opp"]))} for L in ML}
+    save("maps", out)
+    print(C.dumps(out["summary_s9"]), flush=True)
 
 
 # ============================================================================ numbers + summary figures
@@ -634,7 +758,7 @@ def stage_numbers() -> None:
     nums = {"stage1": {"selected": json.loads((C.OUT / "stage1" / "selected.json").read_text()),
                        "layers": json.loads((C.OUT / "stage1" / "layers.json").read_text())},
             "stage2_quality": qual}
-    for nm in ("t028_quality", "select", "h2", "fallback", "basket", "kauf", "dec", "traj"):
+    for nm in ("t028_quality", "select", "h2", "fallback", "basket", "kauf", "dec", "traj", "maps"):
         if (AN / f"{nm}.json").exists():
             nums[nm] = load(nm)
     (C.OUT / "numbers.json").write_text(C.dumps(nums))
@@ -642,16 +766,16 @@ def stage_numbers() -> None:
     # quality figure
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))
     for si, step in enumerate(STEPS):
-        ve = [next(q["ve"] for q in qual if q["job"] == f"L{L:02d}_s{step}") for L in C.LAYERS]
-        ax[0].plot(C.LAYERS, ve, "o-", label=f"mean, step {step}")
-        nf = [next(q["never_fire"] for q in qual if q["job"] == f"L{L:02d}_s{step}") for L in C.LAYERS]
-        ax[1].plot(C.LAYERS, nf, "o-", label=f"mean, step {step}")
-    ve = [next(q["ve"] for q in qual if q["job"] == f"L{L:02d}_s9_tok") for L in C.LAYERS]
-    ax[0].plot(C.LAYERS, ve, "s--", color="k", label="per-token, step 9")
-    nf = [next(q["never_fire"] for q in qual if q["job"] == f"L{L:02d}_s9_tok") for L in C.LAYERS]
-    ax[1].plot(C.LAYERS, nf, "s--", color="k", label="per-token, step 9")
+        ve = [next(q["ve"] for q in qual if q["job"] == f"L{L:02d}_s{step}") for L in ML]
+        ax[0].plot(ML, ve, "o-", label=f"mean, step {step}")
+        nf = [next(q["never_fire"] for q in qual if q["job"] == f"L{L:02d}_s{step}") for L in ML]
+        ax[1].plot(ML, nf, "o-", label=f"mean, step {step}")
+    ve = [next(q["ve"] for q in qual if q["job"] == f"L{L:02d}_s9_tok") for L in TL]
+    ax[0].plot(TL, ve, "s--", color="k", label="per-token, step 9")
+    nf = [next(q["never_fire"] for q in qual if q["job"] == f"L{L:02d}_s9_tok") for L in TL]
+    ax[1].plot(TL, nf, "s--", color="k", label="per-token, step 9")
     if "t028_quality" in nums:
-        ax[0].plot(C.LAYERS, [nums["t028_quality"][f"L{L}_s9"]["var_explained"] for L in C.LAYERS], "^:", color="C3",
+        ax[0].plot(ML, [nums["t028_quality"][f"L{L}_s9"]["var_explained"] for L in ML], "^:", color="C3",
                    label="mean step 9 on T028 rollouts")
     ax[0].set_ylabel("held-out VE (raw space)")
     ax[1].set_ylabel("never-fire fraction")
@@ -665,8 +789,8 @@ def stage_numbers() -> None:
     if "select" in nums:
         fig, ax = plt.subplots(figsize=(6, 3.5))
         for step in STEPS:
-            ax.plot(C.LAYERS, [nums["select"][f"L{L}_s{step}"]["phase_share"] for L in C.LAYERS], "o-", label=f"phase, step {step}")
-        ax.plot(C.LAYERS, [nums["select"][f"L{L}_s9"]["task_share"] for L in C.LAYERS], "s--", color="k", label="task, step 9")
+            ax.plot(ML, [nums["select"][f"L{L}_s{step}"]["phase_share"] for L in ML], "o-", label=f"phase, step {step}")
+        ax.plot(ML, [nums["select"][f"L{L}_s9"]["task_share"] for L in ML], "s--", color="k", label="task, step 9")
         ax.set_xlabel("expert layer")
         ax.set_ylabel("share of live features")
         ax.legend(fontsize=7)
@@ -675,7 +799,7 @@ def stage_numbers() -> None:
         plt.close(fig)
     if "fallback" in nums:
         fig, axes = plt.subplots(2, 6, figsize=(17, 5.6))
-        for j, L in enumerate(C.LAYERS):
+        for j, L in enumerate(TL):
             cv = nums["fallback"]["curves"][f"L{L}_s9"]
             n = nums["fallback"][f"L{L}_s9"]["n_trials_with_features"]
             axes[0, j].plot(cv["exec"], color="C2", label="executed-task features (any)")
@@ -716,7 +840,7 @@ def stage_numbers() -> None:
         kp = pickle.load(open(CODES / "kauf.pkl", "rb"))
         fig, ax = plt.subplots(figsize=(8, 3.5))
         data, labels = [], []
-        for L in C.LAYERS:
+        for L in ML:
             k = kp[f"L{L}_s9"]
             data += [k["pot"][k["beh"]], k["pot"][k["oth"]]]
             labels += [f"L{L}\nbeh", f"L{L}\nother"]
@@ -733,7 +857,7 @@ def stage_numbers() -> None:
         for ax, (met, title) in zip(axes, (("task_bacc", "task (40), bacc"), ("phase_bacc", "phase (4), bacc"),
                                             ("fallback_executed", "fallback: share decoded as executed")), strict=True):
             for kind, mk in (("vec", "o-"), ("sae", "s--")):
-                ax.plot(C.LAYERS, [nums["dec"][f"L{L}_s9"][kind][met] for L in C.LAYERS], mk,
+                ax.plot(ML, [nums["dec"][f"L{L}_s9"][kind][met] for L in ML], mk,
                         label="T030 vector" if kind == "vec" else "SAE codes")
             ax.set_title(title, fontsize=9)
             ax.set_xlabel("expert layer")
@@ -744,7 +868,7 @@ def stage_numbers() -> None:
     print("numbers written", flush=True)
 
 
-STAGES = ("extract", "encode", "select", "fallback", "basket", "kauf", "dec", "traj", "numbers")
+STAGES = ("extract", "encode", "select", "fallback", "basket", "kauf", "dec", "traj", "maps", "numbers")
 
 
 def main() -> None:

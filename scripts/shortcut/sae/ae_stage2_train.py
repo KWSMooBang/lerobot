@@ -103,7 +103,8 @@ def run_job(acts: Path, layer: int, step: int, tok: bool, x_np: np.ndarray, meta
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--acts", required=True)
+    ap.add_argument("--acts", required=True, help="acts dir(s), comma separated; each layer is read from the dir that has it")
+    ap.add_argument("--layers", default="0-17", help="mean-SAE layers, e.g. 0-17 or 2,5,8")
     ap.add_argument("--only", default="all", choices=("all", "mean", "tok"))
     ap.add_argument("--out", default=None, help="default /outputs/VLA-shortcut-exps/sae_ae/stage2")
     ap.add_argument("--device", default="cuda")
@@ -113,21 +114,42 @@ def main() -> None:
     if a.out:
         S2 = Path(a.out)
     ARGS.device, ARGS.max_steps = a.device, a.max_steps
-    acts = Path(a.acts)
+    dirs = [Path(x) for x in a.acts.split(",")]
+    where_mean, where_tok = {}, {}
+    for d in dirs:
+        ident = store.read_plan(d)["identity"]
+        assert ident["ae_steps"] == [0, 4, 9], (d, ident["ae_steps"])
+        for nm in ident["layers"]:
+            where_mean.setdefault(int(nm[2:]), d)
+            if ident.get("tok_steps"):
+                where_tok.setdefault(int(nm[2:]), d)
+    if "-" in a.layers:
+        lo, hi = map(int, a.layers.split("-"))
+        mean_layers = list(range(lo, hi + 1))
+    else:
+        mean_layers = [int(x) for x in a.layers.split(",")]
+    missing = [L for L in mean_layers if L not in where_mean]
+    if missing:
+        raise SystemExit(f"layers {missing} are in none of {dirs}")
+    ep_sets = [sorted({e for p in store.done_parts(d) for e in p["episodes"]}) for d in dirs]
+    if any(e != ep_sets[0] for e in ep_sets):
+        raise SystemExit("acts dirs cover different episodes")
     sel = json.loads((C.OUT / "stage1" / "selected.json").read_text())
     S2.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    eps = sorted({e for p in store.done_parts(acts) for e in p["episodes"]})
+    eps = ep_sets[0]
     rng = np.random.default_rng(0)
     hold_eps = {eps[i] for i in rng.permutation(len(eps))[: max(1, int(round(len(eps) * 0.1)))]}
     rows = []
-    for layer in C.LAYERS:
-        if a.only in ("all", "mean"):
+    for layer in sorted(set(mean_layers) | set(where_tok)):
+        if a.only in ("all", "mean") and layer in mean_layers:
+            acts = where_mean[layer]
             x3, meta, _ = load(acts, layer, tok=False)
             for si, step in enumerate((0, 4, 9)):
                 rows.append(run_job(acts, layer, step, False, np.ascontiguousarray(x3[:, si]), meta, None, sel, hold_eps))
             del x3
-        if a.only in ("all", "tok"):
+        if a.only in ("all", "tok") and layer in where_tok:
+            acts = where_tok[layer]
             xt, meta, ti = load(acts, layer, tok=True)
             rows.append(run_job(acts, layer, 9, True, xt, meta, ti, sel, hold_eps))
             del xt

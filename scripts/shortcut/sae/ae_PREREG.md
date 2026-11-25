@@ -85,3 +85,21 @@ Written 2026-11-26, before any SAE was trained or any SAE number was computed.
 - GPU: VGI-102 GPU 0 only, flock on its queue lock. Stop and report before exceeding 4 GPU-h (smoke + collection +
   training). Disk: activations ≤ 40 GB under `/data0/woosung/datasets/VLA-shortcut-exps/acts/`.
 - CPU workers ≤ 8. No existing output is overwritten.
+
+## Addendum 2026-11-26 (scope extension from the human via lead, before any stage-2 SAE existed)
+- **All 18 expert layers:** token-mean SAEs for layers 0–17 × steps {0, 4, 9} = 54 (stage-1 setting, ER 2 / k 64);
+  per-token SAEs stay at {2, 5, 8, 11, 14, 17} step 9. Layers {0,1,3,4,6,7,9,10,12,13,15,16} come from a second
+  collection (same timesteps: frame stride 2, same noise seeds, token mean only). GPU cap 6 GPU-h; acts + caches ≤ 80 GB.
+- Layers 0–2: massive channels (T030) are flagged in the interpretation; the method is unchanged (stage 1: L2 fails
+  the "handled" criterion).
+- A2–A6 run on all 18 layers (step 9; A2 on all 3 steps). H2a / H2b / H3 / H5 keep their pre-registered layers.
+- **A1b layer × call maps (new, descriptive):** per (layer, step), calls 0–27, references = U40 per-task mean SAE
+  code at the same call. (i) fallback pool: share of trials whose code is closer (cosine) to the executed than to the
+  instructed task, and the mean cosine difference; (ii) basket O9: cosine distance of the condition-mean code from its
+  machine's ctl, minus the ctl split-half distance; (iii) Goal g10: cos(G7) − cos(G2); (iv) T030 L90 lscene case:
+  cos(executed) − cos(instructed ≈ nearest_trained). Trajectory small multiples for all 18 layers (step 9).
+- **A3 exploratory (not a test):** the PREREG task-selective definition leaves almost no fallback trial with features
+  for both its executed and instructed task, so a pair-contrast version is added: per trial, U40 features with
+  P(fire | executed) ≥ 0.3 ∧ P(fire | instructed) ≤ 0.05 and the reverse; per call the share of each set that fires.
+- Disclosure: the analysis code was tested end to end with the stage-1 SAEs (T028-trained, layers 2–17 of 6) in a
+  temp folder; those test numbers were seen and motivated the exploratory A3 variant. They are not reported as results.
