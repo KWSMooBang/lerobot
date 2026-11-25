@@ -30,6 +30,7 @@ import sys
 import tempfile
 import time
 from collections import defaultdict
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -45,7 +46,6 @@ from serve.activations import (  # noqa: E402
     PAD,
     RICH_EXP_TOK_LAYERS,
     RICH_MLP_LAYERS,
-    RICH_STEPS,
     RICH_TOK_LAYERS,
     SEGMENTS,
     RichHooks,
@@ -265,7 +265,7 @@ def save_npz(path: Path, arrays: dict[str, np.ndarray]) -> None:
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as f:
-            np.savez(f, **arrays)  # uncompressed: fp16 activations barely compress, saves CPU time
+            np.savez_compressed(f, **arrays)  # lossless zlib: -11% overall (zero-padded token arrays -30%)
         os.replace(tmp, path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -449,8 +449,14 @@ def _pearson(a: np.ndarray, b: np.ndarray) -> float:
     return float((a * b).sum() / den) if den > 0 else float("nan")
 
 
+def load_obs(row: dict[str, Any]) -> dict[str, np.ndarray]:
+    """Replay input of one episode, read fully (runs in a prefetch thread during extraction)."""
+    with np.load(row["obs_path"]) as z:
+        return {k: z[k] for k in z.files}
+
+
 def run_episode(
-    row: dict[str, str], L: Any, hooks: RichHooks, path_rec: PathRecorder, tok: Any, dev: str,
+    row: dict[str, str], L: Any, hooks: RichHooks, path_rec: PathRecorder, tok: Any, dev: str,  # noqa: N803
     bases: Bases | None, raw: bool, max_batch: int, dims: dict[str, int] | None = None,
     mlp_keep: tuple[int, ...] | None = None, keep_vlm_vec: bool = True,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:  # fmt: skip
@@ -462,7 +468,7 @@ def run_episode(
     mlp_keep = tuple(hooks.mlp_layers if mlp_keep is None else mlp_keep)
     mlp_idx = [hooks.mlp_layers.index(i) for i in mlp_keep]
 
-    d = np.load(row["obs_path"])
+    d = row.get("_obs") or load_obs(row)
     C = len(d["t"])  # noqa: N806
     instruction = str(d["instruction"])
     obs = [{"image": d["image"][k], "image2": d["image2"][k], "state": d["state"][k]} for k in range(C)]
@@ -569,7 +575,7 @@ def load_model(dev: str) -> tuple[Any, Any]:
     from serve.engine import load_any
     from transformers import AutoTokenizer
 
-    L = load_any(os.environ.get("SC_CKPT", "lerobot/pi05_libero_finetuned"), None, "libero_goal", N_ACTION_STEPS, dev)
+    L = load_any(os.environ.get("SC_CKPT", "lerobot/pi05_libero_finetuned"), None, "libero_goal", N_ACTION_STEPS, dev)  # noqa: N806
     tok = AutoTokenizer.from_pretrained(os.environ["SC_TOKENIZER_DIR"])
     return L, tok
 
@@ -632,7 +638,7 @@ def cmd_extract(a: argparse.Namespace) -> None:
         cfg = {"pca": {}, "mlp_layers": list(RICH_MLP_LAYERS), "keep_vlm_vec": True}
     dev = "cuda"
     tic = time.time()
-    L, tok = load_model(dev)
+    L, tok = load_model(dev)  # noqa: N806
     bases = Bases(out / "pca_bases.npz", dev, cfg["pca"]) if a.phase == "main" else None
     hooks = RichHooks(L.policy)
     path_rec = PathRecorder(L.policy.model)
@@ -641,31 +647,46 @@ def cmd_extract(a: argparse.Namespace) -> None:
     log_p = dst / f"extract_{a.phase}.jsonl"
     log_p.parent.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
+    io = ThreadPoolExecutor(2)  # prefetch the next replay input / write the previous episode while the GPU runs
+    nxt = io.submit(load_obs, todo[0]) if todo else None
+    pending: Future | None = None
+
+    def finish(r: dict[str, Any], info: dict[str, Any], t0: float, t1: float, i: int, log: Any) -> None:
+        mb = (dst / r["path"]).stat().st_size / 2**20
+        line = {"episode": r["episode"], "set": r["set"], "job": r["job"], **info,
+                "sec_gpu": round(t1 - t0, 2), "sec_total": round(time.time() - t0, 2), "mb": round(mb, 1),
+                "time": time.strftime("%Y-%m-%dT%H:%M:%S")}  # fmt: skip
+        log.write(json.dumps(line) + "\n")
+        log.flush()
+        r_old = info.get("r_old", {})
+        print(f"[rich] {i}/{len(todo)} {r['set']}/{r['episode']} {line['sec_gpu']}s "
+              f"(main {info['sec_main']} probe {info['sec_probe']}) {mb:.0f}MB "
+              f"act_rec={info['act_max_diff_recorded']:.3g} mn_self={info['mn_self_diff']:.2g} "
+              f"r_old_min={min(r_old.values()) if r_old else float('nan'):.5f}", flush=True)  # fmt: skip
+
     with open(log_p, "a") as log:
         for i, r in enumerate(todo, 1):
             if a.max_hours and (time.time() - t_start) / 3600 > a.max_hours:
                 print(f"[rich] stop: --max-hours {a.max_hours} reached", flush=True)
                 break
             t0 = time.time()
+            r = {**r, "_obs": nxt.result()}
+            nxt = io.submit(load_obs, todo[i]) if i < len(todo) else None
             arrays, info = run_episode(
                 r, L, hooks, path_rec, tok, dev, bases, raw, a.max_batch,
                 dims=cfg["pca"], mlp_keep=tuple(cfg["mlp_layers"]), keep_vlm_vec=cfg["keep_vlm_vec"],
             )  # fmt: skip
             t1 = time.time()
-            save_npz(dst / r["path"], arrays)
-            mb = (dst / r["path"]).stat().st_size / 2**20
-            line = {"episode": r["episode"], "set": r["set"], "job": r["job"], **info,
-                    "sec_gpu": round(t1 - t0, 2), "sec_total": round(time.time() - t0, 2), "mb": round(mb, 1),
-                    "time": time.strftime("%Y-%m-%dT%H:%M:%S")}  # fmt: skip
-            log.write(json.dumps(line) + "\n")
-            log.flush()
-            r_old = info.get("r_old", {})
-            print(f"[rich] {i}/{len(todo)} {r['set']}/{r['episode']} {line['sec_total']}s "
-                  f"(main {info['sec_main']} probe {info['sec_probe']}) {mb:.0f}MB "
-                  f"act_rec={info['act_max_diff_recorded']:.3g} mn_self={info['mn_self_diff']:.2g} "
-                  f"r_old_min={min(r_old.values()) if r_old else float('nan'):.5f}", flush=True)  # fmt: skip
+            if pending is not None:
+                pending.result()  # one write in flight at most (bounded memory, errors surface)
+            r.pop("_obs")
+            pending = io.submit(lambda r=r, arrays=arrays, info=info, t0=t0, t1=t1, i=i: (
+                save_npz(dst / r["path"], arrays), finish(r, info, t0, t1, i, log)))  # fmt: skip
             if a.peak_mem and i == 1:
                 print(f"[rich] peak mem {torch.cuda.max_memory_allocated() / 2**30:.1f} GiB", flush=True)
+        if pending is not None:
+            pending.result()
+    io.shutdown()
 
 
 # ----------------------------------------------------------------------------------------------- PCA
@@ -783,7 +804,7 @@ def cmd_weights(a: argparse.Namespace) -> None:
     if p.exists():
         print(f"{p} exists")
         return
-    L, _tok = load_model("cuda" if torch.cuda.is_available() else "cpu")
+    L, _tok = load_model("cuda" if torch.cuda.is_available() else "cpu")  # noqa: N806
     m = L.policy.model
     pwe = m.paligemma_with_expert
     vlm = pwe.paligemma.model.language_model.layers

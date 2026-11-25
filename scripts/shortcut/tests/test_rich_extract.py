@@ -243,7 +243,7 @@ def pre(batch: dict) -> dict:
 def setup(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     tmp = tmp_path_factory.mktemp("rich")
     policy = TinyPolicy().eval()
-    L = SimpleNamespace(policy=policy, pre=pre, post=lambda a: a, env_post=lambda d: {ACTION: d[ACTION]})
+    L = SimpleNamespace(policy=policy, pre=pre, post=lambda a: a, env_post=lambda d: {ACTION: d[ACTION]})  # noqa: N806
     hooks = A.RichHooks(policy)
     path_rec = RE.PathRecorder(policy.model)
     rows = []
