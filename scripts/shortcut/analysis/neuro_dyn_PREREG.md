@@ -89,3 +89,104 @@ Stage-B (T028) details get an addendum, committed before any B analysis.
 - Also project onto Kim-style source CDs.
 
 ## A8 Ames: proposal only, no data.
+
+---
+# Addendum B (2026-11-25, written before any stage-B number; data seen: manifest columns, keys and shapes, and one design check of call-0 obs equality for cand vs base)
+
+## Data and common rules
+- T028 rich_acts: `/outputs/VLA-shortcut-exps/rich_acts/<set>/<job>/<episode>.npz` plus manifest.csv, pca_bases.npz, weights.npz.
+  - Code is written on the pilot (60 ep) and run on all 1,560 ep after T028 [DONE].
+  - The pilot has raw `vlm_tok` / `exp_tok`. These are projected with pca_bases to match the final `*_tok_pc` keys.
+- **Held-out rule for the T028 PCA bases**: episodes with pca_fit = 1 are used only as the fitting fold. Confirmatory statistics use pca_fit = 0 episodes. Analysis-specific PCA, CCA and LDA are fit on the training fold (by init or by task).
+- **Machine**: every activation was replayed on the 4090 (replay_machine). Every comparison is between episodes with the same replay_machine, so this holds trivially.
+  - Outcome labels come from the original runs. These are A100, except basket_far: same machine, bit-identical.
+  - Replays are teacher-forced on the recorded observations.
+- **Massive activations** (VLM residual dims 1577 and 1959, up to 2.9e5):
+  - (i) Every residual-space distance, PCA or CCA uses per-token RMS-normalised vectors (x / rms(x), which is what K/V see), with dims 1577 and 1959 removed. Their share of the difference energy is reported separately.
+  - (ii) Kaufman read-in PF and GR use the full normalised vector, because the weights decide what is read. A variant with the two dims zeroed is reported as robustness.
+  - (iii) K/V-level metrics need no treatment (post-norm, absmax < 62).
+- Families for BH-FDR: B1, A2, A3, A4, A5, A6, A7. The number of tests per family is reported.
+- Cluster units: candidate (cand), task (train sets), condition × task (basket).
+
+## B1 (confirmatory retest of the stage-A exploratory finding)
+- **Design**: each goal-cand trial is paired with the base-task (roles.csv base_task) train trial at the same init.
+  - A pair is valid only if call-0 obs are identical within render jitter: image max |Δ| ≤ 2, state max |Δ| < 1e-3. Candidates with a modified scene fail this.
+- **Groups**:
+  - FALLBACK = outcome ∈ {trained, fail_trained}
+  - NEW = {new, new_byproduct}
+  - partial, fail_new and fail_other are reported, not tested.
+- **Metrics at call 0, task segment**:
+  - (a) Read-in PF of Δ (exact per-token rms, then segment mean) at tok layers 0, 2, 5, 8, 11, 14, each read by layer l+1. From vlm_seg, all 18 layers (approximate) are also shown.
+  - (b) K/V level: ||Δk_seg|| / ||k_seg|| and ||Δv_seg|| / ||v_seg||, task segment, all 18 layers. Expert attention mass on task tokens (attn_mass), step 0.
+  - (c) Expert: ||Δ exp_mean[L17, step 0]|| and its PF on the action readout (7 rows × AdaRMS scale at t = 1).
+- **H_B1**:
+  - (a) and (b) do not differ between FALLBACK and NEW: two one-sided tests (TOST) with margin = 0.25 pooled SD, plus the usual two-sided test.
+  - (c) is smaller in FALLBACK (both norm and PF).
+- Test: Mann–Whitney U, with p from a permutation that keeps candidate strata (labels shuffled within candidate, 10,000 permutations).
+- Secondary (unpaired; LIBERO-90 lscene, which has no identical-obs partner): attention-weighted value read from task tokens, trained vs nothing.
+
+## A2 token axis
+- (a) **Language**: valid cand–base pairs (identical obs).
+  - Tokens are aligned with difflib on lang_ids. Matched tokens are the same word in both instructions; unmatched tokens are the differing words.
+  - For matched tokens: cosine distance (normalised, massive dims removed) per layer, as a function of signed distance to the nearest differing token, and per-token read-in PF.
+  - Predictions:
+    - Because the prefix attention is bidirectional, matched tokens on both sides of the differing word diverge, and divergence grows with depth.
+    - The matched-token Δ has PF ≤ the PF of the differing-token Δ.
+  - L90 lscene vs part (same scene, different init) is reported as confounded and descriptive only.
+- (b) **Action tokens**: exp_tok PCs (L17, steps 0, 4, 9).
+  - Per call: path length over tokens 0 → 49 in the top-10 PCs.
+  - Prediction: path length grows from step 0 to step 9. At step 9, the Spearman ρ with the predicted chunk's path length (den_x[-1][:, :7] cumulative |Δ|) is > 0.3, and with the executed eef path length over the next 10 steps it is > 0.
+  - Between-condition distance of mean token trajectories: descriptive.
+
+## A3 Elsayed
+- Prep = calls < grasp_call (or contact_call). Move = grasp_call ≤ call ≤ release_call (or the end).
+- Sets: libero3, goal-train, basket (all conditions).
+- Signals: expert exp_mean L17 step 9, VLM vlm_seg L11 (agentview and task, normalised, massive dims removed).
+- Epoch-wise covariance (pooled over calls of pca_fit = 0 episodes, mean-centred per epoch). k = dims for 80 % of variance, capped at 10.
+- AI = tr(U_p^T C_m U_p) / Σ top-k λ(C_m). Baseline: 1,000 covariance-matched random subspaces (Elsayed 2016).
+- Prediction: expert AI < the 5th percentile of the random distribution, and VLM AI > expert AI.
+- VLM(prep) → expert(move): ridge prediction (CV by task) of the move-epoch mean expert state from the call-0 VLM state vs from the call-0 expert state. Descriptive.
+
+## A4 jPCA
+- Axes:
+  - tokens: exp_tok PCs, L17, step 9
+  - denoise: exp_vec L17 over 10 steps
+  - calls: exp_vec L17 step 9
+- 6 PCs (training fold). Fit dx = M x unconstrained vs skew-symmetric. R² on held-out tasks.
+- Rotation frequency = the largest |Im λ(M_skew)| / 2π per unit.
+- Prediction: R²_skew / R²_full > 0.5 on tokens, < 0.5 on the denoise axis. The call axis is not predicted.
+- Condition differences: descriptive (per set / condition).
+
+## A5 Gallego
+- Per-task / per-condition manifold: top-10 PCs of exp_mean L17 step 9 (calls pooled).
+- Principal angles between manifolds vs (i) covariance-matched random subspaces and (ii) the split-half same-task angle.
+- CCA of latent dynamics:
+  - Time-normalise to 20 bins; condition-mean on inits of split A; project onto each manifold; CCA fit on A, evaluated on split B.
+- Predictions:
+  - Pick-and-place pairs (semantics.csv verb = place/put) have a higher mean CCA r than pairs of different types.
+  - Basket opp/far vs near: CCA r is within 0.1 of the near-split-half r, while the principal angles exceed the split-half angles. That is the same dynamics with a different readout.
+
+## A6 Inagaki (multi-noise)
+- 16 noise samples at 4 probe calls (mn_exp_last, mn_act).
+- Coding direction (CD) per family, fit on a training fold of inits:
+  - cand: FALLBACK minus NEW trial mean, at the same probe slot
+  - basket far: success vs released-outside
+  - lscene: trained vs nothing
+- Projection is normalised so that 0 = mean of group 1 and 1 = mean of group 2 (test fold).
+- Metrics:
+  - pooled Hartigan dip test
+  - GMM BIC (1 vs 2 components)
+  - per-observation share of samples within 0.25 of an endpoint vs in the middle
+  - within-observation spread vs between-endpoint distance
+- Baseline: train-instruction trials on a CD between two trained tasks.
+- Prediction: new-instruction trials are discrete (bimodal, mostly at the endpoints), and the per-trial share on the NEW side predicts the outcome (AUC > 0.6, CV by candidate).
+- Convergence along the denoise path cannot be measured across seeds, because only final chunks are stored per seed. This is reported as a limitation, plus the single-seed den_x path.
+
+## A7 combinatorial (Kim 2024 CD idea + NNLS extension)
+- cand states (exp_mean L17 step 9, and VLM L11 task / agentview, normalised) per call.
+- Sources = goal-train centroids, time-normalised to 20 bins, for base_task, A_tasks and B_tasks (roles.csv).
+- NNLS weights per call. Baseline: the same fit with 3 random non-source train tasks (100 draws).
+- Kim-style: projection on the source CD (A − B), fit on half of the train inits.
+- Predictions:
+  - Source weights > random-source weights.
+  - In successful compositions (NEW), the weight moves from the object source to the destination source over the episode; in FALLBACK the base task dominates throughout.
