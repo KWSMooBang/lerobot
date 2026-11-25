@@ -49,7 +49,7 @@ shortcut robustness 를 바로 평가하는 환경. 학습·대규모 평가 = 4
 - 2026-11-23 사람 지시: zest kubectl 이 읽기 전용이 되어, T022 basket far 실험은 VGI-102(이 컨테이너 호스트) GPU 0 에서 실행 (10/30 'VGI-102 GPU 금지' 의 예외, ≈1.3 GPU-h).
 - 2026-11-23 사람 지시: VGI-102 GPU 1 에서 T023 (pi05lib × LIBERO-PRO 전체 3,400 ep + activation 기록) 실행, 예상 ≈11–14 GPU-h, 16 GPU-h 넘으면 멈춤. GPU 0 은 T022.
 - 2026-11-25 사람 지시: VGI-102 GPU 0 에서 T028 (기존 에피소드 rich 재추출: 벡터·token 축·denoise 경로·잡음 16개 probe) 진행, 약 5 GPU-h, 6 GPU-h 넘으면 멈춤.
-- 2026-11-25 T028 디스크: spec 그대로 105 GB > 60 → 사람 결정 A안 (≤80 GB, 무손실 압축). GPU 예상 ≈3 GPU-h.
+- 2026-11-25 T028 디스크: spec 그대로 105 GB > 60 → 사람 결정 A안 (≤80 GB, 무손실 압축) → 실측 ≈90 GB (층 17 massive activation 때문에 fp32) → 사람 결정 95 GB 까지 승인. GPU 예상 ≈2 GPU-h.
 - kubectl 서버 사용량: T015 smoke 2.0 GPU-h (2026-10-31), VLM SAE ≈14 GPU-h 승인 → 실제 합계 ≈11.2 GPU-h (smoke 포함).
 - **2026-10-30 사람 지시: GPU 를 쓰는 일은 smoke 포함 모두 kubectl 서버에서 (baccus-VLA-shortcut-exps 세션에 넘김). 이 컨테이너 GPU 0 은 쓰지 않는다.** L2 명세는 CPU 테스트 + 서버용 smoke 스크립트로.
 - 2026-10-25 사람 지시: 당분간 GPU 0번만 사용. launch.sh 는 GPU 를 고를 수 없으므로 run 은 CUDA_VISIBLE_DEVICES=0 에서 순서대로 직접 실행
