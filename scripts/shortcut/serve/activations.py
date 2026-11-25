@@ -391,3 +391,135 @@ class ActivationRecorder:
         self.buffers.pop(key, None)
         self.calls.pop(key, None)
         self.skipped.pop(key, None)
+
+
+# ---------------------------------------------------------------------------------------------------------
+# Rich mode (T028): residual / K / V *vectors* instead of norms, plus the token and denoising axes.
+# Used by scripts/shortcut/analysis/rich_extract.py (replay extraction); the policy server keeps the light
+# recorder above. The raw streams are returned here; PCA projection is the caller's job.
+# ---------------------------------------------------------------------------------------------------------
+
+RICH_TOK_LAYERS = (0, 2, 5, 8, 11, 14, 17)  # VLM: every language token's residual / K / V at these layers
+RICH_EXP_TOK_LAYERS = (2, 5, 8, 11, 14, 17)  # expert: all action tokens at these layers
+RICH_STEPS = (0, 4, 9)  # denoising steps kept for the expert vectors (0 = pure-noise input)
+RICH_MLP_LAYERS = tuple(range(18))  # expert MLP middle (down_proj input) token means
+
+
+class RichHooks(Hooks):
+    """Hooks (all T021/T023 features) + vectors. Per batch of B calls (P prefix tokens):
+
+    vlm_seg  (B, L, 6, D_vlm)    VLM decoder-layer output, mean over each prefix segment (all L layers)
+    k_seg, v_seg (B, L, 6, D_kv) VLM self_attn k_proj / v_proj output (pre-RoPE), mean per prefix segment
+    vlm_tok  (B, len(tok_layers), N, D_vlm)  every language token (N = max non-pad tokens in the batch)
+    k_tok, v_tok (B, len(tok_layers), N, D_kv)
+    exp_tok  (B, len(exp_tok_layers), len(steps), chunk, D_exp)  expert layer output, all action tokens
+    exp_mean (B, len(steps), Lx, D_exp)                         expert layer output, action-token mean
+    exp_mlp_mean (B, len(steps), len(mlp_layers), D_mlp)        expert down_proj input, action-token mean
+    """
+
+    def __init__(
+        self,
+        policy: Any,
+        tok_layers: tuple[int, ...] = RICH_TOK_LAYERS,
+        exp_tok_layers: tuple[int, ...] = RICH_EXP_TOK_LAYERS,
+        steps: tuple[int, ...] = RICH_STEPS,
+        mlp_layers: tuple[int, ...] = RICH_MLP_LAYERS,
+    ):
+        super().__init__(policy)
+        self.tok_layers = tuple(tok_layers)
+        self.exp_tok_layers = tuple(exp_tok_layers)
+        self.steps = tuple(steps)
+        self.mlp_layers = tuple(mlp_layers)
+        for i, layer in enumerate(self.vlm_layers):
+            self.handles.append(layer.register_forward_hook(self._r_vlm(i)))
+            self.handles.append(layer.self_attn.k_proj.register_forward_hook(self._r_kv(i, "k")))
+            self.handles.append(layer.self_attn.v_proj.register_forward_hook(self._r_kv(i, "v")))
+        for i, layer in enumerate(self.exp_layers):
+            self.handles.append(layer.register_forward_hook(self._r_exp(i)))
+            if i in self.mlp_layers:
+                self.handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._r_mlp(i)))
+
+    def start_rich(
+        self,
+        seg: torch.Tensor,
+        n_img: int,
+        n_steps: int,
+        chunk: int,
+        lang_pos: torch.Tensor,
+        lang_valid: torch.Tensor,
+    ) -> None:
+        """lang_pos: (B, N) prefix index of each language token (0 where invalid); lang_valid: (B, N) bool."""
+        missing = [s for s in self.steps if s >= n_steps]
+        if missing:
+            raise ValueError(f"rich steps {missing} >= {n_steps} denoising steps")
+        self.start(seg, n_img, n_steps, chunk)
+        self.lang_pos, self.lang_valid = lang_pos, lang_valid
+        self.rich: dict[str, dict[int, torch.Tensor]] = {
+            k: {} for k in ("vlm_seg", "k_seg", "v_seg", "vlm_tok", "k_tok", "v_tok")
+        }
+        self.rich_exp: dict[tuple[str, int, int], torch.Tensor] = {}
+
+    def _gather_lang(self, x: torch.Tensor) -> torch.Tensor:
+        """x: (B, P, D) → (B, N, D) at the language positions, zeros where invalid."""
+        idx = self.lang_pos[..., None].expand(-1, -1, x.shape[-1])
+        return torch.gather(x.float(), 1, idx) * self.lang_valid[..., None]
+
+    def _r_vlm(self, i: int) -> Any:
+        def hook(_mod: Any, _inp: Any, out: Any) -> None:
+            if not self.active:
+                return
+            h = out[0] if isinstance(out, tuple) else out
+            self.rich["vlm_seg"][i] = self._seg_mean(h)[:, : len(PREFIX_SEGMENTS)]
+            if i in self.tok_layers:
+                self.rich["vlm_tok"][i] = self._gather_lang(h)
+
+        return hook
+
+    def _r_kv(self, i: int, which: str) -> Any:
+        def hook(_mod: Any, _inp: Any, out: Any) -> None:
+            if not self.active:
+                return
+            self.rich[f"{which}_seg"][i] = self._seg_mean(out)[:, : len(PREFIX_SEGMENTS)]
+            if i in self.tok_layers:
+                self.rich[f"{which}_tok"][i] = self._gather_lang(out)
+
+        return hook
+
+    def _r_exp(self, i: int) -> Any:
+        def hook(_mod: Any, _inp: Any, out: Any) -> None:
+            if not self.active or self.step not in self.steps:
+                return
+            h = (out[0] if isinstance(out, tuple) else out)[:, -self.chunk :].float()
+            self.rich_exp["mean", self.step, i] = h.mean(1)
+            if i in self.exp_tok_layers:
+                self.rich_exp["tok", self.step, i] = h
+
+        return hook
+
+    def _r_mlp(self, i: int) -> Any:
+        def hook(_mod: Any, inp: Any) -> None:
+            if self.active and self.step in self.steps:
+                self.rich_exp["mlp", self.step, i] = inp[0][:, -self.chunk :].float().mean(1)
+
+        return hook
+
+    def stop_rich(self) -> tuple[dict[str, np.ndarray], dict[str, torch.Tensor]]:
+        """→ (light T021/T023 features as numpy, rich features as float32 tensors on the model device)."""
+        light = self.stop()
+        n_vlm = len(self.vlm_layers)
+        for k, by_layer in self.rich.items():
+            want = sorted(self.tok_layers) if k.endswith("_tok") else list(range(n_vlm))
+            if sorted(by_layer) != want:
+                raise RuntimeError(f"rich {k}: hooks saw layers {sorted(by_layer)}, expected {want}")
+        rich = {k: torch.stack([v[i] for i in sorted(v)], 1) for k, v in self.rich.items()}
+        e = self.rich_exp
+        rich["exp_tok"] = torch.stack(
+            [torch.stack([e["tok", s, i] for s in self.steps], 1) for i in self.exp_tok_layers], 1
+        )
+        rich["exp_mean"] = torch.stack(
+            [torch.stack([e["mean", s, i] for i in range(len(self.exp_layers))], 1) for s in self.steps], 1
+        )
+        rich["exp_mlp_mean"] = torch.stack(
+            [torch.stack([e["mlp", s, i] for i in self.mlp_layers], 1) for s in self.steps], 1
+        )
+        return light, rich
