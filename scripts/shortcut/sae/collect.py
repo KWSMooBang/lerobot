@@ -57,8 +57,10 @@ N_DENOISE = 10  # pi05 num_inference_steps (checked against the loaded config)
 # timesteps/s per GPU, ESTIMATES to be replaced by the server smoke (smoke.sh prints the measured value):
 # ~4.8 TFLOP per timestep (Gemma-2B prefix 968 tok ≈ 3.9, SigLIP 3 × 256 tok ≈ 0.6, 10 expert steps ≈ 0.3)
 # at ~40 % of the dense bf16 peak with fp32 accumulation (RTX 4090 ≈ 83, A100 ≈ 312 TFLOPS).
-# A100: measured 17 ts/s by the server smoke (5df0e208, full forward, all 37 layers); RTX 4090: FLOP estimate.
-THROUGHPUT = {"RTX 4090": 7.0, "A100": 17.0}
+# A100: measured 17 ts/s by the server smoke (5df0e208, full forward, all 37 layers).
+# RTX 4090: measured 16.5 ts/s (T031 smoke, VGI-102 GPU 0, full forward, 6 ae layers × 3 steps + per-token step 9,
+# batch 32, 6 PNG workers; 14.7 ts/s on a single short episode).
+THROUGHPUT = {"RTX 4090": 16.5, "A100": 17.0}
 # Share of a full forward's wall time (CPU, real pi05lib, 2 frames; smoke.py --prefix-check): vision + embeddings,
 # the 18 PaliGemma layers, the 10 denoising steps. A prefix-only forward that stops after PaliGemma layer L costs
 # about VISION + PG_LAYERS·(L+1)/18. Measured full/prefix-only: emb,pg:0-5 3.2×, pg:6-11 2.3×, pg:12-17 1.8×.
