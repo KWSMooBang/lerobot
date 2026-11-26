@@ -8,9 +8,11 @@ LEDGER=${T034_LEDGER:-/outputs/VLA-shortcut-exps/sae/crosscoder/gpu_time.tsv}
 mkdir -p "$(dirname "$LEDGER")"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 OPENBLAS_CORETYPE=SkylakeX
 COMMIT=$(git -C "$(dirname "$0")" rev-parse --short HEAD)
-exec 9>"$LOCK"
-echo "[run_gpu] $TAG waiting for GPU 0 lock" >&2
-flock 9
+if [ -z "${T034_NOLOCK:-}" ]; then  # collect.py flocks the GPU itself (sc_train.acquire_gpu_locks)
+  exec 9>"$LOCK"
+  echo "[run_gpu] $TAG waiting for GPU 0 lock" >&2
+  flock 9
+fi
 t0=$(date +%s)
 echo "[run_gpu] $TAG start $(date '+%F %T') commit $COMMIT" >&2
 "$@"
