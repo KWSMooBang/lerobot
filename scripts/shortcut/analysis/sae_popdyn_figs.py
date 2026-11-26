@@ -134,5 +134,104 @@ def fig_a3():
     save(fig, "a3_fallback.png")
 
 
+def _shade(ax, blocks):
+    for j, b in enumerate(blocks):
+        if P.flag(b) not in ("main", "whole"):
+            ax.axvspan(j - 0.5, j + 0.5, color="#f3f3f3", zorder=0, lw=0)
+
+
+def fig_b():
+    B = P.load_json("b")
+    FC = {"time": CAT[2], "I": CAT[1], "E": CAT[0], "scene": CAT[6]}
+    FL = {"time": "time (call)", "I": "instructed task", "E": "executed task", "scene": "scene"}
+    for key, ttl, fn in (("unique_fb", "unique R² on FALLBACK rows", "b1_unique_fallback.png"),
+                         ("unique", "unique R² on all rows (U40 + fallback)", "b1_unique_all.png")):
+        fig, ax = plt.subplots(3, 2, figsize=(13, 8.5), sharey="row", gridspec_kw={"width_ratios": [1, 1]})
+        for i, w in enumerate(P.B_WINDOWS):
+            for j, bl in enumerate((P.VLM_ALL, P.EXP_ALL)):
+                a = ax[i, j]
+                _shade(a, bl)
+                for f in P.B_FACTORS:
+                    a.plot(range(len(bl)), [B[b][f"I/{w}"][key][f] for b in bl], "o-", ms=4, color=FC[f], label=FL[f])
+                full = "R2_full_fb" if key == "unique_fb" else "R2_full"
+                a2v = [B[b][f"I/{w}"][full] for b in bl]
+                a.plot(range(len(bl)), a2v, "--", lw=1.2, color=INK2, label="full model R²")
+                a.set_xticks(range(len(bl)))
+                a.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+                a.axhline(0, color=INK2, lw=0.8)
+                a.set_title(f"{'VLM' if j == 0 else 'action expert'} — calls {w}", fontsize=9)
+            ax[i, 0].set_ylabel("cross-validated R²")
+        ax[0, 0].legend(frameon=False, fontsize=8, ncol=3)
+        fig.suptitle(ttl + " (grey band = reference / caution / massive-channel layers)")
+        fig.tight_layout()
+        save(fig, fn)
+    # dPCA marginalisation shares
+    bl = P.VLM_ALL + P.EXP_ALL + ["vlm_all", "exp_all", "whole"]
+    keys = [("time", CAT[2], "time"), ("condition", CAT[1], "condition (base / FALLBACK / NEW, incl. ×time)"),
+            ("variant", CAT[6], "variant (nuisance)"), ("cond_x_variant", "#bbbbbb", "condition × variant")]
+    fig, ax = plt.subplots(figsize=(13, 3.8))
+    bottom = np.zeros(len(bl))
+    for k, c, lab in keys:
+        v = np.array([B[b]["dpca"]["share"][k] for b in bl])
+        ax.bar(range(len(bl)), v, bottom=bottom, color=c, label=lab, width=0.8, edgecolor="white", linewidth=1)
+        bottom += v
+    ax.set_xticks(range(len(bl)))
+    ax.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+    ax.set_ylabel("share of variance")
+    ax.set_ylim(0, 1.15)
+    ax.legend(frameon=False, fontsize=8, ncol=4, loc="upper left")
+    ax.set_title(f"dPCA marginalisation, Goal cand variants with both FALLBACK and NEW trials (n = {B['v08']['dpca']['V']})", fontsize=9)
+    save(fig, "b2_dpca_shares.png")
+
+
+def fig_c():
+    Cr = P.load_json("c")
+    fig, ax = plt.subplots(2, 2, figsize=(13, 7), sharey="row")
+    for j, bl in enumerate((P.VLM_ALL, P.EXP_ALL)):
+        a = ax[0, j]
+        _shade(a, bl)
+        x = np.arange(len(bl))
+        a.plot(x, [Cr[b]["r2_median"] for b in bl], "o-", ms=4, color=CAT[0], label="source tasks (base, object, destination)")
+        a.plot(x, [Cr[b]["r2_rand_median"] for b in bl], "o-", ms=4, color=INK2, label="random non-source Goal tasks")
+        for k, b in enumerate(bl):
+            if Cr[b].get("q_source_gt_random", 1) < 0.05:
+                a.plot(k, Cr[b]["r2_median"] + 0.04, "*", color=INK, ms=6)
+        a.axhline(0.48, color=CAT[1], lw=1, ls="--", label="T029 raw vectors (source R² 0.48)")
+        a.set_xticks(x)
+        a.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+        a.set_title(("VLM" if j == 0 else "action expert") + ": NNLS fit R² (median over cand trials; * = BH q < 0.05)", fontsize=9)
+        a = ax[1, j]
+        _shade(a, bl)
+        a.plot(x, [Cr[b]["slope_NEW_median"] for b in bl], "o-", ms=4, color=CAT[0], label="NEW")
+        a.plot(x, [Cr[b]["slope_FB_median"] for b in bl], "o-", ms=4, color=CAT[1], label="FALLBACK")
+        for k, b in enumerate(bl):
+            if Cr[b]["p_slope_NEW_vs_FB"] < 0.05:
+                a.plot(k, max(Cr[b]["slope_NEW_median"], Cr[b]["slope_FB_median"]) + 0.05, "*", color=INK, ms=6)
+        a.axhline(0, color=INK2, lw=0.8)
+        a.set_xticks(x)
+        a.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+        a.set_title("slope of (w_destination − w_object) over the episode (median; * = uncorrected p < 0.05)", fontsize=9)
+    ax[0, 0].set_ylabel("R²")
+    ax[1, 0].set_ylabel("slope per episode")
+    ax[0, 0].legend(frameon=False, fontsize=8)
+    ax[1, 0].legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    save(fig, "c1_r2_slope.png")
+    show = ["v04", "v08", "v12", "e08", "e11", "e17", "whole"]
+    fig, ax = plt.subplots(1, len(show), figsize=(2.6 * len(show), 3.2), sharey=True)
+    for a, b in zip(ax, show):
+        t = Cr[b]["traj"]
+        for cls, ls in (("NEW", "-"), ("FALLBACK", "--")):
+            if f"{cls}/w_obj" in t:
+                a.plot(t[f"{cls}/w_obj"], ls, color=CAT[1], label=f"object source, {cls}")
+                a.plot(t[f"{cls}/w_dest"], ls, color=CAT[0], label=f"destination source, {cls}")
+        a.set_title(P.pretty(b), fontsize=9)
+        a.set_xlabel("call")
+    ax[0].set_ylabel("NNLS weight (mean over trials)")
+    ax[0].legend(frameon=False, fontsize=7)
+    fig.tight_layout()
+    save(fig, "c2_weights.png")
+
+
 if __name__ == "__main__":
-    {"a": fig_a, "a3": fig_a3}[sys.argv[1]]()
+    {"a": fig_a, "a3": fig_a3, "b": fig_b, "c": fig_c}[sys.argv[1]]()

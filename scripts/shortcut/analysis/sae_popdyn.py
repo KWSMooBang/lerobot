@@ -591,41 +591,46 @@ def b_design(trials: list[dict], c0: int, c1: int, inst_key: str = "I") -> tuple
     return blocks, rows, init, fb
 
 
-def _kernel(b: str, rows: np.ndarray) -> np.ndarray:
+def _ymat(b: str, rows: np.ndarray) -> sp.csr_matrix:
     if b in WHOLE:
-        return sum(_kernel(x, rows) / info(x)["rms"] ** 2 for x in WHOLE[b])
-    Y = block(b)[rows]
-    return (Y @ Y.T).toarray().astype(np.float64)
+        return sp.hstack([block(x)[rows] / info(x)["rms"] for x in WHOLE[b]], format="csr")
+    return block(b)[rows]
 
 
-def cv_r2_kernel(X: np.ndarray, K: np.ndarray, folds: np.ndarray, lam: float, sub: np.ndarray) -> tuple[float, float, list]:
-    """ridge CV R^2 with outputs given only through their Gram matrix K = Y Y^T (rotation invariant).
-    returns (R2 all rows, R2 rows in `sub`, per-fold all-row R2)."""
-    sse = sst = sse_s = sst_s = 0.0
-    per = []
+def cv_r2_models(X: np.ndarray, Y: sp.csr_matrix, folds: np.ndarray, lams, sub: np.ndarray, models: dict) -> dict:
+    """ridge CV R^2 for several column subsets of X and several lambdas, using only p x p statistics per fold.
+    models: name -> column index array. returns {(name, lam): (sse, sst, sse_sub, sst_sub, per-fold R2 list)}."""
+    acc: dict = {}
     for f in np.unique(folds):
         te, trn = folds == f, folds != f
-        Xtr, Xte = X[trn], X[te]
-        xm = Xtr.mean(0)
-        Xc = Xtr - xm
-        G = np.linalg.solve(Xc.T @ Xc + lam * np.eye(X.shape[1]), np.eye(X.shape[1]))
-        ntr = trn.sum()
-        H = (Xte - xm) @ G @ Xc.T + 1.0 / ntr  # (n_te, n_tr) prediction operator incl. intercept
-        Ktt = K[np.ix_(te, te)]
-        Krt = K[np.ix_(trn, te)]
-        Krr = K[np.ix_(trn, trn)]
-        HK = H @ Krr
-        res = np.diag(Ktt) - 2 * np.einsum("ij,ji->i", H, Krt) + np.einsum("ij,ij->i", HK, H)
-        mu_k = Krt.mean(0)  # <y_te, mean_tr>
-        mm = Krr.mean()
-        tot = np.diag(Ktt) - 2 * mu_k + mm
-        sse += res.sum()
-        sst += tot.sum()
+        xm = X[trn].mean(0)
+        Xc, Xt = X[trn] - xm, X[te] - xm
+        Ytr = Y[trn]
+        ym = np.asarray(Ytr.mean(0)).ravel()
+        Ctr = np.asarray((Ytr.T @ Xc).T)  # p x nf  (Xc is centred so the mean of Y drops out)
+        Ytc = Y[te].toarray().astype(np.float64) - ym
         s = sub[te]
-        sse_s += res[s].sum()
-        sst_s += tot[s].sum()
-        per.append(1 - res.sum() / tot.sum())
-    return 1 - sse / sst, (1 - sse_s / sst_s) if sst_s > 0 else np.nan, per
+        Cte, Cts = Xt.T @ Ytc, Xt[s].T @ Ytc[s]
+        A = Ctr @ Ctr.T
+        Bx, Bs = Ctr @ Cte.T, Ctr @ Cts.T
+        Ste, Sts = Xt.T @ Xt, Xt[s].T @ Xt[s]
+        Sxx = Xc.T @ Xc
+        sst, ssts = float((Ytc**2).sum()), float((Ytc[s] ** 2).sum())
+        for name, m in models.items():
+            ix = np.ix_(m, m)
+            for lam in lams:
+                G = np.linalg.inv(Sxx[ix] + lam * np.eye(len(m)))
+                cross, crs = float((G * Bx[ix]).sum()), float((G * Bs[ix]).sum())
+                quad = float(((G @ Ste[ix] @ G) * A[ix]).sum())
+                quads = float(((G @ Sts[ix] @ G) * A[ix]).sum())
+                sse, sses = sst - 2 * cross + quad, ssts - 2 * crs + quads
+                r = acc.setdefault((name, lam), [0.0, 0.0, 0.0, 0.0, []])
+                r[0] += sse
+                r[1] += sst
+                r[2] += sses
+                r[3] += ssts
+                r[4].append(1 - sse / sst)
+    return acc
 
 
 def b_job(job) -> dict:
@@ -633,21 +638,30 @@ def b_job(job) -> dict:
     c0, c1 = B_WINDOWS[wname]
     trials = b_trials()
     blocks, rows, init, fb = b_design(trials, c0, c1, inst_key)
-    K = _kernel(b, rows)
+    Y = _ymat(b, rows)
     full = np.concatenate([blocks[k] for k in B_FACTORS], 1)
-    # lambda: maximise CV R^2 of the full model (same lambda for every reduced model)
-    scores = {lam: cv_r2_kernel(full, K, init, lam, fb)[0] for lam in B_LAMBDAS}
-    lam = max(scores, key=scores.get)
-    r_all, r_fb, per = cv_r2_kernel(full, K, init, lam, fb)
-    out = {"block": b, "window": wname, "inst": inst_key, "lambda": lam, "lambda_scores": scores, "R2_full": r_all,
-           "R2_full_fb": r_fb, "R2_full_folds": per, "unique": {}, "unique_fb": {}, "alone": {}, "alone_fb": {}}
+    edges = np.cumsum([0] + [blocks[k].shape[1] for k in B_FACTORS])
+    cols = {k: np.arange(edges[j], edges[j + 1]) for j, k in enumerate(B_FACTORS)}
+    models = {"full": np.arange(full.shape[1])}
     for k in B_FACTORS:
-        red = np.concatenate([blocks[j] for j in B_FACTORS if j != k], 1)
-        ra, rf, _ = cv_r2_kernel(red, K, init, lam, fb)
-        out["unique"][k] = r_all - ra
-        out["unique_fb"][k] = r_fb - rf
-        aa, af, _ = cv_r2_kernel(blocks[k], K, init, lam, fb)
-        out["alone"][k], out["alone_fb"][k] = aa, af
+        models[f"-{k}"] = np.concatenate([cols[j] for j in B_FACTORS if j != k])
+        models[f"only_{k}"] = cols[k]
+    acc = cv_r2_models(full, Y, init, B_LAMBDAS, fb, models)
+
+    def r2(name, lam):
+        a = acc[(name, lam)]
+        return 1 - a[0] / a[1], (1 - a[2] / a[3]) if a[3] > 0 else np.nan
+
+    scores = {lam: r2("full", lam)[0] for lam in B_LAMBDAS}
+    lam = max(scores, key=scores.get)
+    r_all, r_fb = r2("full", lam)
+    out = {"block": b, "window": wname, "inst": inst_key, "lambda": lam, "lambda_scores": scores, "R2_full": r_all,
+           "R2_full_fb": r_fb, "R2_full_folds": acc[("full", lam)][4], "unique": {}, "unique_fb": {}, "alone": {}, "alone_fb": {},
+           "n_rows": int(len(rows)), "n_fb_rows": int(fb.sum())}
+    for k in B_FACTORS:
+        ra, rf = r2(f"-{k}", lam)
+        out["unique"][k], out["unique_fb"][k] = r_all - ra, r_fb - rf
+        out["alone"][k], out["alone_fb"][k] = r2(f"only_{k}", lam)
     return out
 
 
@@ -674,7 +688,7 @@ def dpca_job(b: str) -> dict:
     tot = (Xc**2).sum()
     m_t = Xc.mean((0, 1))  # (NC, nf)
     m_kt = Xc.mean(0) - m_t  # condition + condition x time
-    m_k = m_kt.mean(0)
+    m_k = m_kt.mean(1)  # condition main effect (time-averaged)
     m_v = Xc.mean(1) - m_t  # variant + variant x time (nuisance)
     resid = Xc - m_t[None, None] - m_kt[None] - m_v[:, None]
     V = len(vs)
@@ -689,6 +703,15 @@ def dpca_job(b: str) -> dict:
     s = np.linalg.svd(m_kt.reshape(-1, m_kt.shape[-1]), compute_uv=False)
     return {"block": b, "variants": vs, "V": V, "share": share, "pair_dist": pair,
             "cond_pc_share": (s[:3] ** 2 / (s**2).sum()).tolist()}
+
+
+def stage_b_dpca() -> None:
+    """recompute only the dPCA marginalisation (fix: condition main effect averaged over time, not over conditions)."""
+    out = load_json("b")
+    blocks = VLM_ALL + EXP_ALL + list(k for k in WHOLE if k != "whole_sub")
+    for r in pmap(dpca_job, blocks):
+        out[r["block"]]["dpca"] = r
+    save_json("b", out)
 
 
 def stage_b() -> None:
@@ -1227,6 +1250,31 @@ def stage_e() -> None:
         print(pretty(b), s)
 
 
+def numbers_b() -> dict:
+    B = load_json("b")
+    out = {"summary": B["_summary"], "note": "unique R2 of time is 0 by construction (I/E/scene x call blocks span it); time is reported as R2 alone"}
+    for b in VLM_ALL + EXP_ALL + [k for k in WHOLE if k != "whole_sub"]:
+        o = {}
+        for w in B_WINDOWS:
+            r = B[b][f"I/{w}"]
+            o[w] = {"R2_full_fb": r["R2_full_fb"], "uniq_fb_I": r["unique_fb"]["I"], "uniq_fb_E": r["unique_fb"]["E"],
+                    "uniq_fb_scene": r["unique_fb"]["scene"], "alone_time": r["alone"]["time"]}
+            if f"sent/{w}" in B[b]:
+                o[w]["sentence_uniq_fb_I"] = B[b][f"sent/{w}"]["unique_fb"]["I"]
+                o[w]["sentence_uniq_fb_E"] = B[b][f"sent/{w}"]["unique_fb"]["E"]
+        o["dpca"] = B[b]["dpca"]["share"]
+        out[pretty(b)] = o
+    from scipy.stats import spearmanr
+
+    for w in B_WINDOWS:
+        tv = [B[b][f"I/{w}"]["alone"]["time"] for b in VLM_MAIN]
+        te = [B[b][f"I/{w}"]["alone"]["time"] for b in EXP_MAIN]
+        out["summary"][f"H_b3_time_alone_R2/{w}"] = {"vlm_median": float(np.median(tv)), "exp_median": float(np.median(te))}
+        rho = spearmanr(range(len(EXP_MAIN)), [B[b][f"I/{w}"]["unique_fb"]["I"] for b in EXP_MAIN])
+        out["summary"][f"exp_uniqueI_fb_depth_spearman/{w}"] = [float(rho.statistic), float(rho.pvalue)]
+    return out
+
+
 # ============================================================================ numbers
 def stage_numbers() -> None:
     """compact numbers.json (all detail stays in results/*.json)."""
@@ -1252,7 +1300,7 @@ def stage_numbers() -> None:
     (OUT / "numbers.json").write_text(json.dumps(_js(N), indent=1, ensure_ascii=False))
 
 
-STAGES = {"numbers": stage_numbers, "prep": stage_prep, "a_fit": stage_a_fit, "a": stage_a, "b": stage_b, "c": stage_c, "d": stage_d, "e": stage_e}
+STAGES = {"numbers": stage_numbers, "prep": stage_prep, "a_fit": stage_a_fit, "a": stage_a, "b": stage_b, "b_dpca": stage_b_dpca, "c": stage_c, "d": stage_d, "e": stage_e}
 
 
 def main() -> None:
