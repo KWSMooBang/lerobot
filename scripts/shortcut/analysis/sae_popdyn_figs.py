@@ -233,5 +233,152 @@ def fig_c():
     save(fig, "c2_weights.png")
 
 
+def fig_d():
+    D = P.load_json("d")
+    keys = list(D)
+    kind = {k: ("whole" if "vlm_all" in k else "ref" if (k.startswith("pg") and "->pg" in k) or k.startswith("L") else "vlm->exp") for k in keys}
+    KC = {"vlm->exp": CAT[0], "ref": CAT[1], "whole": CAT[6]}
+    n = len(keys)
+    cols = 7
+    rows = int(np.ceil(n / cols))
+    fig, ax = plt.subplots(rows, cols, figsize=(2.4 * cols, 2.2 * rows), sharex=True)
+    for a, k in zip(ax.flat, keys):
+        r = D[k]
+        y = np.array(r["R2_rrr"])
+        se = np.array(r["R2_rrr_se"])
+        x = np.arange(1, len(y) + 1)
+        a.fill_between(x, y - se, y + se, color=KC[kind[k]], alpha=0.2, lw=0)
+        a.plot(x, y, color=KC[kind[k]])
+        a.axhline(r["R2_full"], color=INK2, lw=1, ls="--")
+        a.axvline(r["comm_dim"], color=INK, lw=1, ls=":")
+        a.set_title(f"{k}  dim {r['comm_dim']}", fontsize=8)
+        a.set_ylim(0, max(0.05, r["R2_full"] * 1.15))
+    for a in ax.flat[n:]:
+        a.axis("off")
+    for a in ax[-1]:
+        a.set_xlabel("rank")
+    fig.suptitle("reduced-rank regression: CV R² vs rank (band = ±1 SE over 10 init folds; dashed = full ridge; dotted = communication dim)\n"
+                 "blue = VLM → action expert, orange = within-model reference, violet = whole network", fontsize=9)
+    fig.tight_layout()
+    save(fig, "d1_rrr_curves.png")
+    # tags and pairs
+    vk = [k for k in keys if kind[k] != "ref" or k.startswith("pg")]
+    vk = [k for k in vk if k.startswith("pg") or "vlm_all" in k]
+    tags = [t for t in P.TAGS_V if any(t in D[k].get("lev_by_tag", {}) for k in vk)]
+    M = np.array([[D[k]["lev_by_tag"].get(t, {}).get("ratio", np.nan) for t in tags] for k in vk])
+    fig, ax = plt.subplots(1, 2, figsize=(14, 0.32 * len(vk) + 1.8), gridspec_kw={"width_ratios": [1, 1.3]})
+    im = ax[0].imshow(np.log2(M), cmap="RdBu_r", vmin=-1.5, vmax=1.5, aspect="auto")
+    ax[0].set_xticks(range(len(tags)))
+    ax[0].set_xticklabels(tags, rotation=30, ha="right")
+    ax[0].set_yticks(range(len(vk)))
+    ax[0].set_yticklabels(vk, fontsize=8)
+    ax[0].grid(False)
+    for i, k in enumerate(vk):
+        for j, t in enumerate(tags):
+            d = D[k]["lev_by_tag"].get(t)
+            if d and min(d["p_hi"], d["p_lo"]) < 0.01:
+                ax[0].text(j, i, "*", ha="center", va="center", color=INK, fontsize=9)
+    fig.colorbar(im, ax=ax[0], label="log2 (mean loading of tag / mean of all)")
+    ax[0].set_title("which VLM features load on the communication subspace (* = perm p < 0.01)", fontsize=9)
+    y = np.arange(len(vk))
+    ax[1].barh(y - 0.27, [D[k]["pairs"]["frac_comm"] for k in vk], 0.26, color=CAT[0], label="communication subspace")
+    ax[1].barh(y, [D[k]["pairs"]["frac_topPC"] for k in vk], 0.26, color=CAT[2], label="top-PC subspace (same dim)")
+    ax[1].barh(y + 0.27, [D[k]["pairs"]["frac_rand_p95"] for k in vk], 0.26, color="#bbbbbb", label="random subspaces (95th pct)")
+    ax[1].set_yticks(y)
+    ax[1].set_yticklabels(vk, fontsize=8)
+    ax[1].invert_yaxis()
+    ax[1].set_xlabel("share of the instruction-only call-0 difference (same-observation pairs) inside the subspace")
+    ax[1].legend(frameon=False, fontsize=8, loc="lower right")
+    fig.tight_layout()
+    save(fig, "d2_tags_pairs.png")
+
+
+def fig_e():
+    E = pickle.load(open(P.CACHE / "e_res.pkl", "rb"))
+    bl = P.VLM_ALL + P.EXP_ALL
+    # 1. fallback: median d_I - d_E per call, layers x calls
+    fig, ax = plt.subplots(1, 2, figsize=(14, 6.2), gridspec_kw={"width_ratios": [1, 1]})
+    Mx = np.array([E[b]["fallback"]["median_dI_minus_dE"] for b in bl + ["vlm_all", "exp_all", "whole"]])
+    lim = np.nanmax(np.abs(Mx))
+    im = ax[0].imshow(Mx, cmap="RdBu_r", vmin=-lim, vmax=lim, aspect="auto")
+    names = [P.pretty(b) for b in bl + ["vlm_all", "exp_all", "whole"]]
+    for a in ax:
+        a.set_yticks(range(len(names)))
+        a.set_yticklabels(names, fontsize=7)
+        a.set_xlabel("call")
+        a.grid(False)
+    fig.colorbar(im, ax=ax[0], label="median [d(instructed) − d(executed)]  (red = closer to executed)")
+    ax[0].set_title("fallback trials: cosine distance to U40 mean trajectory", fontsize=9)
+    F = np.array([E[b]["fallback"]["frac_closer_E"] for b in bl + ["vlm_all", "exp_all", "whole"]])
+    im = ax[1].imshow(F, cmap="Blues", vmin=0, vmax=1, aspect="auto")
+    fig.colorbar(im, ax=ax[1], label="share of fallback trials closer to executed task")
+    ax[1].set_title("share closer to EXECUTED task (0.5 = undecided)", fontsize=9)
+    fig.tight_layout()
+    save(fig, "e1_fallback_distance.png")
+    # 2. cand vs base divergence call
+    vs = sorted(E["v08"]["cand_vs_base"])
+    Dv = np.array([[E[b]["cand_vs_base"][v]["all"]["div_call"] if E[b]["cand_vs_base"][v]["all"]["div_call"] is not None else np.nan
+                    for b in bl] for v in vs], float)
+    fig, ax = plt.subplots(figsize=(13, 0.24 * len(vs) + 1.8))
+    im = ax.imshow(Dv, cmap="viridis_r", vmin=0, vmax=10, aspect="auto")
+    ax.set_xticks(range(len(bl)))
+    ax.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+    ylab = []
+    for v in vs:
+        c = E["v08"]["cand_vs_base"][v]["cls"]
+        ylab.append(f"{v} vs {E['v08']['cand_vs_base'][v]['base']}  (FB {c.get('FALLBACK', 0)}, NEW {c.get('NEW', 0)})")
+    ax.set_yticks(range(len(vs)))
+    ax.set_yticklabels(ylab, fontsize=7)
+    ax.grid(False)
+    fig.colorbar(im, ax=ax, label="divergence call (white = never diverges in calls 0–27)")
+    ax.set_title("first call where cand trials (same start, different sentence) differ from their base task beyond the split-half floor (perm p < 0.05)", fontsize=9)
+    save(fig, "e2_cand_divergence.png")
+    # 3. speed
+    show = ["v01", "v08", "v15", "e05", "e11", "e17", "whole"]
+    fig, ax = plt.subplots(1, 2, figsize=(12, 3.6), sharey=True)
+    for k, b in enumerate(show):
+        for a, nm in zip(ax, ("grasp", "release")):
+            sdict = E[b]["speed"][nm]
+            lags = sorted(sdict)
+            v = np.array([sdict[l_] for l_ in lags])
+            a.plot(lags, v / v.max(), color=CAT[k], label=P.pretty(b))
+    for a, nm in zip(ax, ("grasp", "release")):
+        a.axvline(0, color=INK2, lw=1, ls="--")
+        a.set_xlabel(f"call − {nm} call")
+    ax[0].set_ylabel("speed |x(c+1) − x(c)| (÷ max)")
+    ax[0].legend(frameon=False, fontsize=7, ncol=2)
+    fig.tight_layout()
+    save(fig, "e3_speed.png")
+    # 4. basket geometry
+    fig, ax = plt.subplots(1, 3, figsize=(15, 3.8))
+    G = [E[b]["basket_geom"]["mean0-27"] for b in bl]
+    x = np.arange(len(bl))
+    for k, (nm, c) in enumerate((("near", CAT[2]), ("far20", CAT[0]), ("far25", CAT[6]), ("opp", CAT[1]), ("machine", "#bbbbbb"))):
+        ax[0].plot(x, [g["norm"][nm] for g in G], "o-", ms=3, color=c, label=nm if nm != "machine" else "ctl4090 − ctl A100 (machine)")
+    ax[0].plot(x, [g["floor"]["ctl4090"] for g in G], ":", color=INK2, label="noise floor (split-half)")
+    ax[1].plot(x, [g["path_ratio"] for g in G], "o-", ms=3, color=CAT[0], label="path ratio near→far20→far25")
+    ax[1].axhline(1, color=INK2, lw=1)
+    ax[2].plot(x, [g["opp_dev"] for g in G], "o-", ms=3, color=CAT[1], label="opp distance from 0→far25 line ÷ |far25|")
+    ax[2].plot(x, [g["cos"]["opp,far25"] for g in G], "o-", ms=3, color=CAT[6], label="cos(opp, far25)")
+    ax[2].plot(x, [g["cos"]["near,far25"] for g in G], "o-", ms=3, color=CAT[2], label="cos(near, far25)")
+    for a in ax:
+        _shade(a, bl)
+        a.set_xticks(x)
+        a.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=6)
+        a.legend(frameon=False, fontsize=7)
+    ax[0].set_ylabel("|Δ| (episode-mean vector, calls 0–27)")
+    save(fig, "e4_basket_path.png")
+    # 5. participation ratio
+    fig, ax = plt.subplots(figsize=(12, 3.4))
+    for k, su in enumerate("SOGL"):
+        ax.plot(x, [E[b]["PR"][su] for b in bl], "o-", ms=3, color=CAT[k], label={"S": "Spatial", "O": "Object", "G": "Goal", "L": "Long"}[su])
+    _shade(ax, bl)
+    ax.set_xticks(x)
+    ax.set_xticklabels([P.pretty(b) for b in bl], rotation=60, fontsize=7)
+    ax.set_ylabel("participation ratio")
+    ax.legend(frameon=False, fontsize=8, ncol=4)
+    save(fig, "e5_participation_ratio.png")
+
+
 if __name__ == "__main__":
-    {"a": fig_a, "a3": fig_a3, "b": fig_b, "c": fig_c}[sys.argv[1]]()
+    {"a": fig_a, "a3": fig_a3, "b": fig_b, "c": fig_c, "d": fig_d, "e": fig_e}[sys.argv[1]]()

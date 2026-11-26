@@ -789,8 +789,19 @@ def _bin(traj: np.ndarray, nb: int = 20) -> np.ndarray:
     return np.stack([np.interp(tb, t, traj[:, j]) for j in range(traj.shape[1])], 1)
 
 
-def c_job(job) -> dict:
+def nnls_gram(G: np.ndarray, v: np.ndarray, yy: float, S: list) -> tuple[np.ndarray, float]:
+    """NNLS min ||A w - y||, w >= 0, from A^T A = G[S,S], A^T y = v[S], y^T y = yy (exact, via Cholesky). returns (w, R^2)."""
     from scipy.optimize import nnls
+
+    Gs = G[np.ix_(S, S)] + 1e-10 * np.trace(G) * np.eye(len(S))
+    L = np.linalg.cholesky(Gs)
+    z = np.linalg.solve(L, v[S])
+    w, rn = nnls(L.T, z)
+    res = rn**2 + yy - z @ z
+    return w, 1 - max(res, 0.0) / max(yy, 1e-12)
+
+
+def c_job(job) -> dict:
 
     b, align = job  # align: "call" (primary, calls 0..27) or "prog" (T029: whole episode, 20 progress bins)
     rng = np.random.default_rng(1)
@@ -810,6 +821,8 @@ def c_job(job) -> dict:
 
     cent = {t: np.mean([traj(i) for i in U[t]], 0) for t in goal}
     gm = np.mean([cent[t] for t in goal], 0)
+    CEN = {"centred": np.stack([cent[t] - gm for t in goal], 1), "raw": np.stack([cent[t] for t in goal], 1)}
+    GRAM = {k: np.einsum("tkf,tlf->tkl", v, v) for k, v in CEN.items()}
     ro = roles()
     recs = []
     for m in M:
@@ -824,23 +837,21 @@ def c_job(job) -> dict:
         out = {}
         for cen in ("centred", "raw"):
             g = gm if cen == "centred" else np.zeros_like(gm)
+            CC = CEN[cen]  # (T, 10, nf) centroids (minus g)
+            GG = GRAM[cen]  # (T, 10, 10)
+            Y = e - g
+            V = np.einsum("tkf,tf->tk", CC, Y)  # projections of y onto each Goal centroid
+            yy = (Y**2).sum(1)
             Wt, r2 = [], []
             for c in range(T_):
-                A = np.stack([cent[t][c] - g[c] for t in uniq], 1)
-                y = e[c] - g[c]
-                w, rn = nnls(A, y)
+                w, r = nnls_gram(GG[c], V[c], yy[c], [goal.index(t) for t in uniq])
                 Wt.append(w)
-                r2.append(1 - rn**2 / max(y @ y, 1e-12))
+                r2.append(r)
             others = [t for t in goal if t not in uniq]
             rr = []
             for _ in range(100):
-                pick = list(rng.choice(others, len(uniq), replace=False))
-                q = []
-                for c in range(T_):
-                    A = np.stack([cent[t][c] - g[c] for t in pick], 1)
-                    y = e[c] - g[c]
-                    q.append(1 - nnls(A, y)[1] ** 2 / max(y @ y, 1e-12))
-                rr.append(np.mean(q))
+                pick = [goal.index(t) for t in rng.choice(others, len(uniq), replace=False)]
+                rr.append(np.mean([nnls_gram(GG[c], V[c], yy[c], pick)[1] for c in range(T_)]))
             out[cen] = {"W": np.array(Wt), "r2": np.array(r2), "r2_rand": float(np.mean(rr))}
         Wt = out["centred"]["W"]
         tau = np.linspace(0, 1, T_)
@@ -1272,6 +1283,19 @@ def numbers_b() -> dict:
         out["summary"][f"H_b3_time_alone_R2/{w}"] = {"vlm_median": float(np.median(tv)), "exp_median": float(np.median(te))}
         rho = spearmanr(range(len(EXP_MAIN)), [B[b][f"I/{w}"]["unique_fb"]["I"] for b in EXP_MAIN])
         out["summary"][f"exp_uniqueI_fb_depth_spearman/{w}"] = [float(rho.statistic), float(rho.pvalue)]
+    return out
+
+
+def numbers_c() -> dict:
+    Cr = load_json("c")
+    keys = ("n_trials", "r2_median", "r2_rand_median", "diff_by_variant_median", "p_source_gt_random", "q_source_gt_random",
+            "r2_raw_median", "r2_rand_raw_median", "slope_NEW_median", "slope_FB_median", "slope_NEW_minus_FB", "p_slope_NEW_vs_FB",
+            "q_slope_NEW_vs_FB", "n_slope_NEW", "n_slope_FB", "base_share_NEW_median", "base_share_FB_median", "p_base_share_NEW_vs_FB",
+            "r2_NEW_median", "r2_FB_median", "p_r2_NEW_vs_FB", "slope_succ_minus_fail", "p_slope_succ_vs_fail", "q_slope_succ_vs_fail",
+            "r2_succ_minus_fail", "p_r2_succ_vs_fail")
+    out = {k_: {k: v.get(k) for k in keys} for k_, v in Cr.items()}
+    out = {(pretty(k) if "/" not in k else pretty(k.split("/")[0]) + "/prog"): v for k, v in out.items()}
+    out["T029_raw_reference"] = {"r2_source_median": 0.48, "r2_minus_random": 0.29, "slope_NEW_median": 0.33, "slope_FB_median": 0.05, "p": 0.07}
     return out
 
 
