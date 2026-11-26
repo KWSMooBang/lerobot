@@ -129,3 +129,12 @@ Stop and report at 8 GPU-h total, OOM, smoke throughput < 50 % of the T031 measu
   standard fused fp32 Adam at batch 4 096 (smoke: 14.6 GB).
 - Gate before VLM training: `cc_check_vlm.py` (keys equal the expert cache row by row; T015 per-layer SAE VE on the
   new pooled_all within 0.03 of T015's, pg17 reported only). Failure → stop and report.
+
+## Addendum C (2026-11-26 17:20, before any VLM training; lead decision on budget)
+
+- The VLM collection runs at 9.2 ts/s on the shared GPU 0 (≈ 4.1 h). Lead: unless the human moves the work to
+  GPU 1, the VLM sweep is cut to **one run, n 8 192, k 128** (the expert choice), then joint n 8 192 k 128 (Addendum B).
+- Hard stop at 8 GPU-h: `cc_watchdog.sh` (finished jobs + running job's elapsed time) terminates the running job.
+- Variance-aware layer profile (lead request, defined after the expert results): a_il = Σ_rows z_i²·‖x_l − b_pre_l − μ_l‖²·‖d_i^l‖²
+  / (N·Var_l) (feature i's diagonal share of layer l's raw variance); q_il = a_il / Σ_l a_il; same §6 categories on q.
+  Reported next to the decoder-norm categories; per-layer share of explained variance by category also reported.

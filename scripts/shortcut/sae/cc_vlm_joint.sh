@@ -12,16 +12,19 @@ grep -q "collect exit 0" $LOG/collect_vlm.log || { echo "collection failed"; exi
 $PY $SAE/cc_data.py vlm > $LOG/cache_vlm.log 2>&1 || { echo "vlm cache failed"; exit 1; }
 $PY $SAE/cc_check_vlm.py > $LOG/check_vlm.log 2>&1 || { echo "vlm check FAILED (see check_vlm.log); stop"; exit 1; }
 echo "check passed"
-for k in 64 128; do
+VLM_KS=${VLM_KS:-128}  # Addendum C (budget): one VLM run at the expert's k unless lead says otherwise
+for k in $VLM_KS; do
   $SAE/run_gpu.sh vlm_n8192_k$k $PY $SAE/cc_train.py --data vlm --name vlm_n8192_k$k --n-latents 8192 --k $k \
     > $LOG/vlm_n8192_k$k.log 2>&1 || echo "vlm_n8192_k$k failed"
 done
-K=$($PY - <<'EOF'
+if [ "$VLM_KS" = "128" ]; then K=128; else
+K=$($PY - <<'PYEOF'
 import json
 r = {k: json.load(open(f"/outputs/VLA-shortcut-exps/sae/crosscoder/runs/vlm_n8192_k{k}.json"))["heldout"]["ve_mean"] for k in (64, 128)}
 print(128 if r[128] - r[64] >= 0.01 else 64)
-EOF
+PYEOF
 )
+fi
 echo "vlm k = $K"
 name=joint_n8192_k$K
 $SAE/run_gpu.sh $name $PY $SAE/cc_train.py --data joint --name $name --n-latents 8192 --k $K --low-mem-adam \
