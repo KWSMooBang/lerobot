@@ -1104,16 +1104,33 @@ def _cosd(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return 1 - (a * b).sum(-1) / np.maximum(na * nb, 1e-12)
 
 
+def _perm_cosd(allT: np.ndarray, nA: int, idx: np.ndarray, chunk: int = 50) -> np.ndarray:
+    """cosine distance per call between mean(allT[idx[:, :nA]]) and mean(allT[rest]) for many index rows at once."""
+    n = len(allT)
+    flat = allT.reshape(n, -1)
+    tot = flat.sum(0)
+    out = []
+    for a in range(0, len(idx), chunk):
+        sel = idx[a: a + chunk, :nA]
+        S = np.zeros((len(sel), n))
+        np.put_along_axis(S, sel, 1.0, 1)
+        sa = (S @ flat).reshape(len(sel), NC, -1)
+        sb = tot.reshape(NC, -1)[None] - sa
+        out.append(_cosd(sa, sb))  # means differ from sums only by positive scale -> same cosine
+    return np.concatenate(out)
+
+
 def diverge(TA: np.ndarray, TB: np.ndarray, rng, nperm: int = E_PERM) -> dict:
     """TA (nA, NC, nf), TB (nB, NC, nf): per-call cosine distance of means, split-half floor of A, permutation p."""
     d = _cosd(TA.mean(0), TB.mean(0))
     nA = len(TA)
-    fl = np.mean([_cosd(TA[s[: nA // 2]].mean(0), TA[s[nA // 2:]].mean(0)) for s in (rng.permutation(nA) for _ in range(200))], 0)
+    h = nA // 2
+    sh = np.array([rng.permutation(2 * h) for _ in range(200)])
+    fl = _perm_cosd(TA[: 2 * h], h, sh).mean(0)  # split-half floor of A
     allT = np.concatenate([TA, TB])
-    cnt = np.zeros(NC)
-    for _ in range(nperm):
-        s = rng.permutation(len(allT))
-        cnt += _cosd(allT[s[:nA]].mean(0), allT[s[nA:]].mean(0)) >= d - 1e-12
+    idx = np.array([rng.permutation(len(allT)) for _ in range(nperm)])
+    null = _perm_cosd(allT, nA, idx)
+    cnt = (null >= d - 1e-12).sum(0)
     p = (cnt + 1) / (nperm + 1)
     hit = np.flatnonzero((d > fl) & (p < 0.05))
     return {"d": d, "floor": fl, "p": p, "div_call": int(hit[0]) if len(hit) else None}
