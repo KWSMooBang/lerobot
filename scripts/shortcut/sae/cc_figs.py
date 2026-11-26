@@ -190,6 +190,67 @@ def fig_tag_depth(runs: dict[str, str]) -> None:
     plt.close(fig)
 
 
+def capacity(runs: dict[str, str]) -> dict:
+    """Like-for-like size table (lead request): features and active features per sample vs mean VE, crosscoder
+    vs the 18 per-layer SAEs it is compared with (T031 expert: n 2 048, k 64; T015 VLM: n 2 048, k 100)."""
+    ref = sae_ref()
+    out = {}
+    for kind, name in runs.items():
+        m = run_metrics(name)
+        per = m["heldout"]["per_layer"]
+        rows = {"crosscoder": {"features": m["n_latents"], "live_features": int(round((1 - m["never_fire_all"]) * m["n_latents"])),
+                               "active_per_sample": m["k"], "ve_mean": m["heldout"]["ve_mean"]}}
+        for fam, n_sae, k_sae, src in (("ae", 2048, 64, "T031 held-out"), ("pg", 2048, 100, "T015 training data")):
+            ls = [p["layer"] for p in per if p["layer"].startswith(fam)]
+            if ls:
+                rows[f"per_layer_sae_{fam}"] = {"features": n_sae * len(ls), "active_per_sample": k_sae * len(ls),
+                                                "ve_mean": float(np.mean([ref[x] for x in ls])), "ve_source": src,
+                                                "crosscoder_ve_mean_same_layers": float(np.mean([p["var_explained"] for p in per if p["layer"] in ls]))}
+        out[kind] = rows
+    return out
+
+
+TAG_GROUPS = (("instruction", "instruction (same scene)", BLUE), ("task-confounded", "task (scene+instr.)", ORANGE),
+              ("phase", "phase", AQUA))
+
+
+def tag_profiles(name: str) -> dict:
+    """Mean layer profile of each tag group divided by the mean profile of all live features (enrichment by layer)."""
+    f = pd.read_parquet(AN / name / "features.parquet")
+    p = np.load(W / name / "profile.npy")
+    live = f["live"].to_numpy()
+    base = p[live].mean(0)
+    out = {"layers": run_metrics(name)["layers"], "all": base.tolist()}
+    for g, _, _ in TAG_GROUPS + (("scene", "", ""),):
+        m = live & ((f["tag"] == "task") & (f["sub"] == g) if g in ("instruction", "task-confounded") else (f["tag"] == g)).to_numpy()
+        if m.sum():
+            out[g] = {"n": int(m.sum()), "mean_profile": p[m].mean(0).tolist(), "enrichment": (p[m].mean(0) / base).tolist()}
+    return out
+
+
+def fig_tag_profiles(runs: dict[str, str]) -> dict:
+    fig, axs = plt.subplots(1, len(runs), figsize=(3.8 * len(runs), 3.0), squeeze=False)
+    res = {}
+    for ax, (kind, name) in zip(axs[0], runs.items(), strict=True):
+        tp = tag_profiles(name)
+        res[kind] = tp
+        x = np.arange(len(tp["layers"]))
+        for g, lab, col in TAG_GROUPS:
+            if g in tp:
+                ax.plot(x, tp[g]["enrichment"], color=col, label=f"{lab} (n={tp[g]['n']})")
+        ax.axhline(1, color=INK2, lw=1, ls="--")
+        if kind == "joint":
+            ax.axvline(17.5, color=INK2, lw=1)
+        st = 3 if len(x) <= 18 else 6
+        ax.set_xticks(x[::st], [tp["layers"][i] for i in x[::st]], rotation=90, fontsize=7)
+        ax.set_title({"expert": "expert", "vlm": "VLM", "joint": "joint"}[kind], fontsize=9)
+        ax.set_ylabel("mean layer share / all-feature mean")
+        ax.legend(frameon=False, fontsize=7)
+    fig.savefig(FIG / "tag_layer_enrichment.png")
+    plt.close(fig)
+    return res
+
+
 def fig_fallback(runs: dict[str, str]) -> None:
     fig, axs = plt.subplots(2, len(runs), figsize=(3.8 * len(runs), 6.0), squeeze=False)
     for j, (kind, name) in enumerate(runs.items()):
@@ -234,6 +295,8 @@ def main() -> None:
         fig_joint_share(runs["joint"])
     fig_tag_depth(runs)
     fig_fallback(runs)
+    num["tag_profiles"] = fig_tag_profiles(runs)
+    num["capacity"] = capacity(runs)
     for kind, name in runs.items():
         m = run_metrics(name)
         num[kind] = {"name": name, "n_latents": m["n_latents"], "k": m["k"], "heldout_ve_mean": m["heldout"]["ve_mean"],
