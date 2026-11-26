@@ -123,16 +123,51 @@ class Prefetch:
             yield xb
 
 
+class AdamLowMem(torch.optim.Optimizer):
+    """Adam (no weight decay) with exp_avg stored in bf16 and exp_avg_sq in fp32, updated in row chunks so the
+    fp32 temporaries stay small. (bf16 exp_avg_sq would not decay: 0.999·v rounds back to v in bf16.)"""
+
+    def __init__(self, params, lr: float = 1e-4, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-8,
+                 chunk_rows: int = 512):
+        super().__init__(params, {"lr": lr, "betas": betas, "eps": eps})
+        self.chunk_rows = chunk_rows
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        for g in self.param_groups:
+            b1, b2 = g["betas"]
+            for p in g["params"]:
+                if p.grad is None:
+                    continue
+                st = self.state[p]
+                if not st:
+                    st["t"] = 0
+                    st["m"] = torch.zeros_like(p, dtype=torch.bfloat16)
+                    st["v"] = torch.zeros_like(p, dtype=torch.float32)
+                st["t"] += 1
+                t = st["t"]
+                c1, c2 = 1 - b1**t, 1 - b2**t
+                P, G, M, V = (x.view(x.shape[0], -1) if x.dim() > 1 else x.view(1, -1) for x in (p, p.grad, st["m"], st["v"]))
+                for r in range(0, P.shape[0], self.chunk_rows):
+                    sl = slice(r, r + self.chunk_rows)
+                    gg = G[sl]
+                    m = M[sl].float().mul_(b1).add_(gg, alpha=1 - b1)
+                    V[sl].mul_(b2).addcmul_(gg, gg, value=1 - b2)
+                    P[sl].addcdiv_(m, (V[sl] / c2).sqrt_().add_(g["eps"]), value=-g["lr"] / c1)
+                    M[sl] = m.to(torch.bfloat16)
+
+
 # ---------------------------------------------------------------------------- train / eval
 def fit(X: torch.Tensor, train_rows: np.ndarray, names: list[str], dims: list[int], n_latents: int, k: int,
         steps: int, batch: int, seed: int = 0, lr: float = 1e-4, device: str = "cuda", log_every: int = 250,
-        tag: str = "") -> tuple[CrossCoder, dict]:
+        tag: str = "", low_mem_adam: bool = False) -> tuple[CrossCoder, dict]:
     cfg = CrossCoderConfig(layers=names, dims=dims, n_latents=n_latents, k=k)
     cc = CrossCoder(cfg, seed=seed).to(device)
     g = np.random.default_rng(seed)
     pick = np.sort(g.choice(train_rows, size=min(10_000, len(train_rows)), replace=False))
     cc.init_from_data(X[torch.from_numpy(pick)].to(device).float())
-    opt = torch.optim.Adam(cc.parameters(), lr=lr, betas=(0.9, 0.999), fused=device.startswith("cuda"))
+    opt = (AdamLowMem(cc.parameters(), lr=lr) if low_mem_adam else
+           torch.optim.Adam(cc.parameters(), lr=lr, betas=(0.9, 0.999), fused=device.startswith("cuda")))
     last_fired = torch.zeros(n_latents, dtype=torch.long, device=device)
     log: list[dict] = []
     run_mse = torch.zeros((), device=device)
@@ -249,6 +284,7 @@ def main() -> None:
     ap.add_argument("--weights", default=str(WEIGHTS))
     ap.add_argument("--out", default=str(OUT / "runs"))
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--low-mem-adam", action="store_true", help="exp_avg in bf16 (joint, Addendum B)")
     a = ap.parse_args()
     wdir = Path(a.weights) / a.name
     if (wdir / "metrics.json").exists():
@@ -260,7 +296,8 @@ def main() -> None:
     hold = heldout_mask(meta)
     tr, ho = np.where(~hold)[0], np.where(hold)[0]
     steps = a.steps or int(math.ceil(a.epochs * len(tr) / a.batch))
-    cc, info = fit(X, tr, names, dims, a.n_latents, a.k, steps, a.batch, a.seed, a.lr, a.device, tag=a.name)
+    cc, info = fit(X, tr, names, dims, a.n_latents, a.k, steps, a.batch, a.seed, a.lr, a.device, tag=a.name,
+                   low_mem_adam=a.low_mem_adam)
     t1 = time.time()
     codes = None
     if not a.no_codes:

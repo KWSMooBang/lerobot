@@ -134,3 +134,20 @@ def test_save_load_roundtrip(tmp_path):
     l1, _, _ = cc.loss(x, None)
     l2, _, _ = cc2.loss(x, None)
     assert torch.allclose(l1, l2)
+
+
+def test_low_mem_adam_matches_adam():
+    from cc_train import AdamLowMem
+
+    torch.manual_seed(0)
+    p1 = torch.nn.Parameter(torch.randn(37, 11))
+    p2 = torch.nn.Parameter(p1.detach().clone())
+    o1 = torch.optim.Adam([p1], lr=1e-2)
+    o2 = AdamLowMem([p2], lr=1e-2, chunk_rows=8)
+    for _ in range(50):
+        g = torch.randn(37, 11)
+        p1.grad, p2.grad = g.clone(), g.clone()
+        o1.step()
+        o2.step()
+    # bf16 first moment: small relative drift only
+    assert (p1 - p2).abs().max() < 0.02 * (p1.detach() - 0).abs().max()
