@@ -11,8 +11,7 @@ x = [x_0; …; x_{L-1}] (D = Σ d_l).
 Decoder constraint: each feature's concatenated decoder row [d_i^0; …; d_i^{L-1}] has unit norm (tangent-plane
 gradient + renorm, as model.py), so ‖d_i^l‖² is feature i's share in block l (its *layer profile*, sums to 1).
 
-Storage: W_dec is (n_latents, D) (rows = features), so decoding is an embedding-bag over the k active rows
-(B·k·D work instead of a dense B·n·D matmul). W_enc is (n_latents, D) like model.py. With L = 1 this is
+Storage: W_dec is (n_latents, D) (rows = features). W_enc is (n_latents, D) like model.py. With L = 1 this is
 model.TopKSAE with W_dec transposed (tests/test_crosscoder.py checks the reduction).
 """
 
@@ -24,7 +23,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
 
 try:
@@ -129,11 +127,11 @@ class CrossCoder(nn.Module):
         return vals.relu(), idx
 
     def decode_sparse(self, vals: Tensor, idx: Tensor) -> Tensor:
-        """(B, k) values / indices → (B, D) = Σ_j vals_j · W_dec[idx_j] (normalised space)."""
-        shp = vals.shape[:-1]
-        v2, i2 = vals.reshape(-1, vals.shape[-1]), idx.reshape(-1, idx.shape[-1])
-        out = F.embedding_bag(i2, self.W_dec, per_sample_weights=v2.to(self.W_dec.dtype), mode="sum")
-        return out.reshape(*shp, self.cfg.D)
+        """(..., k) values / indices → (..., D) = Σ_j vals_j · W_dec[idx_j] (normalised space). Dense z @ W_dec
+        (compute-bound under bf16 autocast; a row gather is memory-bound for the AuxK k_aux = 512 path)."""
+        z = torch.zeros(*vals.shape[:-1], self.cfg.n_latents, device=vals.device, dtype=vals.dtype)
+        z.scatter_(-1, idx, vals)
+        return z @ self.W_dec
 
     def encode(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """x (..., D) raw → (values, indices) of the k active latents (values ≥ 0)."""

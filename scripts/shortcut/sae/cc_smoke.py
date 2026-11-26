@@ -21,8 +21,9 @@ OUT = Path("/outputs/VLA-shortcut-exps/sae/crosscoder/smoke")
 T031_STEPS_PER_S = 3100 / 12.2
 
 
-def step_loop(model, x, steps: int, amp: bool) -> float:
-    opt = torch.optim.Adam(model.parameters(), lr=1e-4)
+def step_loop(model, x, steps: int, amp: bool, dead_steps: int = 500, fused: bool = True) -> float:
+    """dead_steps 500 = no AuxK within the first 500 steps (as early T031 training); 0 = AuxK on every step."""
+    opt = torch.optim.Adam(model.parameters(), lr=1e-4, fused=fused)
     n = model.cfg.n_latents
     last = torch.zeros(n, dtype=torch.long, device="cuda")
     for s in range(steps + 5):
@@ -30,7 +31,8 @@ def step_loop(model, x, steps: int, amp: bool) -> float:
             torch.cuda.synchronize()
             t0 = time.time()
         with torch.autocast("cuda", dtype=torch.bfloat16, enabled=amp):
-            loss, _, fired = model.loss(x, (s - last) >= 2)
+            dead = torch.ones_like(last, dtype=torch.bool) if dead_steps == 0 else (s - last) >= dead_steps
+            loss, _, fired = model.loss(x, dead)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         model.project_decoder_grad()
@@ -52,6 +54,7 @@ def probe(name: str, dims: list[int], n: int, k: int, batch: int, steps: int = 3
         x = torch.randn(batch, sum(dims), device="cuda", dtype=torch.float16)
         cc.init_from_data(x[:2000].float())
         rec["steps_per_s"] = step_loop(cc, x, steps, amp=True)
+        rec["steps_per_s_auxk_every_step"] = step_loop(cc, x, 10, amp=True, dead_steps=0)
         rec["peak_gb"] = torch.cuda.max_memory_allocated() / 2**30
         rec["ok"] = True
         del cc, x
@@ -71,7 +74,7 @@ def main() -> None:
     sae = TopKSAE(SAEConfig(d=1024, n_latents=2048, k=64), seed=0).cuda()
     x = torch.randn(4096, 1024, device="cuda")
     sae.init_from_data(x)
-    sps = step_loop(sae, x, 500, amp=False)
+    sps = step_loop(sae, x, 500, amp=False, fused=False)
     res["t031_ref"] = {"steps_per_s": sps, "t031_measured": T031_STEPS_PER_S, "ratio": sps / T031_STEPS_PER_S}
     print(res["t031_ref"], flush=True)
     del sae, x
@@ -79,10 +82,10 @@ def main() -> None:
     for n in (8192, 16384):
         for k in (64, 128):
             probes.append(probe(f"expert_n{n}_k{k}", [1024] * 18, n, k, 4096))
-    probes.append(probe("vlm_n8192_k128", [2048] * 18, 8192, 128, 4096))
-    probes.append(probe("vlm_n16384_k64", [2048] * 18, 16384, 64, 4096))
-    probes.append(probe("joint_n8192_k128_b4096", [2048] * 18 + [1024] * 18, 8192, 128, 4096))
-    probes.append(probe("joint_n8192_k128_b2048", [2048] * 18 + [1024] * 18, 8192, 128, 2048))
+    for n, k, b in ((8192, 128, 4096), (16384, 64, 4096), (16384, 64, 2048)):
+        probes.append(probe(f"vlm_n{n}_k{k}_b{b}", [2048] * 18, n, k, b))
+    for n, k, b in ((8192, 128, 4096), (8192, 128, 2048), (4096, 128, 4096)):
+        probes.append(probe(f"joint_n{n}_k{k}_b{b}", [2048] * 18 + [1024] * 18, n, k, b))
     res["probes"] = probes
     (OUT / "probe.json").write_text(json.dumps(res, indent=1) + "\n")
 

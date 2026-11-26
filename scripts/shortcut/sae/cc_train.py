@@ -132,7 +132,7 @@ def fit(X: torch.Tensor, train_rows: np.ndarray, names: list[str], dims: list[in
     g = np.random.default_rng(seed)
     pick = np.sort(g.choice(train_rows, size=min(10_000, len(train_rows)), replace=False))
     cc.init_from_data(X[torch.from_numpy(pick)].to(device).float())
-    opt = torch.optim.Adam(cc.parameters(), lr=lr, betas=(0.9, 0.999))
+    opt = torch.optim.Adam(cc.parameters(), lr=lr, betas=(0.9, 0.999), fused=device.startswith("cuda"))
     last_fired = torch.zeros(n_latents, dtype=torch.long, device=device)
     log: list[dict] = []
     run_mse = torch.zeros((), device=device)
