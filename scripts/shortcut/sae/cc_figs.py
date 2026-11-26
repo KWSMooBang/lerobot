@@ -89,7 +89,7 @@ def fig_quality(runs: dict[str, str], ref: dict) -> dict:
 
 
 def fig_profiles(runs: dict[str, str]) -> None:
-    fig, axs = plt.subplots(1, len(runs), figsize=(3.8 * len(runs), 4.0))
+    fig, axs = plt.subplots(1, len(runs), figsize=(4.6 * len(runs), 4.2), layout="constrained")
     axs = np.atleast_1d(axs)
     for ax, (kind, name) in zip(axs, runs.items(), strict=True):
         f = pd.read_parquet(AN / name / "features.parquet")
@@ -102,10 +102,10 @@ def fig_profiles(runs: dict[str, str]) -> None:
                       [layers[i] for i in range(0, len(layers), 3 if len(layers) <= 18 else 6)], rotation=90, fontsize=7)
         if kind == "joint":
             ax.axvline(17.5, color=ORANGE, lw=1.5)
-        ax.set_ylabel(f"{len(P):,} live features (sorted by depth centroid)")
+        ax.set_ylabel(f"{len(P):,} live features (by depth centroid)", fontsize=8)
         ax.set_title({"expert": "expert", "vlm": "VLM", "joint": "joint (left VLM | right expert)"}[kind], fontsize=9)
         ax.grid(False)
-        fig.colorbar(im, ax=ax, fraction=0.04, label="layer share ||d_i^l||^2")
+        fig.colorbar(im, ax=ax, fraction=0.05, pad=0.02, label="layer share")
     fig.savefig(FIG / "layer_profiles.png")
     plt.close(fig)
 
@@ -115,8 +115,8 @@ def fig_categories(runs: dict[str, str]) -> None:
     for kind, name in runs.items():
         pr = json.loads((AN / name / "profiles.json").read_text())
         if kind == "joint":
-            items.append(("joint: VLM-only", pr["categories_vlm-only"]))
-            items.append(("joint: expert-only", pr["categories_expert-only"]))
+            items.append((f"joint shared ({pr['kinds']['shared']:,}): VLM part", pr["categories_shared_vlm_part"]))
+            items.append((f"joint shared: expert part", pr["categories_shared_expert_part"]))
         else:
             items.append(({"expert": "expert", "vlm": "VLM"}[kind], pr["categories"]))
     fig, axs = plt.subplots(1, len(items), figsize=(3.2 * len(items), 2.8), sharey=True)
@@ -156,7 +156,7 @@ def fig_joint_share(name: str) -> None:
 
 
 def fig_tag_depth(runs: dict[str, str]) -> None:
-    groups = [("instruction", "instruction\n(same scene)"), ("task-confounded", "task\n(scene+instr.)"), ("scene", "scene"),
+    groups = [("instruction", "instr."), ("task-confounded", "task"), ("scene", "scene"),
               ("phase", "phase"), ("mixed", "mixed")]
     cols = []
     for kind, name in runs.items():
@@ -165,7 +165,7 @@ def fig_tag_depth(runs: dict[str, str]) -> None:
             cols.append(("joint: VLM share", name, "vlm_share"))
         else:
             cols.append(({"expert": "expert: depth centroid", "vlm": "VLM: depth centroid"}[kind], name, "centroid"))
-    fig, axs = plt.subplots(1, len(cols), figsize=(3.3 * len(cols), 3.0), sharey=False)
+    fig, axs = plt.subplots(1, len(cols), figsize=(3.8 * len(cols), 3.2), sharey=False)
     axs = np.atleast_1d(axs)
     for ax, (title, name, col) in zip(axs, cols, strict=True):
         f = pd.read_parquet(AN / name / "features.parquet")
