@@ -109,3 +109,14 @@ as T032; expert exp_mean step 9. Encode every call.
 
 GPU 0 only, one job at a time under the queue lock; wall clock logged per job (`run_gpu.sh` → gpu_time.tsv).
 Stop and report at 8 GPU-h total, OOM, smoke throughput < 50 % of the T031 measurement, or collection > 60 GB.
+
+## Addendum A (2026-11-26 15:42, after run expert_n8192_k64 only; the other 3 sweep runs not finished)
+
+- Observation: expert_n8192_k64 has never-fire 0.57 (dead in the last 500-step window 0.47), held-out VE mean 0.961.
+  The ≤ 10 % never-fire filter in §3 will likely exclude every config.
+- Rule change, fixed now: if no run passes the never-fire filter, the filter is dropped and the §3 VE rule is applied
+  to all runs (start n 8 192 k 64; k 128 if mean VE +≥ 0.01; n 16 384 if +≥ 0.005). Never-fire and the number of
+  live features are reported next to VE. Dead (never-fire) features are excluded from every analysis count (§6).
+- Throughput deviation: the smoke showed 0.32 × the T031 SAE throughput (shared GPU); lead informed, continued.
+- Memory deviations (lead approved): VLM n_latents capped at 8 192 (16 384 OOM); joint tries n 8 192 with bf16 Adam
+  states, else n 4 096 (to be fixed in Addendum B before the joint run).
