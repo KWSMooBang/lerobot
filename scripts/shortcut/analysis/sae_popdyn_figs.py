@@ -253,6 +253,7 @@ def fig_d():
         a.axvline(r["comm_dim"], color=INK, lw=1, ls=":")
         a.set_title(f"{k}  dim {r['comm_dim']}", fontsize=8)
         a.set_ylim(0, max(0.05, r["R2_full"] * 1.15))
+        a.set_xscale("log")
     for a in ax.flat[n:]:
         a.axis("off")
     for a in ax[-1]:

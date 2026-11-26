@@ -934,7 +934,8 @@ D_PAIRS = [("v04", "e05"), ("v05", "e05"), ("v07", "e08"), ("v08", "e08"), ("v10
            ("v13", "e14"), ("v14", "e14"), ("v16", "e17"), ("v17", "e17"), ("v04", "e17"), ("v15", "e05")]
 D_REF = [("v01", "v02"), ("v04", "v05"), ("v08", "v09"), ("v12", "v13"), ("e05", "e06"), ("e08", "e09"), ("e11", "e12"), ("e14", "e15")]
 D_LAMBDAS = (0.1, 1.0, 10.0, 100.0, 1000.0)
-D_RMAX = 60
+D_RMAX = 60  # first run; rerun with the full output rank (cap 1000) because the 1-SE rule hit 60
+D_RMAX_FULL = 1000
 D_PCA = 500
 
 
@@ -970,6 +971,7 @@ def d_job(job) -> dict:
     Y, _ = d_mats(yn)
     init = np.concatenate([[m["init"]] * m["C"] for m in M])
     p, q = X.shape[1], Y.shape[1]
+    rmax = min(D_RMAX_FULL, p, q)
     # per-init sufficient statistics
     S = {}
     for k in range(10):
@@ -1001,7 +1003,7 @@ def d_job(job) -> dict:
             # RRR: principal axes of training fitted values  Yhat^T Yhat = B^T Cxx B
             G = B.T @ (Cxx @ B)
             ev, Vy = np.linalg.eigh(G)
-            Vy = Vy[:, ::-1][:, :D_RMAX]
+            Vy = Vy[:, ::-1][:, :rmax]
             Z, Q = P @ Vy, Yte @ Vy
             res = sst - np.cumsum(2 * (Q * Z).sum(0) - (Z**2).sum(0))
             fr["rrr"][lam] = (1 - res / sst).tolist()
@@ -1011,7 +1013,9 @@ def d_job(job) -> dict:
     rrr = np.array([fr["rrr"][lam] for fr in folds])  # (10, RMAX)
     thr = full.mean() - full.std(ddof=1) / np.sqrt(len(full))
     ok = np.flatnonzero(rrr.mean(0) >= thr)
-    dim = int(ok[0] + 1) if len(ok) else D_RMAX
+    dim = int(ok[0] + 1) if len(ok) else rmax
+    m90 = np.flatnonzero(rrr.mean(0) >= 0.9 * full.mean())  # exploratory: rank reaching 90% of full ridge R^2
+    dim90 = int(m90[0] + 1) if len(m90) else rmax
     # subspace on all data
     xm, ym = X.mean(0), Y.mean(0)
     Xc = X - xm
@@ -1025,7 +1029,8 @@ def d_job(job) -> dict:
     Qf = Wx @ Qx if Wx is not None else Qx  # feature coordinates
     out = {"x": xn, "y": yn, "lambda": lam, "R2_full_folds": full.tolist(), "R2_full": float(full.mean()),
            "R2_full_se": float(full.std(ddof=1) / np.sqrt(len(full))), "R2_rrr": rrr.mean(0).tolist(),
-           "R2_rrr_se": (rrr.std(0, ddof=1) / np.sqrt(len(rrr))).tolist(), "comm_dim": dim, "p": p, "q": q}
+           "R2_rrr_se": (rrr.std(0, ddof=1) / np.sqrt(len(rrr))).tolist(), "comm_dim": dim, "dim90": dim90, "p": p, "q": q,
+           "R2_rrr_at": {r_: float(rrr.mean(0)[r_ - 1]) for r_ in (1, 2, 5, 10, 20, 50, 100, 200) if r_ <= rmax}}
     # which input features load on the subspace (feature-space leverage), by tag
     if xn in WHOLE or xn[0] == "v" or xn[0] == "e":
         inf = info(xn) if xn not in ("vlm_all", "exp_all") else info(xn)
@@ -1297,6 +1302,23 @@ def numbers_c() -> dict:
     out = {(pretty(k) if "/" not in k else pretty(k.split("/")[0]) + "/prog"): v for k, v in out.items()}
     out["T029_raw_reference"] = {"r2_source_median": 0.48, "r2_minus_random": 0.29, "slope_NEW_median": 0.33, "slope_FB_median": 0.05, "p": 0.07}
     return out
+
+
+def numbers_d() -> dict:
+    D = load_json("d")
+    out = {}
+    for k, r in D.items():
+        o = {"lambda": r["lambda"], "R2_full": r["R2_full"], "R2_full_se": r["R2_full_se"], "comm_dim": r["comm_dim"],
+             "R2_at_dim": r["R2_rrr"][r["comm_dim"] - 1], "dim90": r["dim90"], "R2_rrr_at": r["R2_rrr_at"], "p": r["p"], "q": r["q"], "pairs": r["pairs"]}
+        if "lev_by_tag" in r:
+            o["lev_ratio_by_tag"] = {t: v["ratio"] for t, v in r["lev_by_tag"].items()}
+            o["lev_p_hi_by_tag"] = {t: v["p_hi"] for t, v in r["lev_by_tag"].items()}
+        out[k] = o
+    return out
+
+
+def numbers_e() -> dict:
+    return load_json("e")["summary"]
 
 
 # ============================================================================ numbers
