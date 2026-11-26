@@ -160,8 +160,8 @@ class AdamLowMem(torch.optim.Optimizer):
 # ---------------------------------------------------------------------------- train / eval
 def fit(X: torch.Tensor, train_rows: np.ndarray, names: list[str], dims: list[int], n_latents: int, k: int,
         steps: int, batch: int, seed: int = 0, lr: float = 1e-4, device: str = "cuda", log_every: int = 250,
-        tag: str = "", low_mem_adam: bool = False) -> tuple[CrossCoder, dict]:
-    cfg = CrossCoderConfig(layers=names, dims=dims, n_latents=n_latents, k=k)
+        tag: str = "", low_mem_adam: bool = False, aux_coef: float = 1 / 32) -> tuple[CrossCoder, dict]:
+    cfg = CrossCoderConfig(layers=names, dims=dims, n_latents=n_latents, k=k, aux_coef=aux_coef)
     cc = CrossCoder(cfg, seed=seed).to(device)
     g = np.random.default_rng(seed)
     pick = np.sort(g.choice(train_rows, size=min(10_000, len(train_rows)), replace=False))
@@ -285,6 +285,7 @@ def main() -> None:
     ap.add_argument("--out", default=str(OUT / "runs"))
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--low-mem-adam", action="store_true", help="exp_avg in bf16 (joint, Addendum B)")
+    ap.add_argument("--aux-coef", type=float, default=1 / 32, help="AuxK weight (Addendum E sensitivity run)")
     a = ap.parse_args()
     wdir = Path(a.weights) / a.name
     if (wdir / "metrics.json").exists():
@@ -297,7 +298,7 @@ def main() -> None:
     tr, ho = np.where(~hold)[0], np.where(hold)[0]
     steps = a.steps or int(math.ceil(a.epochs * len(tr) / a.batch))
     cc, info = fit(X, tr, names, dims, a.n_latents, a.k, steps, a.batch, a.seed, a.lr, a.device, tag=a.name,
-                   low_mem_adam=a.low_mem_adam)
+                   low_mem_adam=a.low_mem_adam, aux_coef=a.aux_coef)
     t1 = time.time()
     codes = None
     if not a.no_codes:

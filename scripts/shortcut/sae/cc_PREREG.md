@@ -147,3 +147,10 @@ Stop and report at 8 GPU-h total, OOM, smoke throughput < 50 % of the T031 measu
 - VLM: both k ∈ {64, 128} at n 8 192 again (Addendum C's one-run cut lifted), rule of Addendum B.
 - Joint: first n 8 192 with the standard fused fp32 Adam, batch 4 096; on OOM fall back in Addendum B's order
   (AdamLowMem batch 4 096 → AdamLowMem batch 2 048 → n 4 096 fp32 Adam).
+
+## Addendum E (2026-11-26 19:30, before the run; lead allowed it if budget remains after joint)
+
+- Optional sensitivity run after the joint run, only if ≥ 0.5 GPU-h remain under the cap: expert n 8 192, k 128,
+  AuxK coefficient 1/8 (instead of 1/32), all else identical (`expert_n8192_k128_aux8`).
+- **Report only**: never-fire (all / train / held-out) and per-layer held-out VE next to the selected run. The
+  selected expert crosscoder and all analyses stay on `expert_n8192_k128`, whatever the outcome.
