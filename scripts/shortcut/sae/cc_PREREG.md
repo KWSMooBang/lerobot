@@ -120,3 +120,12 @@ Stop and report at 8 GPU-h total, OOM, smoke throughput < 50 % of the T031 measu
 - Throughput deviation: the smoke showed 0.32 × the T031 SAE throughput (shared GPU); lead informed, continued.
 - Memory deviations (lead approved): VLM n_latents capped at 8 192 (16 384 OOM); joint tries n 8 192 with bf16 Adam
   states, else n 4 096 (to be fixed in Addendum B before the joint run).
+
+## Addendum B (2026-11-26 16:05, before any VLM / joint training; lead approved the memory handling)
+
+- VLM: n_latents 8 192 (16 384 OOM in the smoke), k ∈ {64, 128}; k 128 only if mean held-out VE +≥ 0.01.
+- Joint: n 8 192, k = VLM choice, batch 4 096, optimizer `AdamLowMem` (exp_avg bf16, exp_avg_sq fp32; plain bf16
+  second moments would not decay, 0.999·v rounds to v). If it OOMs: batch 2 048; if that OOMs: n 4 096 with the
+  standard fused fp32 Adam at batch 4 096 (smoke: 14.6 GB).
+- Gate before VLM training: `cc_check_vlm.py` (keys equal the expert cache row by row; T015 per-layer SAE VE on the
+  new pooled_all within 0.03 of T015's, pg17 reported only). Failure → stop and report.
