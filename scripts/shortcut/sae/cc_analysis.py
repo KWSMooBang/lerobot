@@ -119,6 +119,41 @@ def centroid(p: np.ndarray) -> np.ndarray:
     return (p * np.arange(L)).sum(1) / p.sum(1).clip(1e-12) / (L - 1)
 
 
+def layer_scales(R: Run) -> tuple[np.ndarray, np.ndarray]:
+    """Training rows: s² (N, L) = ‖x_l − b_pre_l − μ_l‖² per row, Var_l = mean ‖x_l − mean_l‖² (raw)."""
+    from safetensors.numpy import load_file
+
+    b_pre = load_file(R.w / "crosscoder.safetensors")["b_pre"].astype(np.float32)
+    srcs = []
+    for fam, nm in (("pg", "vlm"), ("ae", "expert")):
+        if any(l.startswith(fam) for l in R.layers):
+            d = cache_dir(nm)
+            info = json.loads((d / "info.json").read_text())
+            x = np.load(d / "x.npy", mmap_mode="r")
+            srcs += [(x, info["layers"].index(l)) for l in R.layers if l.startswith(fam)]
+    o = np.cumsum([0] + list(R.cfg["dims"]))
+    N = srcs[0][0].shape[0]
+    s2 = np.zeros((N, len(R.layers)), np.float32)
+    var = np.zeros(len(R.layers))
+    for li, (x, j) in enumerate(srcs):
+        acc, acc2 = 0.0, 0.0
+        mean = None
+        for pas in (0, 1):
+            for s in range(0, N, 16384):
+                a = np.asarray(x[s : s + 16384, j], np.float32)
+                if pas == 0:
+                    c = a - b_pre[o[li] : o[li + 1]]
+                    c = c - c.mean(1, keepdims=True)
+                    s2[s : s + 16384, li] = (c**2).sum(1)
+                    acc = acc + a.astype(np.float64).sum(0)
+                else:
+                    acc2 += float(((a - mean) ** 2).sum())
+            if pas == 0:
+                mean = (acc / N).astype(np.float32)
+        var[li] = acc2 / N
+    return s2, var
+
+
 def stage_profiles(name: str) -> dict:
     R = Run(name)
     p = R.prof
@@ -160,6 +195,63 @@ def stage_profiles(name: str) -> dict:
         res["shared_vlm_centroid_median"] = float(sh["centroid_vlm"].median()) if len(sh) else None
         res["shared_expert_centroid_median"] = float(sh["centroid_expert"].median()) if len(sh) else None
         res["mean_profile_live"] = p[R.live].mean(0).tolist()
+    # ---- variance-aware view (lead request, added after the expert results; reported next to the decoder-norm view)
+    # q_il ∝ ‖d_i^l‖² / C_l: feature i's expected explained variance in layer l is E[z_i²]·‖d_i^l‖² / C_l (diagonal
+    # term; E[z_i²] is common to all layers of a feature), so q is the feature's share of explained variance by layer.
+    # C_l ≈ 1 in every layer (mean of the unit x̃ ≈ 0), so ‖d‖²/C_l equals the decoder view. The variance-aware view is
+    # therefore taken in the raw space: a_il = Σ_rows z_i² · s_l² · ‖d_i^l‖² / (N · Var_l), s_l = per-sample norm of
+    # (x_l − b_pre_l − μ_l), Var_l = across-sample variance of raw x_l: feature i's (diagonal) share of layer l's
+    # variance. q_il = a_il / Σ_l a_il.
+    C = np.asarray(R.cfg["c_mse"], np.float64)
+    res["c_mse"] = C.tolist()
+    ix, vv = R.codes()
+    vv = vv.astype(np.float32)
+    s2, var = layer_scales(R)
+    flat = ix.reshape(-1).astype(np.int64)
+    ev = np.zeros_like(p, dtype=np.float64)
+    for li in range(p.shape[1]):
+        w = (vv**2 * s2[:, li : li + 1]).reshape(-1)
+        ev[:, li] = np.bincount(flat, weights=w, minlength=R.n) / len(ix) * p[:, li] / var[li]
+    q = ev / ev.sum(1, keepdims=True).clip(1e-30)
+    res["layer_var_raw"] = var.tolist()
+    res["diag_ev_sum_per_layer"] = ev[R.live].sum(0).tolist()  # ≈ VE without cross terms (sanity)
+    np.save(out_dir(name) / "ev_share.npy", ev.astype(np.float32))
+    if R.data in ("vlm", "expert"):
+        cv = categorize(q)
+        feat["cat_var"] = [CATS[c] for c in cv]
+        feat["centroid_var"] = centroid(q)
+        cnt = Counter(feat.loc[feat.live, "cat_var"])
+        res["categories_var"] = {c: int(cnt.get(c, 0)) for c in CATS}
+        res["category_share_var"] = {c: cnt.get(c, 0) / max(R.live.sum(), 1) for c in CATS}
+        # per layer: share of that layer's (diagonal) explained variance carried by each decoder-norm category
+        cat_arr = feat["cat"].to_numpy()
+        tot = ev[R.live].sum(0).clip(1e-12)
+        res["layer_ev_share_by_cat"] = {c: (ev[R.live & (cat_arr == c)].sum(0) / tot).tolist() for c in CATS}
+    else:
+        qv = q[:, vb].sum(1)
+        feat["vlm_share_var"] = qv
+        kv = np.where(qv >= 0.9, "vlm-only", np.where(qv <= 0.1, "expert-only", "shared"))
+        feat["kind_var"] = kv
+        lv = feat[feat.live]
+        cnt = Counter(lv["kind_var"])
+        res["kinds_var"] = {k: int(cnt.get(k, 0)) for k in ("vlm-only", "shared", "expert-only")}
+        qvv = q[:, vb] / q[:, vb].sum(1, keepdims=True).clip(1e-12)
+        qee = q[:, eb] / q[:, eb].sum(1, keepdims=True).clip(1e-12)
+        feat["cat_vlm_var"] = [CATS[c] for c in categorize(qvv)]
+        feat["cat_expert_var"] = [CATS[c] for c in categorize(qee)]
+        lv = feat[feat.live]
+        for k, col in (("vlm-only", "cat_vlm_var"), ("expert-only", "cat_expert_var")):
+            c2 = Counter(lv.loc[lv.kind_var == k, col])
+            res[f"categories_var_{k}"] = {c: int(c2.get(c, 0)) for c in CATS}
+        kind_arr = feat["kind"].to_numpy()
+        tot = ev[R.live].sum(0).clip(1e-12)
+        res["layer_ev_share_by_kind"] = {k: (ev[R.live & (kind_arr == k)].sum(0) / tot).tolist()
+                                         for k in ("vlm-only", "shared", "expert-only")}
+    # ---- never-fire on train and held-out separately (lead request)
+    hold = np.load(R.w / "heldout.npy")
+    for split, msk in (("train", ~hold), ("heldout", hold)):
+        f = np.bincount(ix[msk][vv[msk] > 0].astype(np.int64), minlength=R.n)
+        res[f"never_fire_{split}"] = float((f == 0).mean())
     feat.to_parquet(out_dir(name) / "features.parquet", index=False)
     save(name, "profiles", res)
     print(json.dumps({k: v for k, v in res.items() if "hist" not in k and "mean_profile" not in k}, indent=1))
