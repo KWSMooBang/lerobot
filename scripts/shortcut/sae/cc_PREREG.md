@@ -138,3 +138,12 @@ Stop and report at 8 GPU-h total, OOM, smoke throughput < 50 % of the T031 measu
 - Variance-aware layer profile (lead request, defined after the expert results): a_il = Σ_rows z_i²·‖x_l − b_pre_l − μ_l‖²·‖d_i^l‖²
   / (N·Var_l) (feature i's diagonal share of layer l's raw variance); q_il = a_il / Σ_l a_il; same §6 categories on q.
   Reported next to the decoder-norm categories; per-layer share of explained variance by category also reported.
+
+## Addendum D (2026-11-26 18:00, before any VLM / joint training; human approved GPU 1 via lead)
+
+- From now on T034 runs on GPU 1 (not shared); GPU 0 is not used again. The 8 GPU-h cap counts GPU 0 time already
+  used (2.60 h: smoke, expert sweep, 14/64 collection parts).
+- The VLM collection resumes on GPU 1 (finished parts kept; the interrupted part re-collected).
+- VLM: both k ∈ {64, 128} at n 8 192 again (Addendum C's one-run cut lifted), rule of Addendum B.
+- Joint: first n 8 192 with the standard fused fp32 Adam, batch 4 096; on OOM fall back in Addendum B's order
+  (AdamLowMem batch 4 096 → AdamLowMem batch 2 048 → n 4 096 fp32 Adam).
