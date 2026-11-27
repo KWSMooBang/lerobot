@@ -1,3 +1,4 @@
+# ruff: noqa: N803, N806, B023  (matrix names X/S/P/U as in the papers; closures are called within their loop iteration)
 """T023: pi05 (lerobot/pi05_libero_finetuned) on all of LIBERO-PRO — performance and activation trajectories.
 
 Input: one sc-bench run with --record-activations (default runs/bench-pi05lib-pro_all): jobs/pro-*/episodes.jsonl
@@ -100,7 +101,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # ---------------------------------------------------------------- small stats
 
 
-def r3(x: float) -> float:
+def r3(x: Any) -> float:
     return round(float(x), 3)
 
 
@@ -305,7 +306,7 @@ def pca_fit(x: np.ndarray, k: int, max_rows: int = 20000) -> tuple[np.ndarray, n
     xs = x if len(x) <= max_rows else x[RNG.choice(len(x), max_rows, replace=False)]
     xs = xs - mu
     _u, s, vt = np.linalg.svd(xs, full_matrices=False) if xs.shape[1] <= 4096 else _rsvd(xs, k + 20)
-    var = s**2
+    var: np.ndarray = s**2
     return mu, vt[:k], var[:k] / var.sum()
 
 
@@ -373,7 +374,10 @@ def stage_perf(out: Path, res: dict) -> None:
             se = [e for e in eps if e["suite"] == s and e["axis"] == a]
             if not se:
                 continue
-            r = {"n": len(se), "success": wilson(sum(bool(e["success"]) for e in se), len(se))}
+            r: dict[str, Any] = {
+                "n": len(se),
+                "success": wilson(sum(bool(e["success"]) for e in se), len(se)),
+            }
             if a == "task":
                 r["success_orig"] = wilson(sum(bool(e["success_orig"]) for e in se), len(se))
                 r["both"] = wilson(sum(bool(e["success_orig"] and e["success_new"]) for e in se), len(se))
@@ -434,19 +438,19 @@ def stage_perf(out: Path, res: dict) -> None:
     for j, a in enumerate(AXES):
         xs, ys, lo, hi = [], [], [], []
         for i, s in enumerate(SUITES):
-            r = tab.get(f"{s}|{a}")
-            if r is None:
+            rt = tab.get(f"{s}|{a}")
+            if rt is None:
                 continue
             xs.append(i + (j - 2.5) * w)
-            ys.append(r["success"][0])
-            lo.append(r["success"][0] - r["success"][1])
-            hi.append(r["success"][2] - r["success"][0])
+            ys.append(rt["success"][0])
+            lo.append(rt["success"][0] - rt["success"][1])
+            hi.append(rt["success"][2] - rt["success"][0])
         ax.bar(xs, ys, w * 0.92, color=HUE[a], label=a)
         ax.errorbar(xs, ys, yerr=[lo, hi], fmt="none", ecolor=INK, lw=0.7)
     for i, s in enumerate(SUITES):  # task-axis shortcut rate as hatched overlay
-        r = tab.get(f"{s}|task")
-        if r:
-            ax.scatter(i + 1.5 * w, r["success_orig"][0], marker="_", s=180, color=INK, zorder=5)
+        rt = tab.get(f"{s}|task")
+        if rt:
+            ax.scatter(i + 1.5 * w, rt["success_orig"][0], marker="_", s=180, color=INK, zorder=5)
     ax.set_xticks(range(4), [SHORT[s] for s in SUITES])
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("success rate (PRO goal), Wilson 95% CI", fontsize=8)
@@ -458,14 +462,14 @@ def stage_perf(out: Path, res: dict) -> None:
     ax.legend(fontsize=7, frameon=False, ncol=6, loc="upper center", bbox_to_anchor=(0.5, -0.08))
     clean(ax)
     ax = axes[1]
-    r = tab.get("libero_object|position")
-    if r:
+    rp = tab.get("libero_object|position")
+    if rp:
         for prefix, col in (("x", "#eb6834"), ("y", "#2a78d6")):
             lv = [f"{prefix}0.{k}" for k in range(1, 6)]
-            m = np.array([r["by_level"][v] for v in lv], float)
+            m = np.array([rp["by_level"][v] for v in lv], float)
             ax.plot(range(1, 6), m[:, 0], "-o", color=col, label=f"{prefix} shift", ms=4)
             ax.fill_between(range(1, 6), m[:, 1], m[:, 2], color=col, alpha=0.15, lw=0)
-        sw = r["by_level"]["swap"]
+        sw = rp["by_level"]["swap"]
         ax.axhline(sw[0], color=MUTED, ls="--", lw=1, label=f"swap {sw[0]:.2f}")
         if "libero_object|none" in tab:
             ax.axhline(tab["libero_object|none"]["success"][0], color=INK, ls=":", lw=1, label="none")
@@ -545,7 +549,7 @@ def norm_sentence(s: str) -> list[str]:
     return re.findall(r"[a-z]+", s)
 
 
-def named_task(new: str, train: list[str], own: int) -> int | None:
+def named_task(new: str, train: list[str | None], own: int) -> int | None:
     """trained task (same suite) whose training sentence the new sentence names; None if none clearly does."""
     a = set(norm_sentence(new))
     best, bj = None, 0.0
@@ -573,7 +577,7 @@ def stage_t021(out: Path, res: dict) -> None:
     dd.mkdir(parents=True, exist_ok=True)
     for suite in present(out):
         S = Suite(out, suite)
-        train = [None] * 10
+        train: list[str | None] = [None] * 10
         for m in S.meta:
             train[m["task_id"]] = m["original_instruction"]  # LIBERO training sentence (same on every axis)
         rs: dict = {}
@@ -610,7 +614,7 @@ def stage_t021(out: Path, res: dict) -> None:
                                 "other": nearest not in (nt, m["task_id"]),
                             }
                         )
-            rf = {c: boot_ci(np.array(v)) for c, v in own.items()}
+            rf: dict[str, Any] = {c: boot_ci(np.array(v)) for c, v in own.items()}
             if named["task"]:
                 rf["task_axis_nearest"] = {
                     k: r3(np.mean([d[k] for d in named["task"]])) for k in ("own", "named", "other")
@@ -658,7 +662,7 @@ def stage_t021(out: Path, res: dict) -> None:
                         fontsize=8,
                         ha="center",
                         va="center",
-                        bbox=dict(boxstyle="round,pad=0.12", fc=SURFACE, ec="none", alpha=0.8),
+                        bbox={"boxstyle": "round,pad=0.12", "fc": SURFACE, "ec": "none", "alpha": 0.8},
                     )
                 ax.set_xticks([])
                 ax.set_yticks([])
@@ -703,10 +707,10 @@ def stage_t021(out: Path, res: dict) -> None:
                 first = []
                 for r, i in enumerate(idx):
                     m = S.meta[i]
-                    j = S.none.get((m["task_id"], m["init_idx"]))
-                    if j is None:
+                    jn = S.none.get((m["task_id"], m["init_idx"]))
+                    if jn is None:
                         continue
-                    a, b = S.ep(f, i), S.ep(f, j)
+                    a, b = S.ep(f, i), S.ep(f, jn)
                     n = min(len(a), len(b), kmax)
                     D[r, :n] = np.sqrt(((a[:n] - b[:n]) ** 2).mean(-1))
                     above = np.where(D[r, :n] > bm[:n] + 2 * bs[:n])[0]
@@ -758,10 +762,13 @@ def stage_t021(out: Path, res: dict) -> None:
         if not r:
             continue
         x = np.arange(len(FEATS6))
-        for j, a in enumerate(AXES):
-            v = [r["trial_map"][f]["nearest_none_centroid_is_own_task"].get(a, [np.nan] * 3) for f in FEATS6]
+        for j, axis_name in enumerate(AXES):
+            v = [
+                r["trial_map"][f]["nearest_none_centroid_is_own_task"].get(axis_name, [np.nan] * 3)
+                for f in FEATS6
+            ]
             v = np.array(v, float)
-            ax.bar(x + (j - 2.5) * 0.13, v[:, 0], 0.12, color=HUE[a], label=a)
+            ax.bar(x + (j - 2.5) * 0.13, v[:, 0], 0.12, color=HUE[axis_name], label=axis_name)
         ax.set_xticks(x, FEATS6, rotation=30, fontsize=7)
         ax.set_title(SHORT[suite], fontsize=9)
         clean(ax)
@@ -857,7 +864,7 @@ def stage_jpca(out: Path, res: dict) -> None:
             cm /= np.maximum(cnt, 1)[:, None]
             Y = np.concatenate([S.ep(feat, i, z=False) - cm[: S.calls[i]] for i in range(S.n)])
             mu, pcs, evr = pca_fit(Y, k)
-            r = {"pca_var_explained": r3(evr.sum())}
+            r: dict[str, Any] = {"pca_var_explained": r3(evr.sum())}
             xn, dxn = jpca_data(S, feat, pcs, mu, cm, S.where(axis="none"))
             m_none_skew, _ = fit_skew(xn, dxn)
             p_none, _ = rot_plane(m_none_skew)
@@ -893,7 +900,7 @@ def stage_jpca(out: Path, res: dict) -> None:
         E = S.raw["expert_denoise"].astype(np.float32)  # (calls, 10, 1024)
         dm = E.mean(0)  # cross-call mean per denoising step
         mu, pcs, evr = pca_fit((E - dm).reshape(-1, E.shape[-1]), k)
-        rd = {"pca_var_explained": r3(evr.sum())}
+        rd: dict[str, Any] = {"pca_var_explained": r3(evr.sum())}
         for c in S.conds():
             idx = [m["i"] for m in S.meta if m["cond"] == c]
             rows = np.concatenate([np.arange(S.off[i], S.off[i + 1]) for i in idx])
@@ -1041,7 +1048,7 @@ def stage_manifold(out: Path, res: dict, kdim: int = 10) -> None:
                 xc = R[rows[c]] - mc
                 align = float(((xc @ Un.T) ** 2).sum() / max(((xc @ Uc.T) ** 2).sum(), 1e-12))
                 # CCA on paired (task, init, call) latents
-                lc, ln, lo, lx = [], [], [], []
+                lc, ln, lo = [], [], []
                 for m in S.meta:
                     if m["cond"] != c:
                         continue
@@ -1248,7 +1255,7 @@ def stage_attractor(out: Path, res: dict) -> None:
     kmax = 52
     for suite in present(out):
         S = Suite(out, suite)
-        train = [None] * 10
+        train: list[str | None] = [None] * 10
         for m in S.meta:
             train[m["task_id"]] = m["original_instruction"]  # LIBERO training sentence (same on every axis)
         rs: dict = {}
@@ -1281,20 +1288,19 @@ def stage_attractor(out: Path, res: dict) -> None:
                             continue
                         ref_kind = None
                         nt = named_task(S.meta[ids[0]]["instruction"], train, t) if axis == "task" else None
+                        good: list[int] = []
                         if nt is not None:
-                            b_ids_fn = lambda _i, nt=nt: [
-                                S.none[(nt, i)] for i in range(10) if (nt, i) in S.none
-                            ]  # noqa: E731
+                            b_fixed = [S.none[(nt, i)] for i in range(10) if (nt, i) in S.none]
                             ref_kind = f"none of task {nt} (named by the new sentence)"
                         else:
                             good = [i for i in ids if S.meta[i]["success"]]
                             if len(good) < 2:
                                 continue
-                            b_ids_fn = lambda i, good=good: [g for g in good if g != i]  # noqa: E731
+                            b_fixed = []
                             ref_kind = "successful perturbed episodes (leave-one-out)"
                         A = mean_traj(a_ids)
                         for i in ids:
-                            B = mean_traj(b_ids_fn(i))
+                            B = mean_traj(b_fixed or [g for g in good if g != i])
                             cd = B - A
                             nrm = (cd**2).sum(1)
                             p = ((traj(i) - A) * cd).sum(1) / np.maximum(nrm, 1e-9)
@@ -1324,7 +1330,7 @@ def stage_attractor(out: Path, res: dict) -> None:
                     "calls_10_12": (10, 13),
                     "calls_20_22": (20, 23),
                 }
-                r = {
+                r: dict[str, Any] = {
                     "n": len(Pm),
                     "references": dict(Counter(x["ref"] for x in info)),
                     "endpoint_last3": bimodality(end),
@@ -1503,6 +1509,7 @@ def stage_traj(out: Path, res: dict) -> None:
 
             def aligned(i: int, j: int, f: str = f) -> np.ndarray:
                 gi, gj = call_of(S.meta[i]["first_grasp_t"]), call_of(S.meta[j]["first_grasp_t"])
+                assert gi is not None and gj is not None  # callers pass grasping episodes only
                 a, b = S.ep(f, i), S.ep(f, j)
                 d = np.full(len(ks), np.nan)
                 for n, k in enumerate(ks):
@@ -1532,8 +1539,9 @@ def stage_traj(out: Path, res: dict) -> None:
                     if j is None or not S.meta[j]["first_grasp_t"]:
                         continue
                     D.append(aligned(m["i"], j))
-                    if m.get("first_release_t"):
-                        rel.append(call_of(m["first_release_t"]) - call_of(m["first_grasp_t"]))
+                    rc, gc = call_of(m.get("first_release_t")), call_of(m["first_grasp_t"])
+                    if rc is not None and gc is not None:
+                        rel.append(rc - gc)
                 if len(D) < 3:
                     continue
                 mD = np.nanmean(D, 0)
