@@ -474,9 +474,9 @@ def cmd_summary(a: argparse.Namespace) -> None:
         lines += [json.loads(x) | {"phase": p.stem[8:]} for x in p.read_text().splitlines()]
     if not lines:
         raise SystemExit("no logs")
-    rows = {r["episode"] + "|" + r["job"]: r for r in read_manifest()}
-    a100 = [x for x in lines if rows[x["episode"] + "|" + x["job"]]["machine"] == "A100"]
-    r4090 = [x for x in lines if rows[x["episode"] + "|" + x["job"]]["machine"] == "4090"]
+    rows = {(r["set"], r["job"], r["episode"]): r for r in read_manifest()}
+    a100 = [x for x in lines if rows[x["set"], x["job"], x["episode"]]["machine"] == "A100"]
+    r4090 = [x for x in lines if rows[x["set"], x["job"], x["episode"]]["machine"] == "4090"]
     du_ep = sum(f.stat().st_size for f in (dst / "ep").rglob("*.npz")) if (dst / "ep").exists() else 0
     du_full = sum(f.stat().st_size for f in (dst / "full").rglob("*.npz")) if (dst / "full").exists() else 0
     full = [x for x in lines if x["full"]]
